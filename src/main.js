@@ -13,6 +13,7 @@ import {
   getHitWindow,
   getUpgradePreview,
   HIT_QUALITY,
+  UPGRADE_DEFINITIONS,
 } from "./game.js";
 import { GameRenderer } from "./renderer.js";
 import {
@@ -68,6 +69,13 @@ const elements = {
   upgradeCopy: document.querySelector("#upgradeCopy"),
   currentUpgrades: document.querySelector("#currentUpgrades"),
   currentUpgradeList: document.querySelector("#currentUpgradeList"),
+  upgradeDetail: document.querySelector("#upgradeDetail"),
+  upgradeDetailClose: document.querySelector("#upgradeDetailClose"),
+  upgradeDetailIcon: document.querySelector("#upgradeDetailIcon"),
+  upgradeDetailName: document.querySelector("#upgradeDetailName"),
+  upgradeDetailLevel: document.querySelector("#upgradeDetailLevel"),
+  upgradeDetailCurrent: document.querySelector("#upgradeDetailCurrent"),
+  upgradeDetailNext: document.querySelector("#upgradeDetailNext"),
   upgradeRerollButton: document.querySelector("#upgradeRerollButton"),
   upgradeRerollCount: document.querySelector("#upgradeRerollCount"),
   startButton: document.querySelector("#startButton"),
@@ -126,6 +134,8 @@ const elements = {
   finalCombo: document.querySelector("#finalCombo"),
   finalPerfect: document.querySelector("#finalPerfect"),
   finalCoins: document.querySelector("#finalCoins"),
+  finalBuild: document.querySelector("#finalBuild"),
+  finalBuildList: document.querySelector("#finalBuildList"),
   resultTitle: document.querySelector("#resultTitle"),
   resultKicker: document.querySelector("#resultKicker"),
   resultComment: document.querySelector("#resultComment"),
@@ -805,6 +815,7 @@ function handleGameEvents() {
         break;
       case "upgradeSelected":
         elements.upgradeOverlay.classList.remove("is-visible");
+        closeUpgradeDetail();
         const upgradeImpact = event.awakened
           ? {
               icon: event.upgrade.icon,
@@ -882,10 +893,11 @@ function showUpgradeDraft({
   choices,
   rerolls = 0,
 }) {
-  elements.upgradeTitle.textContent = "选个新花样";
+  elements.upgradeTitle.textContent = "选择本轮强化";
   elements.upgradeCopy.textContent = "";
   elements.upgradeRerollCount.textContent = rerolls;
   elements.upgradeRerollButton.disabled = rerolls <= 0;
+  closeUpgradeDetail();
   renderCurrentUpgrades();
   elements.upgradeOptions.replaceChildren();
   for (const choice of choices) {
@@ -916,15 +928,46 @@ function showUpgradeDraft({
 
 function renderCurrentUpgrades() {
   const upgrades = game.getUpgradeSummary();
-  elements.currentUpgrades.hidden = upgrades.length === 0;
+  elements.currentUpgrades.hidden = false;
   elements.currentUpgradeList.replaceChildren();
+  if (upgrades.length === 0) {
+    const empty = document.createElement("span");
+    empty.className = "current-upgrade-empty";
+    empty.textContent = "当前暂无强化";
+    elements.currentUpgradeList.append(empty);
+    return;
+  }
   for (const upgrade of upgrades) {
-    const chip = document.createElement("span");
+    const chip = document.createElement("button");
+    chip.type = "button";
     chip.className = "current-upgrade-chip";
     chip.title = `${upgrade.name}：${upgrade.rule}`;
     chip.textContent = `${upgrade.icon} ${upgrade.name}${upgrade.stacks > 1 ? ` ×${upgrade.stacks}` : ""}`;
+    chip.addEventListener("click", () => showUpgradeDetail(upgrade));
     elements.currentUpgradeList.append(chip);
   }
+}
+
+function showUpgradeDetail(upgrade) {
+  const definition = UPGRADE_DEFINITIONS.find((candidate) => candidate.id === upgrade.id);
+  const maxStacks = definition?.maxStacks || upgrade.stacks;
+  const currentPreview = getUpgradePreview(upgrade.id, Math.max(0, upgrade.stacks - 1));
+  const nextPreview = upgrade.stacks < maxStacks
+    ? getUpgradePreview(upgrade.id, upgrade.stacks)
+    : null;
+
+  elements.upgradeDetailIcon.textContent = upgrade.icon;
+  elements.upgradeDetailName.textContent = upgrade.name;
+  elements.upgradeDetailLevel.textContent = `Lv.${upgrade.stacks}`;
+  elements.upgradeDetailCurrent.textContent = `当前：${currentPreview.after || upgrade.rule}`;
+  elements.upgradeDetailNext.textContent = nextPreview
+    ? `下一层：${nextPreview.after}`
+    : "已达到当前最高层";
+  elements.upgradeDetail.hidden = false;
+}
+
+function closeUpgradeDetail() {
+  elements.upgradeDetail.hidden = true;
 }
 
 function rerollUpgradeDraft() {
@@ -1263,6 +1306,13 @@ function updateHeatRow({
   row.classList.toggle("is-blind", blind);
   fill.style.width = `${heat}%`;
   marker.style.left = `${heat}%`;
+  if (active) {
+    marker.style.visibility = "visible";
+    marker.style.opacity = "1";
+    marker.style.display = "block";
+    fill.style.visibility = "visible";
+    row.style.visibility = "visible";
+  }
 
   const status = blind ? "blind" : classifyHeat(heat, perfectMin, perfectMax);
   const hitQuality = blind
@@ -1274,13 +1324,16 @@ function updateHeatRow({
 
 function showStageResults(result) {
   elements.resultOverlay.classList.remove("is-stage-clear", "is-stage-fail", "is-final");
-  elements.resultKicker.textContent = `第 ${result.level} 关`;
+  elements.resultKicker.textContent = "下一关";
 
   if (result.canContinue) {
     elements.resultOverlay.classList.add("is-stage-clear");
-    elements.resultTitle.textContent = `进入第 ${result.level + 1} 关`;
+    elements.resultTitle.textContent = `即将进入第 ${result.level + 1} 关`;
     elements.resultComment.textContent = "";
+    elements.finalBuildList.replaceChildren();
     elements.continueButton.classList.remove("is-hidden");
+    elements.restartButton.classList.add("is-hidden");
+    elements.homeButton.classList.add("is-hidden");
     elements.continueLabel.textContent = "选择强化";
   }
 
@@ -1291,14 +1344,42 @@ function showStageResults(result) {
 function showFinalResults(result) {
   elements.resultOverlay.classList.remove("is-stage-clear", "is-stage-fail");
   elements.resultOverlay.classList.add("is-final");
-  elements.finalScoreLabel.textContent = "本轮金币";
+  elements.finalScoreLabel.textContent = "获得金币";
   elements.finalScore.textContent = `+${result.coinsEarned}`;
+  elements.finalEggs.textContent = result.eggsCooked;
+  elements.finalCombo.textContent = `x${result.bestPerfectStreak ?? result.bestCombo ?? 0}`;
+  elements.finalPerfect.textContent = result.perfectEggs;
+  elements.finalCoins.textContent = result.coinsEarned;
   elements.resultKicker.textContent = `到达第 ${result.levelReached} 关`;
-  elements.resultTitle.textContent = "挑战结束";
+  elements.resultTitle.textContent = "本局总结";
   elements.resultComment.textContent = "";
+  renderFinalBuild(result.upgrades || []);
   elements.continueButton.classList.add("is-hidden");
+  elements.restartButton.classList.remove("is-hidden");
+  elements.homeButton.classList.remove("is-hidden");
   mountMascot(elements.resultMascot, "fail");
   elements.resultOverlay.classList.add("is-visible");
+}
+
+function renderFinalBuild(upgrades) {
+  elements.finalBuildList.replaceChildren();
+  if (!upgrades.length) {
+    const empty = document.createElement("p");
+    empty.className = "final-build-empty";
+    empty.textContent = "本局暂无强化";
+    elements.finalBuildList.append(empty);
+    return;
+  }
+  for (const upgrade of upgrades) {
+    const preview = getUpgradePreview(upgrade.id, Math.max(0, upgrade.stacks - 1));
+    const item = document.createElement("div");
+    item.className = "final-build-item";
+    item.innerHTML = `
+      <strong>${upgrade.icon} ${upgrade.name} Lv.${upgrade.stacks}</strong>
+      <span>${preview.after || upgrade.rule}</span>
+    `;
+    elements.finalBuildList.append(item);
+  }
 }
 
 function pauseGame() {
@@ -1338,6 +1419,7 @@ function returnHome() {
   resetTransientGameUi();
   elements.resultOverlay.classList.remove("is-visible");
   elements.upgradeOverlay.classList.remove("is-visible");
+  closeUpgradeDetail();
   elements.pauseOverlay.classList.remove("is-visible");
   elements.mechanicsOverlay.classList.remove("is-visible");
   elements.impactBanner.classList.remove("is-visible");
@@ -1376,6 +1458,10 @@ elements.resumeButton.addEventListener("click", resumeGame);
 elements.pauseHomeButton.addEventListener("click", returnHome);
 elements.panReadyButton.addEventListener("click", confirmPanReady);
 elements.upgradeRerollButton.addEventListener("click", rerollUpgradeDraft);
+elements.upgradeDetailClose.addEventListener("click", closeUpgradeDetail);
+elements.upgradeOverlay.addEventListener("click", (event) => {
+  if (event.target === elements.upgradeOverlay) closeUpgradeDetail();
+});
 elements.actionButton.addEventListener("click", performAction);
 
 window.addEventListener("keydown", (event) => {

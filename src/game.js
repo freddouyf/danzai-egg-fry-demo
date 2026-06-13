@@ -763,6 +763,7 @@ export class EggFryGame {
     this.stageEarnedTimeMs = 0;
     this.combo = 0;
     this.bestCombo = 0;
+    this.bestPerfectStreak = 0;
     this.perfectChain = 0;
     this.perfectStreak = 0;
     this.comboMood = COMBO_MOOD.NORMAL;
@@ -1012,6 +1013,10 @@ export class EggFryGame {
     const previousComboMood = this.comboMood;
     if (result.hitQuality === HIT_QUALITY.PERFECT) {
       this.perfectStreak += 1;
+      this.bestPerfectStreak = Math.max(
+        this.bestPerfectStreak,
+        this.perfectStreak,
+      );
     }
     this.lastHitQuality = result.hitQuality;
     this.comboMood = getComboMood(this.perfectStreak);
@@ -1509,6 +1514,7 @@ export class EggFryGame {
       totalScore: this.totalScore,
       eggsCooked: this.eggsCooked,
       bestCombo: this.bestCombo,
+      bestPerfectStreak: this.bestPerfectStreak,
       perfectEggs: this.perfectEggs,
       coinsEarned: this.coinsEarned,
       upgrades: this.getUpgradeSummary(),
@@ -1758,6 +1764,7 @@ export class EggFryGame {
       totalScore: this.totalScore,
       eggsCooked: this.eggsCooked,
       bestCombo: this.bestCombo,
+      bestPerfectStreak: this.bestPerfectStreak,
       perfectEggs: this.perfectEggs,
       perfectChain: this.perfectChain,
       coinsPreview: this.coinsEarned,
@@ -1887,6 +1894,7 @@ export class EggFryGame {
       stagePerfects: this.stagePerfects,
       combo: this.combo,
       bestCombo: this.bestCombo,
+      bestPerfectStreak: this.bestPerfectStreak,
       perfectChain: this.perfectChain,
       perfectStreak: this.perfectStreak,
       comboMood: this.comboMood,

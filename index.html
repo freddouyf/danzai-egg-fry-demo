@@ -225,11 +225,21 @@
 
       <section class="overlay upgrade-overlay" id="upgradeOverlay" aria-labelledby="upgradeTitle">
         <div class="upgrade-card">
-          <h2 id="upgradeTitle">选个新花样</h2>
+          <h2 id="upgradeTitle">选择本轮强化</h2>
           <p class="upgrade-copy" id="upgradeCopy"></p>
-          <div class="current-upgrades" id="currentUpgrades" hidden>
+          <div class="current-upgrades" id="currentUpgrades">
             <span>当前强化</span>
             <div class="current-upgrade-list" id="currentUpgradeList"></div>
+          </div>
+          <div class="upgrade-detail" id="upgradeDetail" hidden>
+            <button class="upgrade-detail-close" id="upgradeDetailClose" type="button" aria-label="关闭强化详情">×</button>
+            <span class="upgrade-detail-icon" id="upgradeDetailIcon">🍳</span>
+            <div class="upgrade-detail-copy">
+              <strong id="upgradeDetailName">强化名称</strong>
+              <small id="upgradeDetailLevel">Lv.1</small>
+              <p id="upgradeDetailCurrent">当前效果</p>
+              <p id="upgradeDetailNext">下一层效果</p>
+            </div>
           </div>
           <div class="upgrade-tools">
             <button class="upgrade-reroll" id="upgradeRerollButton" type="button">
@@ -266,12 +276,16 @@
             <strong id="finalScore">0</strong>
           </div>
           <div class="result-grid" aria-hidden="true">
-            <div><strong id="finalEggs">0</strong><span>完成鸡蛋</span></div>
-            <div><strong id="finalCombo">3</strong><span>剩余生命</span></div>
-            <div><strong id="finalPerfect">0</strong><span>完美鸡蛋</span></div>
+            <div><strong id="finalEggs">0</strong><span>成功出锅</span></div>
+            <div><strong id="finalCombo">0</strong><span>最高连击</span></div>
+            <div><strong id="finalPerfect">0</strong><span>Perfect</span></div>
           </div>
           <div class="coin-reward" aria-hidden="true">🪙 <span id="finalCoins">0</span></div>
           <p class="result-comment" id="resultComment">旦仔已经闻到香味啦！</p>
+          <div class="final-build" id="finalBuild">
+            <span>最终强化</span>
+            <div class="final-build-list" id="finalBuildList"></div>
+          </div>
           <div class="result-actions">
             <button class="primary-button continue-button" id="continueButton" type="button">
               <span id="continueLabel">选择强化</span>

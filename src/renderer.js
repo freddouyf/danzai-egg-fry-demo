@@ -212,6 +212,7 @@ export class GameRenderer {
   triggerServe(result, now = performance.now()) {
     let label = `+${result.awardedScore}`;
     let color = "#ff7a35";
+    let showServePopup = false;
     if (result.awardedScore >= 1000) {
       label = `MEGA!  +${result.awardedScore}`;
       color = "#e63f82";
@@ -236,15 +237,18 @@ export class GameRenderer {
     } else if (result.isBurnt) {
       label = result.preservedCombo ? "糊了，但连击保住！" : "糊锅啦！";
       color = "#734439";
+      showServePopup = true;
       this.triggerBurn(now);
     }
 
-    this.scorePopups.push({
-      label,
-      color,
-      startedAt: now,
-      duration: result.isPerfect ? 1200 : 900,
-    });
+    if (showServePopup) {
+      this.scorePopups.push({
+        label,
+        color,
+        startedAt: now,
+        duration: 900,
+      });
+    }
 
     const buildTriggers = result.buildTriggers || [];
     if (buildTriggers.length > 0) {
