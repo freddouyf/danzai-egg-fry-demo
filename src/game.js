@@ -1917,6 +1917,7 @@ export class EggFryGame {
       stageEggs: this.stageEggs,
       stagePerfects: this.stagePerfects,
       combo: this.combo,
+      currentHitCombo: this.combo,
       bestCombo: this.bestCombo,
       bestPerfectStreak: this.bestPerfectStreak,
       perfectChain: this.perfectChain,

@@ -770,7 +770,7 @@ function handleGameEvents() {
           quality: event.hitQuality || HIT_QUALITY.PERFECT,
           title: getHitFeedbackText({
             quality: event.hitQuality || HIT_QUALITY.PERFECT,
-            combo: event.combo || event.perfectStreak,
+            combo: getAuthoritativeCombo(),
           }),
           rarity: "legendary",
           duration: 1_250,
@@ -1138,6 +1138,10 @@ function getHitFeedbackText({ quality, combo = 0, isCoinRush = false } = {}) {
   return "";
 }
 
+function getAuthoritativeCombo(snapshot = game.getSnapshot()) {
+  return snapshot.currentHitCombo ?? snapshot.combo ?? 0;
+}
+
 function showActionFeedback({
   result = null,
   quality = result?.hitQuality,
@@ -1152,6 +1156,7 @@ function showActionFeedback({
   const isMiss = quality === HIT_QUALITY.MISS;
   const isCoinRush = quality === "coin-rush";
   const isEvent = quality === "event";
+  const authoritativeCombo = getAuthoritativeCombo();
   const defaultTitle = isPerfect
     ? "Perfect!"
     : isGood
@@ -1173,7 +1178,7 @@ function showActionFeedback({
     title ||
     getHitFeedbackText({
       quality,
-      combo: result?.combo,
+      combo: authoritativeCombo,
       isCoinRush,
     }) ||
     defaultTitle;
@@ -1221,10 +1226,11 @@ function showCoinTap(event) {
 function spawnCoinTapFloat(event) {
   const float = document.createElement("span");
   const drift = ((event.taps % 7) - 3) * 9;
+  const authoritativeCombo = getAuthoritativeCombo();
   float.className = event.milestone
     ? "coin-tap-float is-milestone"
     : "coin-tap-float";
-  float.textContent = event.milestone ? `Combo x${event.combo}` : `+${event.comboGain} 连击`;
+  float.textContent = event.milestone ? `Combo x${authoritativeCombo}` : `+${event.comboGain} 连击`;
   float.style.setProperty("--coin-drift", `${drift}px`);
   elements.actionButton.append(float);
   window.setTimeout(() => float.remove(), 720);
@@ -1245,8 +1251,9 @@ function updateInterface(snapshot) {
   elements.scoreLabel.textContent = "生命";
   elements.score.textContent =
     "♥".repeat(snapshot.health) + "♡".repeat(snapshot.maxHealth - snapshot.health);
-  elements.combo.textContent = snapshot.perfectStreak;
-  elements.comboCard.hidden = snapshot.perfectStreak <= 0;
+  const authoritativeCombo = getAuthoritativeCombo(snapshot);
+  elements.combo.textContent = authoritativeCombo;
+  elements.comboCard.hidden = authoritativeCombo <= 0;
   elements.level.textContent = `第 ${snapshot.level} 关`;
   elements.levelBadge.dataset.levelSkin = `level-${snapshot.level}`;
   elements.app.dataset.event = snapshot.baseEffect.id;

@@ -90,6 +90,8 @@ test("Perfect 三连进入活力状态，五连进入狂欢，Good 保留而 Mis
   cookAt(game, 55);
   snapshot = game.getSnapshot();
   assert.equal(snapshot.perfectStreak, 3);
+  assert.equal(snapshot.combo, 4);
+  assert.equal(snapshot.currentHitCombo, snapshot.combo);
   assert.equal(snapshot.lastHitQuality, HIT_QUALITY.GOOD);
 
   cookAt(game, 75);
