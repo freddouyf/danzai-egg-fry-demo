@@ -6108,6 +6108,19 @@ img,
     0 7px 0 rgba(139, 85, 32, 0.12);
 }
 
+.action-button.is-auto-locked {
+  color: #6d3f1f;
+  border-color: #fff5a8;
+  background:
+    radial-gradient(circle at 22% 16%, rgba(255, 255, 255, 0.72), transparent 22%),
+    linear-gradient(180deg, #fff07a, #ffc64b 62%, #f18a32);
+  box-shadow:
+    inset 0 -6px 0 rgba(123, 77, 25, 0.08),
+    0 7px 0 rgba(139, 85, 32, 0.12),
+    0 0 22px rgba(255, 211, 56, 0.42);
+  cursor: default;
+}
+
 .action-button.is-coin-rush.is-coin-tapping {
   animation:
     coin-rush-button 420ms ease-in-out infinite alternate,
@@ -6158,6 +6171,13 @@ img,
 .game-shell[data-coin-rush-grace="true"] .heat-track {
   opacity: 0.48;
   filter: saturate(0.65);
+}
+
+.game-shell[data-auto-serve="true"] .heat-track {
+  box-shadow:
+    inset 0 4px 8px rgba(113, 73, 20, 0.22),
+    0 0 0 4px rgba(255, 220, 57, 0.18),
+    0 4px 10px rgba(102, 61, 31, 0.12);
 }
 
 @keyframes coin-tap-punch {
@@ -6383,21 +6403,22 @@ img,
   visibility: visible !important;
 }
 
-/* V29: reduce center feedback clutter and tighten the active play layout. */
+/* V29/V30: reduce center feedback clutter and tighten the active play layout. */
 .game-screen {
-  gap: clamp(3px, 0.55svh, 5px);
+  gap: clamp(2px, 0.45svh, 4px);
   padding:
-    max(6px, env(safe-area-inset-top))
-    8px
-    max(6px, env(safe-area-inset-bottom));
+    max(5px, env(safe-area-inset-top))
+    6px
+    max(4px, env(safe-area-inset-bottom));
 }
 
 .stage-wrap {
   width: 100%;
-  max-height: min(52svh, calc(100svh - 248px));
+  max-height: min(53svh, calc(100svh - 232px));
   flex: 0 0 auto;
   aspect-ratio: 1 / 1;
-  border-radius: 25px;
+  border-width: 2px;
+  border-radius: 23px;
 }
 
 .combat-readout {
@@ -6405,7 +6426,7 @@ img,
 }
 
 .score-burst {
-  top: 39%;
+  top: 50%;
   width: min(330px, 86vw);
 }
 
@@ -6476,12 +6497,13 @@ img,
 }
 
 .heat-panel {
-  padding: 10px 10px 11px;
-  border-radius: 25px;
+  padding: 8px 9px 9px;
+  border-width: 2px;
+  border-radius: 22px;
 }
 
 .heat-row {
-  min-height: 82px;
+  min-height: 76px;
 }
 
 .heat-track {
@@ -6508,12 +6530,12 @@ img,
 }
 
 .controls {
-  margin-top: 0;
+  margin-top: -1px;
 }
 
 .action-button {
-  min-height: 90px;
-  border-radius: 25px;
+  min-height: 86px;
+  border-radius: 23px;
 }
 
 .keyboard-tip {
@@ -6523,7 +6545,7 @@ img,
 
 @media (max-height: 720px) {
   .stage-wrap {
-    max-height: min(49svh, calc(100svh - 232px));
+    max-height: min(50svh, calc(100svh - 214px));
   }
 
   .combat-readout {
@@ -6531,11 +6553,11 @@ img,
   }
 
   .heat-panel {
-    padding-block: 8px;
+    padding-block: 7px;
   }
 
   .heat-row {
-    min-height: 70px;
+    min-height: 66px;
   }
 
   .heat-track {
@@ -6548,10 +6570,51 @@ img,
   }
 
   .action-button {
-    min-height: 80px;
+    min-height: 76px;
   }
 
   .score-burst {
-    top: 38%;
+    top: 50%;
+  }
+}
+
+#comboCard:not([hidden]) {
+  padding: 0 8px;
+  flex-direction: column;
+  gap: 0;
+  line-height: 1;
+}
+
+#comboCard span {
+  font-size: clamp(11px, 3vw, 13px);
+  line-height: 1;
+}
+
+#comboCard strong {
+  font-size: clamp(22px, 5.8vw, 27px);
+  line-height: 1;
+}
+
+.level-badge,
+#comboCard:not([hidden]),
+.pause-button {
+  height: 52px;
+  min-height: 52px;
+}
+
+@media (max-height: 720px) {
+  #comboCard span {
+    font-size: 10px;
+  }
+
+  #comboCard strong {
+    font-size: 22px;
+  }
+
+  .level-badge,
+  #comboCard:not([hidden]),
+  .pause-button {
+    height: 48px;
+    min-height: 48px;
   }
 }

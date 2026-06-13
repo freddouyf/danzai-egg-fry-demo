@@ -274,16 +274,7 @@ export class GameRenderer {
         : ["#fff36a", "#ff9c56", "#79dfff", "#ff79a8"],
     );
     this.activateCostume(now, isFever ? 1_900 : 1_100, streak);
-    this.scorePopups.push({
-      label: isFever
-        ? `PERFECT x${streak}！大狂欢！`
-        : `PERFECT x${streak}！活力开锅！`,
-      color: isFever ? "#e93e86" : "#ff783f",
-      startedAt: now,
-      duration: isFever ? 1_800 : 1_350,
-      large: true,
-      offsetY: -26,
-    });
+    void streak;
   }
 
   render(snapshot, now = performance.now()) {

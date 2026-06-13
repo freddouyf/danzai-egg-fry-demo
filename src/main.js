@@ -549,6 +549,7 @@ function resetTransientGameUi() {
     "is-coin-rush-grace",
     "is-coin-tapping",
     "is-awakening",
+    "is-auto-locked",
   );
   elements.actionButton.disabled = false;
   elements.actionIcon.textContent = "✓";
@@ -556,6 +557,7 @@ function resetTransientGameUi() {
   elements.actionButton.setAttribute("aria-label", "出锅");
   elements.app.dataset.event = "none";
   elements.app.dataset.coinRush = "false";
+  elements.app.dataset.autoServe = "false";
   elements.app.dataset.comboMood = "normal";
   elements.app.dataset.lastHitQuality = "";
   elements.eventBubble.classList.remove(...RARITY_CLASSES);
@@ -605,7 +607,13 @@ function performAction() {
     return;
   }
   if (game.coinRushGraceRemainingMs > 0) {
-    showToast("准备出锅！", 650);
+    showToast("回到火候，准备出锅！", 650);
+    replayClass(elements.actionButton, "is-coin-tapping");
+    window.setTimeout(() => elements.actionButton.classList.remove("is-coin-tapping"), 220);
+    return;
+  }
+  if ((game.upgrades["steady-hand"] || 0) > 0) {
+    showToast("自动锁定 Perfect 中", 650);
     replayClass(elements.actionButton, "is-coin-tapping");
     window.setTimeout(() => elements.actionButton.classList.remove("is-coin-tapping"), 220);
     return;
@@ -747,7 +755,7 @@ function handleGameEvents() {
         }
         break;
       case "coinRushEnded":
-        showToast("狂欢结束，准备出锅！", 900);
+        showToast("狂欢结束，回到火候！", 1_100);
         break;
       case "served":
         renderer.triggerServe(event.result);
@@ -764,23 +772,25 @@ function handleGameEvents() {
         break;
       case "perfectStreakLively":
         renderer.triggerComboMood("lively", event.perfectStreak);
-        showImpactBanner({
-          icon: "✨",
-          title: "Perfect x3 活力开锅！",
-          short: "背景和旦仔都热起来了",
+        showActionFeedback({
+          quality: HIT_QUALITY.PERFECT,
+          title: `Perfect x${event.perfectStreak}!`,
+          summary: "活力开锅！",
           rarity: "epic",
-        }, 1150);
+          duration: 1_050,
+        });
         playCue("streak3");
         vibrate([35, 20, 55]);
         break;
       case "perfectStreakFever":
         renderer.triggerComboMood("fever", event.perfectStreak);
-        showImpactBanner({
-          icon: "🎉",
-          title: "Perfect x5 大狂欢！",
-          short: "保持节奏，继续连中",
+        showActionFeedback({
+          quality: HIT_QUALITY.PERFECT,
+          title: `Perfect x${event.perfectStreak}!`,
+          summary: "大狂欢！",
           rarity: "legendary",
-        }, 1500);
+          duration: 1_250,
+        });
         playCue("fever");
         vibrate([55, 25, 85, 30, 110]);
         break;
@@ -1094,7 +1104,6 @@ function showToast(message, duration = 1_750) {
 function buildActionSummary(result) {
   if (!result) return "";
   const parts = [];
-  if (result.coinReward > 0) parts.push(`金币 +${result.coinReward}`);
   const triggers = result.buildTriggers || [];
   if (triggers.length > 2) {
     parts.push(`触发 ${triggers.length} 项加成`);
@@ -1139,8 +1148,7 @@ function showActionFeedback({
   const summaryText =
     summary ??
     (result
-      ? buildActionSummary(result) ||
-        (isPerfect ? `Perfect 连中 ×${result.perfectStreak}` : "稳稳出锅")
+      ? buildActionSummary(result)
       : "");
 
   elements.scoreBurstValue.textContent = title || defaultTitle;
@@ -1226,12 +1234,18 @@ function updateInterface(snapshot) {
   const coinRushGraceActive =
     !coinRushActive && snapshot.coinRushGraceRemainingMs > 0;
   const coinRushEnding = coinRushActive && snapshot.coinRushRemainingMs <= 1_000;
+  const autoServeActive = Boolean(snapshot.autoServeActive);
   elements.app.dataset.coinRush = String(coinRushActive);
   elements.app.dataset.coinRushEnding = String(coinRushEnding);
   elements.app.dataset.coinRushGrace = String(coinRushGraceActive);
+  elements.app.dataset.autoServe = String(autoServeActive);
   elements.actionButton.classList.toggle("is-coin-rush", coinRushActive);
   elements.actionButton.classList.toggle("is-coin-rush-ending", coinRushEnding);
   elements.actionButton.classList.toggle("is-coin-rush-grace", coinRushGraceActive);
+  elements.actionButton.classList.toggle(
+    "is-auto-locked",
+    autoServeActive && !coinRushActive && !coinRushGraceActive,
+  );
   elements.heatRow.classList.toggle("is-coin-rush", coinRushActive);
   if (coinRushActive) {
     elements.actionButton.disabled = false;
@@ -1266,18 +1280,22 @@ function updateInterface(snapshot) {
     "is-awakening",
     snapshot.panIntroRemainingMs > 0,
   );
-  elements.actionButton.disabled = snapshot.panIntroRemainingMs > 0;
+  elements.actionButton.disabled = snapshot.panIntroRemainingMs > 0 || autoServeActive;
   elements.actionIcon.textContent = "✓";
   elements.actionLabel.textContent =
     coinRushGraceActive
-      ? "准备..."
+      ? "回到火候..."
+      : autoServeActive
+      ? "自动出锅中"
       : snapshot.panIntroRemainingMs > 0
       ? "读规则"
       : "出锅";
   elements.actionButton.setAttribute(
     "aria-label",
     coinRushGraceActive
-      ? "准备出锅"
+      ? "回到火候"
+      : autoServeActive
+      ? "自动锁定 Perfect"
       : snapshot.panIntroRemainingMs > 0
       ? "特殊目标确认中"
       : "出锅",

@@ -5,7 +5,7 @@ export const EVENT_CHANCE = 0.72;
 export const LEVEL_SPEED_STEP = 0.14;
 export const LEVEL_SCORE_STEP = 0.75;
 export const MAX_STAGE_EARNED_TIME_MS = 0;
-export const COIN_RUSH_END_GRACE_MS = 700;
+export const COIN_RUSH_END_GRACE_MS = 1_200;
 export const EARLY_LEVEL_TARGETS = Object.freeze([
   7,
   8,
@@ -1909,6 +1909,7 @@ export class EggFryGame {
       draftRerolls: this.draftRerolls,
       awakenedCount: awakenedUpgradeCount(this.upgrades),
       coinsEarned: this.coinsEarned,
+      autoServeActive: (this.upgrades["steady-hand"] || 0) > 0,
       currentEgg: egg ? { ...egg, sideOne, sideTwo } : null,
       currentMultiplier: comboMultiplier(this.combo),
     };
