@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#ffca57" />
+    <meta
+      name="description"
+      content="10 秒内守住三颗心，煎蛋闯关、赚金币、解锁新旦仔！"
+    />
+    <title>旦仔煎蛋挑战</title>
+  </head>
+  <body>
+    <main class="game-shell" id="app">
+      <div class="background-sparkle sparkle-one" aria-hidden="true"></div>
+      <div class="background-sparkle sparkle-two" aria-hidden="true"></div>
+
+      <section class="game-screen" aria-label="旦仔煎蛋挑战游戏">
+        <header class="hud" aria-label="游戏数据">
+          <div class="level-badge">
+            <strong id="levelValue">第 1 关</strong>
+          </div>
+          <div class="combo-hud" id="comboCard" hidden>
+            <span>COMBO</span>
+            <strong>×<i id="comboValue">0</i></strong>
+          </div>
+          <button class="pause-button" id="pauseButton" type="button" aria-label="暂停游戏">Ⅱ</button>
+        </header>
+
+        <div class="stage-wrap">
+          <canvas id="gameCanvas" aria-label="旦仔正在平底锅里煎蛋"></canvas>
+          <div class="event-bubble rarity-normal" id="eventBubble" role="status" aria-live="polite">
+            <span class="event-icon" id="eventIcon">✨</span>
+            <span class="event-copy">
+              <b>奇遇发动</b>
+              <strong id="eventTitle">普通蛋</strong>
+            </span>
+          </div>
+
+          <div class="combat-readout" aria-label="本关核心数据">
+            <div class="combat-time">
+              <small>⏱</small>
+              <strong><span id="timeValue">10</span><i>s</i></strong>
+            </div>
+            <div class="combat-score">
+              <small id="scoreLabel">生命</small>
+              <strong id="scoreValue">♥♥♥</strong>
+            </div>
+          </div>
+
+          <div class="stage-stats" aria-label="本局强化状态">
+            <div class="run-stats">
+              <span class="shield-badge" id="shieldValue">🛡 护盾 0</span>
+              <div class="recipe-strip" id="recipeStrip" aria-label="本局秘制配方">
+                <span class="recipe-empty">配方 0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="toast" id="toast" role="status" aria-live="polite"></div>
+          <div class="score-burst" id="scoreBurst" aria-hidden="true">
+            <strong id="scoreBurstValue">🪙 +4</strong>
+            <span id="scoreBurstLabel">Perfect</span>
+            <div class="score-burst-reasons" id="scoreBurstReasons"></div>
+          </div>
+          <div class="impact-banner" id="impactBanner" aria-hidden="true">
+            <span id="impactIcon">⚡</span>
+            <strong id="impactTitle">史诗事件！</strong>
+            <small id="impactSubtitle">准备接招</small>
+          </div>
+          <div class="pan-awaken" id="panAwaken" aria-hidden="true">
+            <span class="pan-awaken-icon" id="panAwakenIcon">🍳</span>
+            <span class="pan-awaken-copy">
+              <small id="panAwakenKicker">煎锅觉醒</small>
+              <strong id="panAwakenName">第 1 关</strong>
+              <em id="panAwakenGoal">坚持 10 秒</em>
+              <b id="panAwakenTrait">前 2 颗更容易 Perfect</b>
+              <button class="pan-ready-button" id="panReadyButton" type="button">开火</button>
+            </span>
+          </div>
+        </div>
+
+        <section class="heat-panel" aria-label="当前火候">
+          <div class="heat-row is-active" id="heatRow">
+            <div class="heat-track" aria-hidden="true">
+              <span class="perfect-zone" id="perfectZone"></span>
+              <span class="build-target-zone" id="buildTargetZone"></span>
+              <span class="heat-fill" id="heatFill"></span>
+              <span class="heat-marker" id="heatMarker"></span>
+            </div>
+            <span class="build-route-badge" id="buildRouteBadge" hidden></span>
+          </div>
+        </section>
+
+        <div class="controls" aria-label="煎蛋操作">
+          <button class="action-button" id="actionButton" type="button">
+            <span class="button-icon" id="actionIcon" aria-hidden="true">✓</span>
+            <span id="actionLabel">出锅</span>
+            <small class="action-build-badge" id="actionBuildBadge" hidden></small>
+          </button>
+        </div>
+
+        <p class="keyboard-tip">Space 操作 · R 重开 · Esc 暂停</p>
+      </section>
+
+      <section class="overlay start-overlay is-visible" id="startOverlay" aria-labelledby="gameTitle">
+        <div class="start-rays" aria-hidden="true"></div>
+        <div class="logo-area" id="logoArea">
+          <div class="title-kicker">10 秒生存爆炒</div>
+          <h1 id="gameTitle">旦仔<br /><span>煎蛋挑战</span></h1>
+        </div>
+        <div class="hero-visual" id="startMascot" aria-hidden="true"></div>
+        <div class="wallet-pill">🪙 已有 <strong id="walletCoins">0</strong> 金币</div>
+        <div class="home-record-strip">
+          <span>累计 <strong id="homeBestScore">0</strong> 金币</span>
+          <span>第 <strong id="homeBestLevel">0</strong> 关</span>
+          <span>图鉴 <strong id="homeEventProgress">0/13</strong></span>
+        </div>
+        <div class="start-actions">
+          <button class="primary-button" id="startButton" type="button">
+            <span>开始爆炒</span>
+          </button>
+          <button class="wardrobe-button" id="shopButton" type="button">
+            <span>👕 商城衣柜</span>
+            <small id="equippedSkinLabel" hidden>当前：经典旦仔</small>
+          </button>
+          <button class="records-button" id="recordsButton" type="button">
+            <span>🏆 战绩图鉴</span>
+          </button>
+        </div>
+        <button class="mechanics-link" id="mechanicsButton" type="button">
+          ❓ 规则
+        </button>
+      </section>
+
+      <section class="overlay mechanics-overlay" id="mechanicsOverlay" aria-labelledby="mechanicsTitle">
+        <div class="mechanics-panel">
+          <header class="mechanics-header">
+            <div>
+              <p>一眼看懂玩法</p>
+              <h2 id="mechanicsTitle">怎么活着赚更多金币？</h2>
+            </div>
+            <button class="shop-close" id="mechanicsCloseButton" type="button" aria-label="关闭数值说明">×</button>
+          </header>
+          <div class="mechanics-list">
+            <article class="mechanic-card heat-mechanic">
+              <span>🍳</span>
+              <div>
+                <strong>绿色出锅，黄色等待</strong>
+                <p>指针进入绿色区域时点击出锅。</p>
+              </div>
+            </article>
+            <article class="mechanic-card score-mechanic">
+              <span>❤️</span>
+              <div>
+                <strong>三颗心就是全部机会</strong>
+                <p>点早、点晚或让火候烧到底都会扣心，归零立即结束。</p>
+              </div>
+            </article>
+            <article class="mechanic-card shield-mechanic">
+              <span>🛡️</span>
+              <div>
+                <strong>回魂：挡住一次失误</strong>
+                <p>失误时自动消耗 1 层，不损失生命并立刻换下一颗蛋。</p>
+              </div>
+            </article>
+            <article class="mechanic-card recipe-mechanic">
+              <span>🪙</span>
+              <div>
+                <strong>金币才是长期目标</strong>
+                <p>成功出锅和金币狂欢都会掉落金币，用来购买带被动的角色。</p>
+              </div>
+            </article>
+          </div>
+          <button class="primary-button mechanics-done-button" id="mechanicsDoneButton" type="button">
+            <span>看懂了</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="overlay records-overlay" id="recordsOverlay" aria-labelledby="recordsTitle">
+        <div class="records-panel">
+          <header class="records-header">
+            <div>
+              <p>旦仔生涯</p>
+              <h2 id="recordsTitle">战绩与事件图鉴</h2>
+            </div>
+            <button class="shop-close" id="recordsCloseButton" type="button" aria-label="关闭战绩图鉴">×</button>
+          </header>
+          <div class="record-grid">
+            <div><span>累计金币</span><strong id="recordBestScore">0</strong></div>
+            <div><span>最高关</span><strong id="recordBestLevel">0</strong></div>
+            <div><span>最高连中</span><strong id="recordBestCombo">0</strong></div>
+            <div><span>挑战次数</span><strong id="recordTotalRuns">0</strong></div>
+          </div>
+          <div class="collection-card">
+            <span>事件收集 <strong id="eventCollectionText">0 / 13</strong></span>
+            <div><i id="eventCollectionFill"></i></div>
+            <small id="careerSummary">累计完成 0 颗蛋</small>
+          </div>
+          <div class="collection-card skin-collection-card">
+            <span>造型收集 <strong id="skinCollectionText">1 / 8</strong></span>
+            <div><i id="skinCollectionFill"></i></div>
+          </div>
+          <h3>随机事件图鉴</h3>
+          <div class="event-codex" id="eventCodex"></div>
+        </div>
+      </section>
+
+      <section class="overlay shop-overlay" id="shopOverlay" aria-labelledby="shopTitle">
+        <div class="shop-panel">
+          <header class="shop-header">
+            <div>
+              <p class="shop-kicker">旦仔衣柜</p>
+              <h2 id="shopTitle">金币换新造型</h2>
+            </div>
+            <button class="shop-close" id="shopCloseButton" type="button" aria-label="关闭商城">×</button>
+          </header>
+          <div class="shop-wallet">🪙 我的金币 <strong id="shopBalance">0</strong></div>
+          <div class="shop-preview">
+            <div id="shopPreviewMascot" aria-hidden="true"></div>
+            <span>
+              <small>当前装备</small>
+              <strong id="shopEquippedName">经典旦仔</strong>
+            </span>
+          </div>
+          <p class="shop-message" id="shopMessage" role="status" aria-live="polite">
+            购买后永久拥有，可随时回来换装。
+          </p>
+          <div class="skin-grid" id="skinGrid"></div>
+        </div>
+      </section>
+
+      <section class="overlay upgrade-overlay" id="upgradeOverlay" aria-labelledby="upgradeTitle">
+        <div class="upgrade-card">
+          <h2 id="upgradeTitle">选个新花样</h2>
+          <p class="upgrade-copy" id="upgradeCopy"></p>
+          <div class="upgrade-tools">
+            <button class="upgrade-reroll" id="upgradeRerollButton" type="button">
+              ↻ 换一批 <b id="upgradeRerollCount">1</b>
+            </button>
+          </div>
+          <div class="upgrade-options" id="upgradeOptions"></div>
+        </div>
+      </section>
+
+      <section class="overlay pause-overlay" id="pauseOverlay" aria-labelledby="pauseTitle">
+        <div class="pause-card">
+          <p class="upgrade-kicker">⏸ 锅先离火</p>
+          <h2 id="pauseTitle">游戏已暂停</h2>
+          <button class="primary-button" id="resumeButton" type="button">
+            <span>继续爆炒</span>
+          </button>
+          <button class="secondary-button" id="pauseHomeButton" type="button">
+            结算金币并返回首页
+          </button>
+          <button class="text-button" id="pauseMechanicsButton" type="button">
+            ❓ 查看火候与数值说明
+          </button>
+        </div>
+      </section>
+
+      <section class="overlay result-overlay" id="resultOverlay" aria-labelledby="resultTitle">
+        <div class="result-card">
+          <p class="result-kicker" id="resultKicker">第 1 关结算</p>
+          <h2 id="resultTitle">香喷喷出锅！</h2>
+          <div class="result-mascot" id="resultMascot" aria-hidden="true"></div>
+          <div class="final-score">
+            <span id="finalScoreLabel">获得金币</span>
+            <strong id="finalScore">0</strong>
+          </div>
+          <div class="result-grid" aria-hidden="true">
+            <div><strong id="finalEggs">0</strong><span>完成鸡蛋</span></div>
+            <div><strong id="finalCombo">3</strong><span>剩余生命</span></div>
+            <div><strong id="finalPerfect">0</strong><span>完美鸡蛋</span></div>
+          </div>
+          <div class="coin-reward" aria-hidden="true">🪙 <span id="finalCoins">0</span></div>
+          <p class="result-comment" id="resultComment">旦仔已经闻到香味啦！</p>
+          <div class="result-actions">
+            <button class="primary-button continue-button" id="continueButton" type="button">
+              <span id="continueLabel">选择强化</span>
+            </button>
+            <button class="primary-button restart-button" id="restartButton" type="button">
+              <span>再来一局</span>
+            </button>
+            <button class="secondary-button" id="homeButton" type="button">
+              返回首页
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
