@@ -1,4 +1,4 @@
-import "./style.css";
+﻿import "./style.css";
 import {
   chooseDanzaiAsset,
   chooseEventAsset,
@@ -31,7 +31,7 @@ import {
   recordRun,
 } from "./progression.js";
 
-// 阻止双击触发默认缩放。
+// Prevent double-tap zoom on mobile browsers.
 document.addEventListener(
   "dblclick",
   (event) => {
@@ -45,7 +45,7 @@ const RARITY_LABELS = {
   common: "普通",
   rare: "稀有",
   epic: "史诗",
-  danger: "高危",
+  danger: "危险",
   legendary: "传说",
 };
 const RARITY_CLASSES = Object.keys(RARITY_LABELS).map((rarity) => `rarity-${rarity}`);
@@ -113,7 +113,6 @@ const elements = {
   scoreBurst: document.querySelector("#scoreBurst"),
   scoreBurstValue: document.querySelector("#scoreBurstValue"),
   scoreBurstLabel: document.querySelector("#scoreBurstLabel"),
-  scoreBurstReasons: document.querySelector("#scoreBurstReasons"),
   impactBanner: document.querySelector("#impactBanner"),
   impactIcon: document.querySelector("#impactIcon"),
   impactTitle: document.querySelector("#impactTitle"),
@@ -174,7 +173,7 @@ if (elements.hud && elements.combatReadout && elements.pauseButton) {
 const pauseUpgradePanel = document.createElement("section");
 pauseUpgradePanel.className = "pause-upgrades";
 pauseUpgradePanel.innerHTML = `
-  <strong>当前强化</strong>
+  <strong>褰撳墠寮哄寲</strong>
   <div class="pause-upgrade-list"></div>
 `;
 elements.pauseOverlay
@@ -383,7 +382,7 @@ function mountLoadedAssets() {
   if (loadedAssets.logo) {
     elements.logoArea.replaceChildren();
     const logo = loadedAssets.logo.cloneNode();
-    logo.alt = "旦仔煎蛋挑战";
+    logo.alt = "鏃︿粩鐓庤泲鎸戞垬";
     elements.logoArea.append(logo);
     elements.logoArea.classList.add("has-image");
   }
@@ -412,7 +411,7 @@ function renderShop() {
     const name = document.createElement("strong");
     name.textContent = skin.name;
     const tagline = document.createElement("small");
-    tagline.textContent = `${skin.buffTitle}：${skin.buffDescription}`;
+    tagline.textContent = `${skin.buffTitle}: ${skin.buffDescription}`;
     copy.append(name, tagline);
 
     const button = document.createElement("button");
@@ -424,7 +423,7 @@ function renderShop() {
     } else if (owned) {
       button.textContent = "装备";
     } else {
-      button.textContent = skin.price === 0 ? "免费解锁" : `🪙 ${skin.price}`;
+      button.textContent = skin.price === 0 ? "免费解锁" : `金币 ${skin.price}`;
       button.classList.toggle("is-expensive", walletCoins < skin.price);
     }
     button.addEventListener("click", () => handleSkinAction(skin.id));
@@ -442,7 +441,7 @@ function handleSkinAction(skinId) {
     const result = equipSkin(wardrobe, skinId);
     if (result.ok) {
       saveWardrobe(result.wardrobe);
-      elements.shopMessage.textContent = `${skin.name} 已装备，下一锅就穿这套！`;
+      elements.shopMessage.textContent = `${skin.name} 已装备`;
       playCue("upgrade");
       vibrate(35);
     }
@@ -450,13 +449,13 @@ function handleSkinAction(skinId) {
     const result = buySkin(wardrobe, walletCoins, skinId);
     if (!result.ok) {
       elements.shopMessage.textContent =
-        `还差 ${Math.max(0, skin.price - walletCoins)} 金币，再挑战几关就能带走！`;
+        `还差 ${Math.max(0, skin.price - walletCoins)} 金币`;
       vibrate(25);
       return;
     }
     saveWallet(result.balance);
     saveWardrobe(result.wardrobe);
-    elements.shopMessage.textContent = `购买成功！${skin.name} 已自动装备。`;
+    elements.shopMessage.textContent = `购买成功：${skin.name} 已自动装备`;
     playCue("perfect");
     vibrate([40, 25, 70]);
   }
@@ -502,7 +501,7 @@ function renderRecords() {
   elements.skinCollectionText.textContent = `${skinProgress.count} / ${skinProgress.total}`;
   elements.skinCollectionFill.style.width = `${skinProgress.percent}%`;
   elements.careerSummary.textContent =
-    `累计完成 ${progress.totalEggs} 颗蛋 · Perfect ${progress.totalPerfects} 次 · 赚取 ${progress.totalCoinsEarned} 金币`;
+    `累计完成 ${progress.totalEggs} 颗蛋 · Perfect ${progress.totalPerfects} 次 · 获得 ${progress.totalCoinsEarned} 金币`;
 
   elements.eventCodex.replaceChildren();
   for (const event of EVENT_DEFINITIONS) {
@@ -521,10 +520,10 @@ function renderRecords() {
       setEventArt(card.querySelector(":scope > span"), event);
     } else {
       card.innerHTML = `
-        <span>？</span>
+        <span>?</span>
         <div>
           <strong>尚未遭遇</strong>
-          <small>继续爆炒，等待随机惊喜</small>
+          <small>继续挑战，等待随机惊喜</small>
         </div>
         <b>未解锁</b>
       `;
@@ -624,13 +623,13 @@ function performAction() {
     return;
   }
   if (game.coinRushGraceRemainingMs > 0) {
-    showToast("回到火候，准备出锅！", 650);
+    showToast("准备出锅", 650);
     replayClass(elements.actionButton, "is-coin-tapping");
     window.setTimeout(() => elements.actionButton.classList.remove("is-coin-tapping"), 220);
     return;
   }
-  if ((game.upgrades["steady-hand"] || 0) > 0) {
-    showToast("自动锁定 Perfect 中", 650);
+  if (game.getSnapshot().autoServeActive) {
+    showToast("自动锁定 Perfect", 650);
     replayClass(elements.actionButton, "is-coin-tapping");
     window.setTimeout(() => elements.actionButton.classList.remove("is-coin-tapping"), 220);
     return;
@@ -731,7 +730,7 @@ function handleGameEvents() {
       case "coinRushStarted":
         showActionFeedback({
           quality: "coin-rush",
-          title: "金币狂欢！",
+          title: "连击狂欢！",
           rarity: "legendary",
           duration: 900,
         });
@@ -812,7 +811,7 @@ function handleGameEvents() {
             }
           : {
               icon: event.upgrade.icon,
-              title: `${event.upgrade.name}装入锅具！`,
+              title: `${event.upgrade.name}已选择`,
               short: event.preview.headline,
               rarity: event.upgrade.rarity,
               duration: 1150,
@@ -927,8 +926,8 @@ function renderCurrentUpgrades() {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "current-upgrade-chip";
-    chip.title = `${upgrade.name}：${upgrade.rule}`;
-    chip.textContent = `${upgrade.icon} ${upgrade.name}${upgrade.stacks > 1 ? ` ×${upgrade.stacks}` : ""}`;
+    chip.title = `${upgrade.name}: ${upgrade.rule}`;
+    chip.textContent = `${upgrade.icon} ${upgrade.name}${upgrade.stacks > 1 ? ` x${upgrade.stacks}` : ""}`;
     chip.addEventListener("click", () => showUpgradeDetail(upgrade));
     elements.currentUpgradeList.append(chip);
   }
@@ -948,12 +947,16 @@ function renderPauseUpgrades() {
   }
   for (const upgrade of upgrades) {
     const preview = getUpgradePreview(upgrade.id, Math.max(0, upgrade.stacks - 1));
+    const extra =
+      upgrade.id === "steady-hand" && game.getSnapshot().autoServeStageCharges > 0
+        ? ` · 剩余 ${game.getSnapshot().autoServeStageCharges} 关`
+        : "";
     const item = document.createElement("article");
     item.className = "pause-upgrade-item";
     item.innerHTML = `
       <span>${upgrade.icon}</span>
       <b>${upgrade.name} Lv.${upgrade.stacks}</b>
-      <small>${preview.after || upgrade.rule}</small>
+      <small>${preview.after || upgrade.rule}${extra}</small>
     `;
     list.append(item);
   }
@@ -990,11 +993,11 @@ function showServeFeedback(result) {
   void result;
   return;
   if (result.preservedByShield) {
-    showToast("🛟 糊锅回魂！这颗蛋救回来了");
+    showToast("护盾救回这颗蛋");
   } else if (result.isBurnt) {
     const protectedText = result.preservedCombo
-        ? "旦仔替你保住了连击！"
-        : "糊锅啦，连击清零！";
+        ? "连击已保住"
+        : "Miss，连击清零";
     showToast(protectedText);
   }
 }
@@ -1026,7 +1029,7 @@ function setEventArt(element, effect) {
     element.textContent = "";
     element.style.backgroundImage = `url("${image.src}")`;
   } else {
-    element.textContent = effect?.icon || "✨";
+    element.textContent = effect?.icon || "✓";
     element.style.removeProperty("background-image");
   }
 }
@@ -1041,11 +1044,11 @@ function isImportantEvent(effect) {
 }
 
 function getEventToast(effect) {
-  if (effect?.specialMode === "coin-rush") return "金币狂欢开始！";
+  if (effect?.specialMode === "coin-rush") return "连击狂欢开始！";
   if (effect?.rarity === "danger") return "危险火候！";
-  if (effect?.id === "jackpot") return "超级大奖！";
+  if (effect?.id === "jackpot") return "大奖触发！";
   if (effect?.id === "time-warp") return "成功回血！";
-  if (effect?.id === "lucky-scallion") return "金币加成！";
+  if (effect?.id === "lucky-scallion") return "加成触发！";
   return effect?.short || "事件触发！";
 }
 
@@ -1119,26 +1122,10 @@ function showToast(message, duration = 1_750) {
 function buildActionSummary(result) {
   void result;
   return "";
-  if (!result) return "";
-  const parts = [];
-  const triggers = result.buildTriggers || [];
-  if (triggers.length > 2) {
-    parts.push(`触发 ${triggers.length} 项加成`);
-  } else {
-    for (const trigger of triggers) {
-      const multiplier = trigger.multiplier
-        ? Number.isInteger(trigger.multiplier)
-          ? trigger.multiplier
-          : trigger.multiplier.toFixed(1)
-        : null;
-      parts.push(trigger.text || (multiplier ? `${trigger.label} ×${multiplier}` : trigger.label));
-    }
-  }
-  return parts.slice(0, 2).join(" · ");
 }
 
 function getHitFeedbackText({ quality, combo = 0, isCoinRush = false } = {}) {
-  if (isCoinRush) return "金币狂击！";
+  if (isCoinRush) return "连击狂欢！";
   const safeCombo = Math.max(0, Math.floor(Number(combo) || 0));
   const isPerfect = quality === HIT_QUALITY.PERFECT;
   const isGood = quality === HIT_QUALITY.GOOD;
@@ -1172,7 +1159,7 @@ function showActionFeedback({
       : isMiss
         ? "Miss!"
         : isCoinRush
-          ? "金币狂欢！"
+          ? "连击狂欢！"
           : isEvent
             ? "事件触发！"
             : "大丰收！";
@@ -1191,7 +1178,6 @@ function showActionFeedback({
     }) ||
     defaultTitle;
   elements.scoreBurstLabel.textContent = summaryText;
-  elements.scoreBurstReasons.replaceChildren();
   elements.scoreBurst.classList.remove(
     "is-visible",
     "is-perfect",
@@ -1238,7 +1224,7 @@ function spawnCoinTapFloat(event) {
   float.className = event.milestone
     ? "coin-tap-float is-milestone"
     : "coin-tap-float";
-  float.textContent = event.milestone ? `+${event.reward} 爆!` : `+${event.reward}`;
+  float.textContent = event.milestone ? `Combo x${event.combo}` : `+${event.comboGain} 连击`;
   float.style.setProperty("--coin-drift", `${drift}px`);
   elements.actionButton.append(float);
   window.setTimeout(() => float.remove(), 720);
@@ -1289,11 +1275,11 @@ function updateInterface(snapshot) {
   elements.heatRow.classList.toggle("is-coin-rush", coinRushActive);
   if (coinRushActive) {
     elements.actionButton.disabled = false;
-    elements.actionIcon.textContent = "🪙";
+    elements.actionIcon.textContent = "⚡";
     elements.actionLabel.textContent = coinRushEnding
       ? "最后 1 秒！"
-      : `狂点金币！${Math.ceil(snapshot.coinRushRemainingMs / 1000)}`;
-    elements.actionButton.setAttribute("aria-label", "狂点金币");
+      : `狂点连击！${Math.ceil(snapshot.coinRushRemainingMs / 1000)}`;
+    elements.actionButton.setAttribute("aria-label", "狂点连击");
     return;
   }
   if (!egg) return;
@@ -1324,20 +1310,20 @@ function updateInterface(snapshot) {
   elements.actionIcon.textContent = "✓";
   elements.actionLabel.textContent =
     coinRushGraceActive
-      ? "回到火候..."
+      ? "准备出锅..."
       : autoServeActive
       ? "自动出锅中"
       : snapshot.panIntroRemainingMs > 0
-      ? "读规则"
+      ? "确认"
       : "出锅";
   elements.actionButton.setAttribute(
     "aria-label",
     coinRushGraceActive
-      ? "回到火候"
+      ? "准备出锅"
       : autoServeActive
       ? "自动锁定 Perfect"
       : snapshot.panIntroRemainingMs > 0
-      ? "特殊目标确认中"
+      ? "确认特殊目标"
       : "出锅",
   );
 }
@@ -1431,7 +1417,7 @@ function renderFinalBuild(upgrades) {
   if (!upgrades.length) {
     const empty = document.createElement("p");
     empty.className = "final-build-empty";
-    empty.textContent = "本局暂无强化";
+    empty.textContent = "鏈眬鏆傛棤寮哄寲";
     elements.finalBuildList.append(empty);
     return;
   }

@@ -6,6 +6,12 @@ export const LEVEL_SPEED_STEP = 0.14;
 export const LEVEL_SCORE_STEP = 0.75;
 export const MAX_STAGE_EARNED_TIME_MS = 0;
 export const COIN_RUSH_END_GRACE_MS = 1_200;
+export const MAX_AUTO_SERVE_STAGES = 5;
+export const AUTO_SERVE_STAGES_PER_UPGRADE = 2;
+const DEPRECATED_ECONOMY_ONLY_UPGRADES = new Set([
+  "opening-jackpot",
+  "coin-sprout",
+]);
 export const EARLY_LEVEL_TARGETS = Object.freeze([
   7,
   8,
@@ -83,8 +89,8 @@ export const EVENT_DEFINITIONS = Object.freeze([
     id: "double-yolk",
     icon: "🥚",
     title: "双黄暴富蛋！",
-    short: "金币翻倍",
-    message: "双黄蛋登场，本颗金币奖励加倍！",
+    short: "双倍得分",
+    message: "双黄蛋登场，本颗得分大幅提升！",
     rarity: "rare",
     weight: 12,
     scoreMultiplier: 3,
@@ -96,8 +102,8 @@ export const EVENT_DEFINITIONS = Object.freeze([
     id: "golden-heat",
     icon: "🌟",
     title: "黄金火候降临！",
-    short: "超宽目标区",
-    message: "发光区大幅扩张，成功再多掉 4 金币！",
+    short: "目标区变宽",
+    message: "绿色区大幅扩张，更容易命中 Perfect！",
     rarity: "rare",
     weight: 12,
     scoreMultiplier: 1.5,
@@ -111,8 +117,8 @@ export const EVENT_DEFINITIONS = Object.freeze([
     id: "angry-fire",
     icon: "🔥",
     title: "暴躁炉火开大！",
-    short: "极速双倍币",
-    message: "升温速度暴涨，成功金币翻倍！",
+    short: "极速高分",
+    message: "升温速度暴涨，成功得分更高！",
     rarity: "danger",
     weight: 12,
     minLevel: 2,
@@ -123,10 +129,10 @@ export const EVENT_DEFINITIONS = Object.freeze([
   Object.freeze({
     ...BASE_EFFECT,
     id: "slow-egg",
-    icon: "🫧",
+    icon: "🐢",
     title: "慢悠悠蛋！",
     short: "慢速绿区",
-    message: "指针速度大幅降低，稳稳瞄准绿色区域！",
+    message: "指针速度降低，更容易看准绿色区域！",
     rarity: "rare",
     weight: 10,
     speedMultiplier: 0.62,
@@ -135,10 +141,10 @@ export const EVENT_DEFINITIONS = Object.freeze([
   Object.freeze({
     ...BASE_EFFECT,
     id: "lucky-scallion",
-    icon: "🌱",
+    icon: "🌿",
     title: "幸运葱花雨！",
-    short: "金币 +8",
-    message: "成功出锅额外撒落 8 金币！",
+    short: "成功加分",
+    message: "成功出锅会额外加分！",
     rarity: "rare",
     weight: 12,
     successBonus: 180,
@@ -149,8 +155,8 @@ export const EVENT_DEFINITIONS = Object.freeze([
     id: "spatula-critical",
     icon: "⚡",
     title: "锅铲暴击充能！",
-    short: "暴击金币 +12",
-    message: "命中绿色区域后暴击，额外爆出 12 金币！",
+    short: "Perfect 暴击",
+    message: "命中绿色区域后暴击加分！",
     rarity: "epic",
     weight: 8,
     perfectBonus: 500,
@@ -161,8 +167,8 @@ export const EVENT_DEFINITIONS = Object.freeze([
     id: "pan-crisis",
     icon: "💥",
     title: "糊锅危机！",
-    short: "乱火大赏",
-    message: "火力疯狂乱跳，成功金币 ×2.5！",
+    short: "乱火高分",
+    message: "火力疯狂乱跳，成功得分更高！",
     rarity: "danger",
     weight: 10,
     minLevel: 2,
@@ -197,10 +203,10 @@ export const EVENT_DEFINITIONS = Object.freeze([
   Object.freeze({
     ...BASE_EFFECT,
     id: "coin-rush",
-    icon: "🤑",
-    title: "金币狂欢机！",
-    short: "狂点金币",
-    message: "大奖时间！狂点按钮，把金币全敲出来！",
+    icon: "⚡",
+    title: "连击狂欢机！",
+    short: "狂点连击",
+    message: "狂点按钮，把连击数冲起来！",
     rarity: "legendary",
     weight: 5,
     specialMode: "coin-rush",
@@ -209,10 +215,10 @@ export const EVENT_DEFINITIONS = Object.freeze([
   Object.freeze({
     ...BASE_EFFECT,
     id: "jackpot",
-    icon: "🎰",
+    icon: "🎇",
     title: "超级大奖蛋！",
-    short: "超级金币 ×4",
-    message: "叮叮叮！成功出锅触发四倍金币！",
+    short: "超级得分",
+    message: "叮叮叮！成功出锅触发高额得分！",
     rarity: "legendary",
     weight: 3,
     scoreMultiplier: 10,
@@ -224,8 +230,8 @@ export const EVENT_DEFINITIONS = Object.freeze([
     id: "devil-fire",
     icon: "😈",
     title: "恶魔火焰契约！",
-    short: "针眼高回报",
-    message: "极速针眼目标区，成功金币 ×3！",
+    short: "针眼高分",
+    message: "极速针眼目标区，成功得分极高！",
     rarity: "legendary",
     weight: 3,
     minLevel: 3,
@@ -241,8 +247,8 @@ export const EVENT_DEFINITIONS = Object.freeze([
     id: "blind-heat",
     icon: "🙈",
     title: "蒙眼豪赌蛋！",
-    short: "蒙眼三倍币",
-    message: "指针过半后隐藏，成功金币 ×3！",
+    short: "蒙眼高分",
+    message: "指针过半后隐藏，成功得分更高！",
     rarity: "legendary",
     weight: 5,
     minLevel: 2,
@@ -267,14 +273,14 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     id: "perfect-chain",
     icon: "🖨️",
     name: "完美复印机",
-    rule: "连续命中会爆出额外金币",
+    rule: "连续命中会触发额外加分",
     family: "basic",
     rarity: "epic",
     maxStacks: 2,
   }),
   Object.freeze({
     id: "event-booster",
-    icon: "📣",
+    icon: "📚",
     name: "奇遇复读机",
     rule: "成功事件会在下一颗重演",
     family: "basic",
@@ -283,7 +289,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
   }),
   Object.freeze({
     id: "event-album",
-    icon: "🎰",
+    icon: "🎇",
     name: "大奖蓄力器",
     rule: "连续事件成功后必出大奖",
     family: "basic",
@@ -294,14 +300,14 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     id: "combo-engine",
     icon: "⚡",
     name: "连击超频器",
-    rule: "连击达标后连续金币暴击",
+    rule: "连击达标后进入短时加分",
     family: "basic",
     rarity: "epic",
     maxStacks: 2,
   }),
   Object.freeze({
     id: "singed-gourmet",
-    icon: "🥩",
+    icon: "🥘",
     name: "焦香翻身",
     rule: "微焦直接按 Perfect 结算",
     family: "basic",
@@ -312,8 +318,9 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     id: "opening-jackpot",
     icon: "🍽️",
     name: "双份装盘",
-    rule: "每 3 颗成功蛋额外爆金币",
+    rule: "旧金币强化，暂时不出现在奖励池",
     family: "basic",
+    deprecatedEconomyOnly: true,
     rarity: "rare",
     maxStacks: 2,
   }),
@@ -321,7 +328,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     id: "last-call",
     icon: "🚨",
     name: "末秒狂飙",
-    rule: "最后 3 秒全锅进入暴走",
+    rule: "最后 3 秒进入得分爆发",
     family: "basic",
     rarity: "epic",
     maxStacks: 2,
@@ -337,7 +344,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
   }),
   Object.freeze({
     id: "combo-armor",
-    icon: "🛟",
+    icon: "🛡️",
     name: "回魂锅盖",
     rule: "把糊锅强行救回 Perfect",
     family: "basic",
@@ -346,16 +353,16 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
   }),
   Object.freeze({
     id: "danger-chef",
-    icon: "🌋",
+    icon: "🌡️",
     name: "红温引擎",
-    rule: "连续微焦会叠高金币奖励",
+    rule: "连续微焦会提高得分压力",
     family: "basic",
     rarity: "epic",
     maxStacks: 2,
   }),
   Object.freeze({
     id: "lucky-lid",
-    icon: "🔮",
+    icon: "🔭",
     name: "命运双开",
     rule: "每颗事件取更稀有的一次",
     family: "basic",
@@ -364,10 +371,11 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
   }),
   Object.freeze({
     id: "coin-sprout",
-    icon: "🎆",
+    icon: "🎊",
     name: "彩蛋礼炮",
-    rule: "事件成功和狂点都会多掉金币",
+    rule: "旧金币强化，暂时不出现在奖励池",
     family: "basic",
+    deprecatedEconomyOnly: true,
     rarity: "epic",
     maxStacks: 2,
   }),
@@ -384,19 +392,19 @@ export function getUpgradePreview(id, currentStacks = 0) {
   const nextStacks = stacks + 1;
   const previews = {
     "steady-hand": {
-      headline: nextStacks === 1 ? "绿区自动出锅" : "自动出锅 +3 币",
+      headline: nextStacks === 1 ? "绿区自动出锅" : "自动出锅次数增加",
       before: stacks === 0 ? "手动出锅" : "自动出锅",
-      after: nextStacks === 1 ? "指针进绿区立即完成" : "自动完成时额外掉金币",
+      after: nextStacks === 1 ? "指针进绿区立即完成" : "自动出锅可累计，最多 5 关",
     },
     "perfect-chain": {
-      headline: nextStacks === 1 ? "3 连命中 +6 币" : "2 连命中 +10 币",
-      before: stacks === 0 ? "尚未启动" : "3 连爆发",
-      after: nextStacks === 1 ? "第三颗额外爆金币" : "每两颗触发更大金币袋",
+      headline: nextStacks === 1 ? "3 连命中触发" : "2 连命中触发",
+      before: stacks === 0 ? "尚未启动" : "3 连触发",
+      after: nextStacks === 1 ? "第三颗额外加分" : "每两颗触发更高加分",
     },
     "event-booster": {
-      headline: nextStacks === 1 ? "事件再演一次" : "再演额外 +8 币",
+      headline: nextStacks === 1 ? "事件再演一次" : "再演效果增强",
       before: stacks === 0 ? "事件只出现一次" : "下一颗重演",
-      after: nextStacks === 1 ? "成功事件下一颗重演" : "重演成功额外掉金币",
+      after: nextStacks === 1 ? "成功事件下一颗重演" : "重演成功时额外加分",
     },
     "event-album": {
       headline: nextStacks === 1 ? "3 次事件后必出大奖" : "2 次事件后必出大奖",
@@ -406,22 +414,22 @@ export function getUpgradePreview(id, currentStacks = 0) {
     "combo-engine": {
       headline: nextStacks === 1 ? "连中 5 次开超频" : "连中 4 次开超频",
       before: stacks === 0 ? "普通节奏" : "4 秒超频",
-      after: nextStacks === 1 ? "4 秒内每颗额外 +4 币" : "6 秒内每颗额外 +8 币",
+      after: nextStacks === 1 ? "短时间内每颗额外加分" : "超频持续更久",
     },
     "singed-gourmet": {
-      headline: nextStacks === 1 ? "微焦也算命中" : "微焦额外 +6 币",
-      before: stacks === 0 ? "微焦低分" : "微焦可当完美",
-      after: nextStacks === 1 ? "焦香区成为新目标" : "焦香区命中再掉金币",
+      headline: nextStacks === 1 ? "微焦也算命中" : "微焦额外加分",
+      before: stacks === 0 ? "微焦低分" : "微焦可当 Perfect",
+      after: nextStacks === 1 ? "焦香区成为新目标" : "焦香区命中再加分",
     },
     "opening-jackpot": {
-      headline: nextStacks === 1 ? "每 3 颗 +4 币" : "每 2 颗 +8 币",
-      before: stacks === 0 ? "普通装盘" : "三颗触发金币装盘",
-      after: nextStacks === 1 ? "定期爆出金币" : "更频繁爆出大金币袋",
+      headline: "暂时移出奖励池",
+      before: "旧金币强化",
+      after: "等待后续构筑系统重做",
     },
     "last-call": {
-      headline: nextStacks === 1 ? "末 3 秒 +4 币" : "末 3 秒 +8 币",
+      headline: nextStacks === 1 ? "末 3 秒加分" : "末 3 秒爆发增强",
       before: stacks === 0 ? "正常收尾" : "末秒暴走",
-      after: nextStacks === 1 ? "末秒每颗额外爆币" : "末秒金币奖励翻倍",
+      after: nextStacks === 1 ? "末秒每颗额外加分" : "末秒加分更高",
     },
     "time-seasoning": {
       headline: nextStacks === 1 ? "5 连成功回 1 心" : "4 连成功回 1 心",
@@ -434,19 +442,19 @@ export function getUpgradePreview(id, currentStacks = 0) {
       after: nextStacks === 1 ? "糊锅拉回 Perfect" : "两次强制救场",
     },
     "danger-chef": {
-      headline: nextStacks === 1 ? "微焦连续升压" : "红温升压翻倍",
+      headline: nextStacks === 1 ? "微焦连续升压" : "红温升压增强",
       before: stacks === 0 ? "火力稳定" : "焦香会叠层",
-      after: nextStacks === 1 ? "每层 +2 金币，火也更快" : "每层 +4 金币",
+      after: nextStacks === 1 ? "分数更高，火也更快" : "叠层收益更高",
     },
     "lucky-lid": {
       headline: nextStacks === 1 ? "事件取优 2 次" : "事件取优 3 次",
       before: stacks === 0 ? "只抽一次事件" : "两次取优",
-      after: nextStacks === 1 ? "更常遇到史诗事件" : "三次只留最稀有",
+      after: nextStacks === 1 ? "更常遇到稀有事件" : "三次只留最稀有",
     },
     "coin-sprout": {
-      headline: nextStacks === 1 ? "事件成功 +5 币" : "事件成功 +10 币",
-      before: stacks === 0 ? "普通掉币" : "小型金币礼炮",
-      after: nextStacks === 1 ? "狂点每次也多 1 币" : "金币礼炮效果翻倍",
+      headline: "暂时移出奖励池",
+      before: "旧金币强化",
+      after: "等待后续构筑系统重做",
     },
   };
   const preview = previews[id] || {
@@ -567,6 +575,25 @@ export function comboMultiplier(combo) {
 
 export function levelScoreMultiplier(level) {
   return 1 + Math.max(0, level - 1) * LEVEL_SCORE_STEP;
+}
+
+export function calculateRunCoinsByLevel(levelReached) {
+  const level = Math.max(1, Math.floor(Number(levelReached) || 1));
+  const rewards = [0, 5, 12, 20, 30, 42, 56, 72, 90, 110, 135];
+  if (level < rewards.length) return rewards[level];
+  return rewards[10] + (level - 10) * 30;
+}
+
+export function addAutoServeCharges(current, amount = AUTO_SERVE_STAGES_PER_UPGRADE) {
+  return Math.min(
+    MAX_AUTO_SERVE_STAGES,
+    Math.max(0, Math.floor(Number(current) || 0)) + Math.max(0, Math.floor(Number(amount) || 0)),
+  );
+}
+
+export function isDeprecatedEconomyOnlyUpgrade(upgrade) {
+  const id = typeof upgrade === "string" ? upgrade : upgrade?.id;
+  return DEPRECATED_ECONOMY_ONLY_UPGRADES.has(id);
 }
 
 export function getPanPerk(level) {
@@ -795,6 +822,8 @@ export class EggFryGame {
     this.pendingChoices = [];
     this.draftRerolls = 0;
     this.coinsEarned = 0;
+    this.autoServeStageCharges = 0;
+    this.autoServeStageActive = false;
     this.events.length = 0;
   }
 
@@ -899,7 +928,9 @@ export class EggFryGame {
       const previousHeat = this.currentEgg.heat;
       this.currentEgg.heat = clamp(this.currentEgg.heat + heatGain, 0, 100);
 
-      const magneticStacks = this.upgrades["steady-hand"] || 0;
+      const magneticStacks = this.autoServeStageActive
+        ? this.upgrades["steady-hand"] || 0
+        : 0;
       if (
         magneticStacks > 0 &&
         previousHeat < activeEffect.perfectMin &&
@@ -908,6 +939,7 @@ export class EggFryGame {
         this.currentEgg.heat =
           (activeEffect.perfectMin + activeEffect.perfectMax) / 2;
         this.pushEvent("autoServed", {
+          remainingStages: this.autoServeStageCharges,
           upgrade: UPGRADE_DEFINITIONS.find(
             (upgrade) => upgrade.id === "steady-hand",
           ),
@@ -1323,36 +1355,10 @@ export class EggFryGame {
       0,
       Math.floor(Math.log2(Math.max(1, result.buildMultiplier || 1))),
     );
-    let coinReward = 2 + (result.isPerfect ? 2 : 0) + rarityCoins + buildCoins;
-    coinReward += result.singedCoinBonus || 0;
-    coinReward += result.riskCoinBonus || 0;
-    coinReward += result.encoreCoinBonus || 0;
-    coinReward += result.confettiCoinBonus || 0;
-    coinReward += result.eventCoinBonus || 0;
-    coinReward += result.doublePlateCoinBonus || 0;
-    coinReward += result.lastCallCoinBonus || 0;
-    coinReward += result.chainCoinBonus || 0;
-    coinReward += result.overdriveCoinBonus || 0;
-    coinReward += result.characterPeriodicCoinBonus || 0;
+    let coinReward = 0;
     if (singleTap && (this.upgrades["steady-hand"] || 0) >= 2) {
-      coinReward += 3;
-      result.magneticCoinBonus = 3;
+      result.magneticCoinBonus = 0;
     }
-    coinReward += this.characterBuff.serveCoinBonus || 0;
-    if (this.stageEggs === 1) {
-      coinReward += this.characterBuff.firstEggCoinBonus || 0;
-    }
-    coinReward += activeEffect.coinBonus || 0;
-    coinReward = Math.max(
-      1,
-      Math.round(
-        coinReward *
-          (activeEffect.coinMultiplier || 1) *
-          (this.characterBuff.serveCoinMultiplier || 1),
-      ),
-    );
-    this.runCoins += coinReward;
-    this.stageCoins += coinReward;
     result.coinReward = coinReward;
 
     const timeSeasoningStacks = this.upgrades["time-seasoning"] || 0;
@@ -1495,18 +1501,16 @@ export class EggFryGame {
   tapCoinRush() {
     if (this.state !== "playing" || this.coinRushRemainingMs <= 0) return false;
     this.coinRushTaps += 1;
-    let reward = 1 + (this.characterBuff.coinRushTapBonus || 0);
-    const confettiStacks = this.upgrades["coin-sprout"] || 0;
-    reward += confettiStacks;
+    const comboGain = 1 + (this.characterBuff.coinRushTapBonus || 0);
     const milestone = this.coinRushTaps % 10 === 0;
-    if (milestone) reward += 5;
-    this.runCoins += reward;
-    this.stageCoins += reward;
+    this.combo += comboGain;
+    this.bestCombo = Math.max(this.bestCombo, this.combo);
+    this.comboMood = getComboMood(this.combo);
     this.pushEvent("coinRushTap", {
       taps: this.coinRushTaps,
-      reward,
+      comboGain,
+      combo: this.combo,
       milestone,
-      coins: this.runCoins,
     });
     return true;
   }
@@ -1541,6 +1545,10 @@ export class EggFryGame {
     if (!upgrade) return false;
 
     this.upgrades[id] = (this.upgrades[id] || 0) + 1;
+    if (id === "steady-hand") {
+      this.autoServeStageCharges = addAutoServeCharges(this.autoServeStageCharges);
+      this.autoServeStageActive = this.autoServeStageCharges > 0;
+    }
     const awakened = this.upgrades[id] === upgrade.maxStacks;
     this.pendingChoices = [];
     this.pushEvent("upgradeSelected", {
@@ -1619,7 +1627,7 @@ export class EggFryGame {
     });
     if (this.currentEgg.isEncore) {
       this.pushEvent("buildBurst", {
-        icon: "📣",
+        icon: "📚",
         title: "奇遇复读！",
         short: this.effect.title,
         rarity: "epic",
@@ -1628,9 +1636,9 @@ export class EggFryGame {
     }
     if (this.currentEgg.isForcedJackpot) {
       this.pushEvent("buildBurst", {
-        icon: "🎰",
+        icon: "🎇",
         title: "保底大奖登场！",
-        short: "蓄力完成，本颗 ×10",
+        short: "蓄力完成",
         rarity: "legendary",
         family: "basic",
       });
@@ -1681,7 +1689,9 @@ export class EggFryGame {
 
   createUpgradeChoices(excludedIds = []) {
     const available = UPGRADE_DEFINITIONS.filter(
-      (upgrade) => (this.upgrades[upgrade.id] || 0) < upgrade.maxStacks,
+      (upgrade) =>
+        !isDeprecatedEconomyOnlyUpgrade(upgrade) &&
+        (this.upgrades[upgrade.id] || 0) < upgrade.maxStacks,
     );
     const excluded = new Set(excludedIds);
     const freshPool = available.filter((upgrade) => !excluded.has(upgrade.id));
@@ -1756,11 +1766,10 @@ export class EggFryGame {
     this.currentEgg = null;
     this.coinRushRemainingMs = 0;
     this.coinRushGraceRemainingMs = 0;
-    if (this.stageCleared) {
-      const clearBonus = 8 + this.level * 2;
-      this.runCoins += clearBonus;
-      this.stageCoins += clearBonus;
+    if (this.stageCleared && this.autoServeStageActive) {
+      this.autoServeStageCharges = Math.max(0, this.autoServeStageCharges - 1);
     }
+    this.autoServeStageActive = this.autoServeStageCharges > 0;
     this.coinsEarned = this.calculateCoins();
     const target = null;
     this.pendingNextStageTarget = null;
@@ -1815,6 +1824,7 @@ export class EggFryGame {
     this.shieldCharges = this.upgrades["combo-armor"] || 0;
     this.stageGuardCharges = this.characterBuff.stageGuard || 0;
     this.stageTarget = levelTarget(this.level);
+    this.autoServeStageActive = this.autoServeStageCharges > 0;
     this.pendingNextStageTarget = null;
     this.state = "playing";
     this.pushEvent("stageStarted", {
@@ -1832,7 +1842,7 @@ export class EggFryGame {
   }
 
   calculateCoins() {
-    return Math.max(0, Math.round(this.runCoins));
+    return calculateRunCoinsByLevel(this.level);
   }
 
   ensurePlaying() {
@@ -1923,7 +1933,8 @@ export class EggFryGame {
       draftRerolls: this.draftRerolls,
       awakenedCount: awakenedUpgradeCount(this.upgrades),
       coinsEarned: this.coinsEarned,
-      autoServeActive: (this.upgrades["steady-hand"] || 0) > 0,
+      autoServeActive: this.autoServeStageActive,
+      autoServeStageCharges: this.autoServeStageCharges,
       currentEgg: egg ? { ...egg, sideOne, sideTwo } : null,
       currentMultiplier: comboMultiplier(this.combo),
     };

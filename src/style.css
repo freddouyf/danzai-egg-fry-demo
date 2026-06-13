@@ -5228,20 +5228,6 @@ body {
     0 10px 24px rgba(118, 42, 70, 0.3);
 }
 
-.score-burst-reasons {
-  display: flex;
-  width: min(330px, 86vw);
-  margin-top: 7px;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.score-burst-reasons:empty {
-  display: none;
-}
-
 .score-burst .score-trigger {
   padding: 4px 8px;
   border: 2px solid rgba(255, 255, 255, 0.95);
@@ -5287,10 +5273,6 @@ body {
 @media (max-height: 720px) {
   .score-burst.is-build strong {
     font-size: 52px;
-  }
-
-  .score-burst-reasons {
-    width: min(310px, 84vw);
   }
 }
 
@@ -6536,10 +6518,6 @@ img,
   display: none;
 }
 
-.score-burst-reasons {
-  display: none !important;
-}
-
 .impact-banner {
   top: 43%;
   width: min(72%, 272px);
@@ -6729,7 +6707,6 @@ img,
 }
 
 .score-burst span,
-.score-burst-reasons,
 .impact-banner {
   display: none !important;
 }

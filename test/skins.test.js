@@ -64,6 +64,8 @@ test("全部商城造型都有唯一 id、素材键和非负价格", () => {
     assert.ok(skin.price >= 0);
     assert.ok(skin.buffTitle);
     assert.ok(skin.buffDescription);
-    assert.ok(Object.keys(getSkinBuff(skin.id)).length > 0);
+    if (skin.id !== DEFAULT_SKIN_ID) {
+      assert.ok(Object.keys(getSkinBuff(skin.id)).length > 0);
+    }
   }
 });

@@ -1,4 +1,4 @@
-import {
+﻿import {
   chooseDanzaiAsset,
   chooseEggAsset,
   choosePanAsset,
@@ -94,14 +94,14 @@ export class GameRenderer {
     }
   }
 
-  triggerUpgrade(name, impact = "大幅强化", now = performance.now()) {
+  triggerUpgrade(name, impact = "Upgrade", now = performance.now()) {
     this.animations.upgradeAt = now;
     this.addSparkBurst(46);
     void name;
     void impact;
     return;
     this.scorePopups.push({
-      label: `${name}！${impact}`,
+      label: `${name}: ${impact}`,
       color: "#8f52c6",
       startedAt: now,
       duration: 1600,
@@ -112,19 +112,19 @@ export class GameRenderer {
   triggerEvent(effect, now = performance.now()) {
     this.animations.eventAt = now;
     const payoff = {
-      "double-yolk": "双黄同屏 · 金币翻倍",
-      "golden-heat": "金色完美区大扩张",
-      "angry-fire": "烈火加速 · 本颗 ×4",
-      "slow-egg": "慢速指针 · 稳稳命中",
-      "lucky-scallion": "葱花雨 · 成功 +180",
-      "spatula-critical": "双 Perfect 暴击 +500",
-      "pan-crisis": "火力乱跳 · 成功 ×5",
-      "danzai-cheer": "糊锅不掉连击",
-      "time-warp": "成功恢复 1 颗心",
-      jackpot: "超级大奖 · 金币 ×4",
-      "devil-fire": "针眼火候 · 成功 ×8",
-      "blind-heat": "过半致盲 · 成功 ×6",
-    }[effect.id] || effect.title;
+      "double-yolk": "Double yolk",
+      "golden-heat": "Wider perfect zone",
+      "angry-fire": "Fast fire",
+      "slow-egg": "Slow heat",
+      "lucky-scallion": "Scallion rain",
+      "spatula-critical": "Perfect bonus",
+      "pan-crisis": "Risk heat",
+      "danzai-cheer": "Combo guard",
+      "time-warp": "Heart restore",
+      jackpot: "Jackpot",
+      "devil-fire": "Danger fire",
+      "blind-heat": "Blind heat",
+    }[effect.id] || effect.title || "Event";
     this.scorePopups.push({
       label: payoff,
       color:
@@ -153,7 +153,7 @@ export class GameRenderer {
     void target;
     return;
     this.scorePopups.push({
-      label: `过关！目标 ${target} 已突破`,
+      label: `Stage clear: ${target}`,
       color: "#e54c6f",
       startedAt: now,
       duration: 1700,
@@ -172,7 +172,7 @@ export class GameRenderer {
     this.addSparkBurst(34, ["#fff3d0", "#ff9a43", "#ff6b92"]);
     return;
     this.scorePopups.push({
-      label: `第 ${level} 关`,
+      label: `Stage ${level}`,
       color: "#e33c78",
       startedAt: now,
       duration: 900,
@@ -226,7 +226,7 @@ export class GameRenderer {
       this.activateCostume(now, 1400);
       this.addSparkBurst(44);
     } else if (result.awardedScore >= 500) {
-      label = `暴击!  +${result.awardedScore}`;
+      label = `鏆村嚮!  +${result.awardedScore}`;
       color = "#8f52c6";
       this.activateCostume(now, 1100);
       this.addSparkBurst(32);
@@ -242,7 +242,7 @@ export class GameRenderer {
       color = "#35aa73";
       this.addSparkBurst(14, ["#d9ff91", "#6ed88b", "#fff06a"]);
     } else if (result.isBurnt) {
-      label = result.preservedCombo ? "糊了，但连击保住！" : "糊锅啦！";
+      label = result.preservedCombo ? "Combo saved" : "Miss";
       color = "#734439";
       showServePopup = true;
       this.triggerBurn(now);
@@ -402,7 +402,6 @@ export class GameRenderer {
         ctx.restore();
       }
       ctx.globalAlpha = 0;
-      ctx.fillText("×10", 257, 178);
     } else if (effect.id === "golden-heat") {
       const glow = ctx.createRadialGradient(250, 250, 20, 250, 250, 175);
       glow.addColorStop(0, "rgba(255, 244, 92, 0.34)");
@@ -427,7 +426,6 @@ export class GameRenderer {
       ctx.fillStyle = "#ffbd2f";
       ctx.font = "1000 64px Microsoft YaHei";
       ctx.textAlign = "center";
-      ctx.fillText("×3", 255, 180);
     } else if (effect.id === "slow-egg") {
       ctx.fillStyle = "rgba(92, 205, 255, 0.12)";
       ctx.fillRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
@@ -511,7 +509,6 @@ export class GameRenderer {
       ctx.fillStyle = "#7c279c";
       ctx.font = "1000 66px Microsoft YaHei";
       ctx.textAlign = "center";
-      ctx.fillText("×8", 252, 182);
     } else if (effect.id === "blind-heat" && heat >= effect.hiddenHeatAfter) {
       const vignette = ctx.createRadialGradient(250, 250, 45, 250, 250, 220);
       vignette.addColorStop(0, "rgba(42, 26, 25, 0.05)");
@@ -522,7 +519,7 @@ export class GameRenderer {
       ctx.fillStyle = "rgba(255,255,255,0.86)";
       ctx.font = "1000 24px Microsoft YaHei";
       ctx.textAlign = "center";
-      ctx.fillText("凭感觉！", 252, 175);
+      ctx.fillText("鍑劅瑙夛紒", 252, 175);
     }
     ctx.restore();
   }
