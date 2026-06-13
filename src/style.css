@@ -6618,3 +6618,66 @@ img,
     min-height: 48px;
   }
 }
+
+/* V31: keep live play text quiet and give the main action more thumb space. */
+.game-screen {
+  gap: clamp(1px, 0.32svh, 3px);
+  padding-bottom: max(2px, env(safe-area-inset-bottom));
+}
+
+.stage-wrap {
+  max-height: min(52svh, calc(100svh - 244px));
+}
+
+.heat-panel {
+  margin-bottom: 0;
+}
+
+.controls {
+  margin-top: -2px;
+  margin-bottom: 0;
+}
+
+.action-button {
+  min-height: 104px;
+  gap: 10px;
+  border-radius: 26px;
+}
+
+.button-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 19px;
+  font-size: 38px;
+}
+
+.action-button > span:last-child {
+  font-size: clamp(31px, 8.4vw, 38px);
+  line-height: 1;
+}
+
+.score-burst span,
+.score-burst-reasons,
+.impact-banner {
+  display: none !important;
+}
+
+@media (max-height: 720px) {
+  .stage-wrap {
+    max-height: min(48svh, calc(100svh - 224px));
+  }
+
+  .action-button {
+    min-height: 88px;
+  }
+
+  .button-icon {
+    width: 52px;
+    height: 52px;
+    font-size: 34px;
+  }
+
+  .action-button > span:last-child {
+    font-size: 30px;
+  }
+}

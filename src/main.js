@@ -626,28 +626,17 @@ function presentEventTrigger(event) {
   const discovery = discoverEvent(progress, event.effect.id, EVENT_IDS);
   if (discovery.isNew) {
     saveProgress(discovery.progress);
-    showToast(`图鉴解锁：${event.effect.title}`, 900);
   }
 
   if (event.effect.specialMode === "coin-rush") return;
 
   const important = isImportantEvent(event.effect);
-  showToast(getEventToast(event.effect), important ? 1_050 : 850);
   playCue(important ? "event" : "good", event.effect.rarity);
   vibrate(important ? [35, 20, 55] : 12);
 
   if (!important) return;
 
   replayClass(elements.app, "is-event-struck");
-  if (event.effect.rarity === "legendary" || event.effect.id === "devil-fire") {
-    showActionFeedback({
-      title: getEventToast(event.effect),
-      summary: event.effect.short,
-      rarity: event.effect.rarity,
-      quality: "event",
-      duration: 820,
-    });
-  }
 }
 
 function handleGameEvents() {
@@ -674,12 +663,11 @@ function handleGameEvents() {
         }
         break;
       case "autoServed":
-        showToast(`${event.upgrade?.icon || "🧲"} 自动出锅！`, 700);
+        void event;
         playCue("perfect");
         vibrate([30, 15, 55]);
         break;
       case "buildBurst":
-        showToast(`${event.icon || "✨"} ${event.title}`, 850);
         playCue(event.rarity === "legendary" ? "perfect" : "upgrade");
         vibrate(
           event.rarity === "legendary"
@@ -691,7 +679,6 @@ function handleGameEvents() {
         renderer.triggerBurn();
         playCue("burn");
         vibrate([55, 40, 55]);
-        showToast("冒烟啦！快出锅！");
         break;
       case "heartLost":
         renderer.triggerBurn();
@@ -699,7 +686,6 @@ function handleGameEvents() {
         showActionFeedback({
           quality: HIT_QUALITY.MISS,
           title: event.missLabel || "Miss!",
-          summary: `还剩 ${event.health} 颗心`,
           rarity: "danger",
           duration: 760,
         });
@@ -714,13 +700,6 @@ function handleGameEvents() {
         showActionFeedback({
           quality: HIT_QUALITY.MISS,
           title: event.missLabel ? event.missLabel.replace("！", "") : "失误",
-          summary: savedByEvent
-            ? "没扣心 · 旦仔鼓励"
-            : savedByCharacter
-              ? "没扣心 · 角色被动"
-              : savedByPan
-                ? "没扣心 · 保护生效"
-              : "没扣心 · 回魂锅盖",
           rarity: "epic",
           duration: 760,
         });
@@ -729,7 +708,6 @@ function handleGameEvents() {
         break;
         }
       case "heartRestored":
-        showToast(`❤️ 恢复 1 颗心`, 850);
         playCue("perfect");
         vibrate([35, 20, 55]);
         break;
@@ -737,7 +715,6 @@ function handleGameEvents() {
         showActionFeedback({
           quality: "coin-rush",
           title: "金币狂欢！",
-          summary: "狂点按钮爆金币",
           rarity: "legendary",
           duration: 900,
         });
@@ -755,7 +732,6 @@ function handleGameEvents() {
         }
         break;
       case "coinRushEnded":
-        showToast("狂欢结束，回到火候！", 1_100);
         break;
       case "served":
         renderer.triggerServe(event.result);
@@ -775,7 +751,6 @@ function handleGameEvents() {
         showActionFeedback({
           quality: HIT_QUALITY.PERFECT,
           title: `Perfect x${event.perfectStreak}!`,
-          summary: "活力开锅！",
           rarity: "epic",
           duration: 1_050,
         });
@@ -787,7 +762,6 @@ function handleGameEvents() {
         showActionFeedback({
           quality: HIT_QUALITY.PERFECT,
           title: `Perfect x${event.perfectStreak}!`,
-          summary: "大狂欢！",
           rarity: "legendary",
           duration: 1_250,
         });
@@ -843,7 +817,6 @@ function handleGameEvents() {
         break;
       case "panPerkTriggered":
         renderer.triggerPanPerk(event);
-        showToast(`${event.panPerk.icon} ${event.label}：${event.message}`);
         playCue("upgrade");
         vibrate(24);
         break;
@@ -977,6 +950,8 @@ function rerollUpgradeDraft() {
 }
 
 function showServeFeedback(result) {
+  void result;
+  return;
   if (result.preservedByShield) {
     showToast("🛟 糊锅回魂！这颗蛋救回来了");
   } else if (result.isBurnt) {
@@ -988,6 +963,9 @@ function showServeFeedback(result) {
 }
 
 function showImpactBanner(effect, duration = 850) {
+  void effect;
+  void duration;
+  return;
   window.clearTimeout(impactTimer);
   setEventArt(elements.impactIcon, effect);
   elements.impactTitle.textContent = effect.title;
@@ -1102,6 +1080,8 @@ function showToast(message, duration = 1_750) {
 }
 
 function buildActionSummary(result) {
+  void result;
+  return "";
   if (!result) return "";
   const parts = [];
   const triggers = result.buildTriggers || [];
@@ -1189,7 +1169,6 @@ function showCoinTap(event) {
   replayClass(elements.actionButton, "is-coin-tapping");
   window.setTimeout(() => elements.actionButton.classList.remove("is-coin-tapping"), 220);
   spawnCoinTapFloat(event);
-  if (event.milestone) showToast(`金币 +${event.reward} · 十连加码`, 450);
 }
 
 function spawnCoinTapFloat(event) {

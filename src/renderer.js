@@ -97,6 +97,9 @@ export class GameRenderer {
   triggerUpgrade(name, impact = "大幅强化", now = performance.now()) {
     this.animations.upgradeAt = now;
     this.addSparkBurst(46);
+    void name;
+    void impact;
+    return;
     this.scorePopups.push({
       label: `${name}！${impact}`,
       color: "#8f52c6",
@@ -147,6 +150,8 @@ export class GameRenderer {
   triggerStageGoal(target, now = performance.now()) {
     this.addSparkBurst(64);
     this.activateCostume(now, 1500);
+    void target;
+    return;
     this.scorePopups.push({
       label: `过关！目标 ${target} 已突破`,
       color: "#e54c6f",
@@ -165,6 +170,7 @@ export class GameRenderer {
     this.animations.panUpgradeId = "basic-pan";
     this.activateCostume(now, 1800, level - 1);
     this.addSparkBurst(34, ["#fff3d0", "#ff9a43", "#ff6b92"]);
+    return;
     this.scorePopups.push({
       label: `第 ${level} 关`,
       color: "#e33c78",
@@ -190,6 +196,7 @@ export class GameRenderer {
     if (["golden-feast", "legendary-resonance"].includes(trigger.kind)) {
       this.activateCostume(now, 1_250);
     }
+    return;
     this.scorePopups.push({
       label: trigger.label,
       color,
