@@ -748,20 +748,15 @@ function handleGameEvents() {
         break;
       case "perfectStreakLively":
         renderer.triggerComboMood("lively", event.perfectStreak);
-        showActionFeedback({
-          quality: HIT_QUALITY.PERFECT,
-          title: `Perfect x${event.perfectStreak}!`,
-          rarity: "epic",
-          duration: 1_050,
-        });
-        playCue("streak3");
-        vibrate([35, 20, 55]);
         break;
       case "perfectStreakFever":
         renderer.triggerComboMood("fever", event.perfectStreak);
         showActionFeedback({
-          quality: HIT_QUALITY.PERFECT,
-          title: `Perfect x${event.perfectStreak}!`,
+          quality: event.hitQuality || HIT_QUALITY.PERFECT,
+          title: getHitFeedbackText({
+            quality: event.hitQuality || HIT_QUALITY.PERFECT,
+            combo: event.combo || event.perfectStreak,
+          }),
           rarity: "legendary",
           duration: 1_250,
         });
@@ -1100,6 +1095,20 @@ function buildActionSummary(result) {
   return parts.slice(0, 2).join(" · ");
 }
 
+function getHitFeedbackText({ quality, combo = 0, isCoinRush = false } = {}) {
+  if (isCoinRush) return "金币狂击！";
+  const safeCombo = Math.max(0, Math.floor(Number(combo) || 0));
+  const isPerfect = quality === HIT_QUALITY.PERFECT;
+  const isGood = quality === HIT_QUALITY.GOOD;
+  if ((isPerfect || isGood) && safeCombo >= 3) {
+    return `${isPerfect ? "Perfect" : "Good"} x${safeCombo}`;
+  }
+  if (isPerfect) return "Perfect!";
+  if (isGood) return "Good!";
+  if (quality === HIT_QUALITY.MISS) return "Miss!";
+  return "";
+}
+
 function showActionFeedback({
   result = null,
   quality = result?.hitQuality,
@@ -1131,7 +1140,14 @@ function showActionFeedback({
       ? buildActionSummary(result)
       : "");
 
-  elements.scoreBurstValue.textContent = title || defaultTitle;
+  elements.scoreBurstValue.textContent =
+    title ||
+    getHitFeedbackText({
+      quality,
+      combo: result?.combo,
+      isCoinRush,
+    }) ||
+    defaultTitle;
   elements.scoreBurstLabel.textContent = summaryText;
   elements.scoreBurstReasons.replaceChildren();
   elements.scoreBurst.classList.remove(
@@ -1151,7 +1167,10 @@ function showActionFeedback({
   elements.scoreBurst.classList.toggle("is-miss", isMiss);
   elements.scoreBurst.classList.toggle("is-event", isEvent || rarity !== "normal");
   elements.scoreBurst.classList.toggle("is-coin-rush", isCoinRush);
-  elements.scoreBurst.classList.toggle("is-fever", result?.comboMood === "fever");
+  elements.scoreBurst.classList.toggle(
+    "is-fever",
+    result?.comboMood === "fever" || rarity === "legendary",
+  );
   elements.scoreBurst.classList.toggle("is-burnt", false);
   elements.scoreBurst.classList.toggle(
     "is-build",

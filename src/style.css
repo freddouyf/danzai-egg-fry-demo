@@ -6681,3 +6681,39 @@ img,
     font-size: 30px;
   }
 }
+
+/* V32: give the heat bar and main action button a clearer thumb rhythm. */
+.heat-panel {
+  margin-bottom: 8px;
+}
+
+.controls {
+  margin-top: 6px;
+}
+
+.action-button {
+  min-height: 118px;
+  padding-block: 10px;
+  border-radius: 28px;
+}
+
+.button-icon {
+  width: 62px;
+  height: 62px;
+  font-size: 40px;
+}
+
+@media (max-height: 720px) {
+  .heat-panel {
+    margin-bottom: 6px;
+  }
+
+  .controls {
+    margin-top: 4px;
+  }
+
+  .action-button {
+    min-height: 98px;
+    padding-block: 8px;
+  }
+}

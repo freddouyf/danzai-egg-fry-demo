@@ -84,7 +84,7 @@ test("Perfect 三连进入活力状态，五连进入狂欢，Good 保留而 Mis
   assert.equal(snapshot.comboMood, COMBO_MOOD.LIVELY);
   assert.ok(game.drainEvents().some((event) => event.type === "perfectStreakLively"));
 
-  cookAt(game, 65);
+  cookAt(game, 55);
   snapshot = game.getSnapshot();
   assert.equal(snapshot.perfectStreak, 3);
   assert.equal(snapshot.lastHitQuality, HIT_QUALITY.GOOD);
@@ -510,8 +510,8 @@ test("规则型强化会直接改变火速和微焦判定", () => {
   game.spawnEgg("double-yolk");
   const effect = game.getActiveEffect();
 
-  assert.equal(effect.perfectMin, 70);
-  assert.equal(effect.perfectMax, 85);
+  assert.equal(effect.perfectMin, 62);
+  assert.equal(effect.perfectMax, 93);
   assert.equal(effect.scoreMultiplier, 3);
   assert.equal(effect.speedMultiplier, 1.28);
   assert.equal(effect.singedAsPerfect, true);
@@ -578,7 +578,7 @@ test("微焦强化只触发卡牌自身奖励，不再叠流派倍率", () => {
   game.upgrades["danger-chef"] = 1;
   game.upgrades["combo-armor"] = 1;
   game.stageEggs = 2;
-  const result = cookAt(game, 90);
+  const result = cookAt(game, 94);
 
   assert.equal(result.isGood, true);
   assert.equal(result.routeMultiplier, undefined);
@@ -593,19 +593,19 @@ test("微焦强化只触发卡牌自身奖励，不再叠流派倍率", () => {
 test("基础煎锅不会在前两颗自动扩大完美区", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
-  assert.equal(game.getActiveEffect().perfectMin, 70);
-  assert.equal(game.getActiveEffect().perfectMax, 85);
+  assert.equal(game.getActiveEffect().perfectMin, 62);
+  assert.equal(game.getActiveEffect().perfectMax, 93);
   game.stageEggs = 2;
-  assert.equal(game.getActiveEffect().perfectMin, 70);
-  assert.equal(game.getActiveEffect().perfectMax, 85);
+  assert.equal(game.getActiveEffect().perfectMin, 62);
+  assert.equal(game.getActiveEffect().perfectMax, 93);
 });
 
 test("基础煎锅不会把擦边火候吸附进 Perfect", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
-  const result = cookAt(game, 63);
-  assert.equal(result.sideOne, 63);
-  assert.equal(result.sideTwo, 63);
+  const result = cookAt(game, 55);
+  assert.equal(result.sideOne, 55);
+  assert.equal(result.sideTwo, 55);
   assert.equal(result.hitQuality, HIT_QUALITY.GOOD);
   assert.equal(
     game.drainEvents().filter((event) => event.type === "panPerkTriggered").length,
@@ -795,8 +795,8 @@ test("剑侠扩大目标区，潮帽旦仔增加一颗心", () => {
   });
   swordsman.start();
   swordsman.stageEggs = 2;
-  assert.equal(swordsman.getActiveEffect().perfectMin, 66);
-  assert.equal(swordsman.getActiveEffect().perfectMax, 89);
+  assert.equal(swordsman.getActiveEffect().perfectMin, 58);
+  assert.equal(swordsman.getActiveEffect().perfectMax, 95);
 
   const streetCap = new EggFryGame({
     eventChance: 0,
@@ -921,7 +921,7 @@ test("过关后选择一次强化，并保留已有强化进入下一关", () =>
   assert.equal(game.remainingMs, 1_000);
   assert.equal(levelScoreMultiplier(2), 1.75);
   assert.ok(game.getActiveEffect().speedMultiplier > 1);
-  assert.ok(game.getActiveEffect().perfectMin > 70);
+  assert.ok(game.getActiveEffect().perfectMin < 70);
   assert.ok(levelTarget(2) > levelTarget(1));
 });
 

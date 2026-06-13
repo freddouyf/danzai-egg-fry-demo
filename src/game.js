@@ -552,6 +552,15 @@ export function getComboMood(perfectStreak) {
   return COMBO_MOOD.NORMAL;
 }
 
+export function getEarlyLevelPerfectPadding(level) {
+  const safeLevel = Math.max(1, Math.floor(Number(level) || 1));
+  if (safeLevel <= 1) return 8;
+  if (safeLevel === 2) return 6;
+  if (safeLevel === 3) return 4;
+  if (safeLevel === 4) return 2;
+  return 0;
+}
+
 export function comboMultiplier(combo) {
   return 1 + Math.floor(Math.max(0, combo) / 3) * 0.5;
 }
@@ -1019,7 +1028,7 @@ export class EggFryGame {
       );
     }
     this.lastHitQuality = result.hitQuality;
-    this.comboMood = getComboMood(this.perfectStreak);
+    this.comboMood = getComboMood(result.combo);
     result.perfectStreak = this.perfectStreak;
     result.comboMood = this.comboMood;
     result.awakenedCount = activeEffect.awakenedCount;
@@ -1372,6 +1381,8 @@ export class EggFryGame {
     ) {
       this.pushEvent("perfectStreakLively", {
         perfectStreak: this.perfectStreak,
+        combo: result.combo,
+        hitQuality: result.hitQuality,
         comboMood: this.comboMood,
       });
     } else if (
@@ -1380,6 +1391,8 @@ export class EggFryGame {
     ) {
       this.pushEvent("perfectStreakFever", {
         perfectStreak: this.perfectStreak,
+        combo: result.combo,
+        hitQuality: result.hitQuality,
         comboMood: this.comboMood,
       });
     }
@@ -1633,9 +1646,10 @@ export class EggFryGame {
     const singedStacks = this.upgrades["singed-gourmet"] || 0;
     const awakenedCount = awakenedUpgradeCount(this.upgrades);
     const characterPadding = this.characterBuff.perfectPadding || 0;
+    const earlyPadding = getEarlyLevelPerfectPadding(this.level);
 
-    effect.perfectMin = clamp(effect.perfectMin - characterPadding, 45, 90);
-    effect.perfectMax = clamp(effect.perfectMax + characterPadding, 55, 95);
+    effect.perfectMin = clamp(effect.perfectMin - characterPadding - earlyPadding, 40, 90);
+    effect.perfectMax = clamp(effect.perfectMax + characterPadding + earlyPadding, 55, 95);
     if (dangerStacks === 1) effect.speedMultiplier *= 1.28;
     if (dangerStacks >= 2) effect.speedMultiplier *= 1.55;
     effect.singedAsPerfect = singedStacks > 0;
