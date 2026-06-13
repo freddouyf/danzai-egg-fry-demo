@@ -294,7 +294,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     icon: "🧲",
     name: "磁吸锅铲",
     rule: "进入绿色区域自动出锅",
-    family: "precision",
+    family: "basic",
     rarity: "rare",
     maxStacks: 2,
   }),
@@ -303,7 +303,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     icon: "🖨️",
     name: "完美复印机",
     rule: "连续命中会爆出额外金币",
-    family: "precision",
+    family: "basic",
     rarity: "epic",
     maxStacks: 2,
   }),
@@ -312,7 +312,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     icon: "📣",
     name: "奇遇复读机",
     rule: "成功事件会在下一颗重演",
-    family: "carnival",
+    family: "basic",
     rarity: "epic",
     maxStacks: 2,
   }),
@@ -321,7 +321,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     icon: "🎰",
     name: "大奖蓄力器",
     rule: "连续事件成功后必出大奖",
-    family: "carnival",
+    family: "basic",
     rarity: "epic",
     maxStacks: 2,
   }),
@@ -330,7 +330,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     icon: "⚡",
     name: "连击超频器",
     rule: "连击达标后连续金币暴击",
-    family: "precision",
+    family: "basic",
     rarity: "epic",
     maxStacks: 2,
   }),
@@ -339,7 +339,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     icon: "🥩",
     name: "焦香翻身",
     rule: "微焦直接按 Perfect 结算",
-    family: "gamble",
+    family: "basic",
     rarity: "epic",
     maxStacks: 2,
   }),
@@ -348,7 +348,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     icon: "🍽️",
     name: "双份装盘",
     rule: "每 3 颗成功蛋额外爆金币",
-    family: "tempo",
+    family: "basic",
     rarity: "rare",
     maxStacks: 2,
   }),
@@ -357,7 +357,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     icon: "🚨",
     name: "末秒狂飙",
     rule: "最后 3 秒全锅进入暴走",
-    family: "tempo",
+    family: "basic",
     rarity: "epic",
     maxStacks: 2,
   }),
@@ -366,7 +366,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     icon: "❤️",
     name: "爱心便当",
     rule: "连续成功可以恢复生命",
-    family: "tempo",
+    family: "basic",
     rarity: "rare",
     maxStacks: 2,
   }),
@@ -375,7 +375,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     icon: "🛟",
     name: "回魂锅盖",
     rule: "把糊锅强行救回 Perfect",
-    family: "gamble",
+    family: "basic",
     rarity: "epic",
     maxStacks: 2,
   }),
@@ -384,7 +384,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     icon: "🌋",
     name: "红温引擎",
     rule: "连续微焦会叠高金币奖励",
-    family: "gamble",
+    family: "basic",
     rarity: "epic",
     maxStacks: 2,
   }),
@@ -393,7 +393,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     icon: "🔮",
     name: "命运双开",
     rule: "每颗事件取更稀有的一次",
-    family: "carnival",
+    family: "basic",
     rarity: "rare",
     maxStacks: 2,
   }),
@@ -402,55 +402,11 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     icon: "🎆",
     name: "彩蛋礼炮",
     rule: "事件成功和狂点都会多掉金币",
-    family: "carnival",
+    family: "basic",
     rarity: "epic",
     maxStacks: 2,
   }),
 ]);
-
-export const BUILD_FAMILIES = Object.freeze({
-  precision: Object.freeze({
-    icon: "🎯",
-    name: "精准",
-    color: "blue",
-    trigger: "Perfect 连锁",
-    stance: "自动出锅，连中爆币",
-  }),
-  carnival: Object.freeze({
-    icon: "🎲",
-    name: "奇遇",
-    color: "pink",
-    trigger: "事件续演",
-    stance: "复读奇遇，蓄力大奖",
-  }),
-  gamble: Object.freeze({
-    icon: "🔥",
-    name: "豪赌",
-    color: "red",
-    trigger: "微焦叠层",
-    stance: "微焦翻身，糊锅救回",
-  }),
-  tempo: Object.freeze({
-    icon: "⏱",
-    name: "节奏",
-    color: "gold",
-    trigger: "快速装盘",
-    stance: "定期爆币，末秒超频",
-  }),
-});
-
-export function buildFamilyCount(upgrades = {}, family) {
-  return UPGRADE_DEFINITIONS.filter(
-    (upgrade) => upgrade.family === family && (upgrades[upgrade.id] || 0) > 0,
-  ).length;
-}
-
-export function buildFamilyMultiplier(upgrades = {}, family) {
-  const count = buildFamilyCount(upgrades, family);
-  if (count >= 3) return 4;
-  if (count >= 2) return 2;
-  return 1;
-}
 
 export function awakenedUpgradeCount(upgrades = {}) {
   return UPGRADE_DEFINITIONS.filter(
@@ -859,7 +815,6 @@ export class EggFryGame {
     this.panGuardCharges = getPanPerk(this.level).guardCharges || 0;
     this.panIntroRemainingMs = 0;
     this.upgrades = {};
-    this.activeBuildFamily = null;
     this.encounteredEventIds = new Set();
     this.shieldCharges = 0;
     this.pendingChoices = [];
@@ -1087,26 +1042,15 @@ export class EggFryGame {
     result.comboMood = this.comboMood;
     result.awakenedCount = activeEffect.awakenedCount;
     result.awakenedMultiplier = activeEffect.awakenedMultiplier;
-    result.activeBuildFamily = this.activeBuildFamily;
     result.originalSideOne = originalSideOne;
     result.originalSideTwo = originalSideTwo;
     result.preservedByShield = rescuedByShield;
-    result.routeMultiplier = activeEffect.routeMultiplier || 1;
-    result.routeTriggered =
-      (this.activeBuildFamily === "precision" && result.isPerfect) ||
-      (this.activeBuildFamily === "carnival" &&
-        this.effect.id !== "none" &&
-        result.baseScore > 0);
     const hadSingedSide =
       classifyHeat(originalSideOne, activeEffect.perfectMin, activeEffect.perfectMax) ===
         HEAT_STATUS.SINGED ||
       classifyHeat(originalSideTwo, activeEffect.perfectMin, activeEffect.perfectMax) ===
         HEAT_STATUS.SINGED;
     result.hadSingedSide = hadSingedSide;
-    if (this.activeBuildFamily === "gamble" && !result.isBurnt && hadSingedSide) {
-      result.routeMultiplier = 2;
-      result.routeTriggered = true;
-    }
     result.level = this.level;
     result.levelMultiplier = levelScoreMultiplier(this.level);
     result.rawAwardedScore = result.awardedScore;
@@ -1153,14 +1097,14 @@ export class EggFryGame {
         icon: "🛟",
         label: "糊锅回魂",
         text: "救回 Perfect",
-        family: "gamble",
+        family: "basic",
       });
       this.pushEvent("buildBurst", {
         icon: "🛟",
         title: "回魂锅盖！",
         short: "糊锅被强行拉回 Perfect",
         rarity: "legendary",
-        family: "gamble",
+        family: "basic",
       });
     }
 
@@ -1178,14 +1122,14 @@ export class EggFryGame {
             icon: "🖨️",
             label: "完美复印",
             multiplier: chainMultiplier,
-            family: "precision",
+            family: "basic",
           });
           this.pushEvent("buildBurst", {
             icon: "🖨️",
             title: "完美复印！",
             short: "连中触发金币复印",
             rarity: perfectChainStacks >= 2 ? "legendary" : "epic",
-            family: "precision",
+            family: "basic",
           });
         }
       }
@@ -1202,7 +1146,7 @@ export class EggFryGame {
         icon: "🥩",
         label: "焦香翻身",
         multiplier: singedMultiplier,
-        family: "gamble",
+        family: "basic",
       });
       result.singedCoinBonus = 6;
     }
@@ -1220,7 +1164,7 @@ export class EggFryGame {
         icon: "🌋",
         label: `红温 ${this.riskStreak} 层`,
         multiplier: riskMultiplier,
-        family: "gamble",
+        family: "basic",
       });
       result.riskCoinBonus = this.riskStreak * (dangerStacks >= 2 ? 4 : 2);
     }
@@ -1234,7 +1178,7 @@ export class EggFryGame {
         icon: "🚨",
         label: "末秒狂飙",
         multiplier: lastCallMultiplier,
-        family: "tempo",
+        family: "basic",
       });
     }
 
@@ -1247,7 +1191,7 @@ export class EggFryGame {
         icon: "⚡",
         label: "连击超频",
         multiplier: overdriveMultiplier,
-        family: "precision",
+        family: "basic",
       });
     }
 
@@ -1261,7 +1205,7 @@ export class EggFryGame {
           icon: "📣",
           label: "复读加倍",
           multiplier: 2,
-          family: "carnival",
+          family: "basic",
         });
         result.encoreCoinBonus = 8;
       } else if (!this.currentEgg.isEncore) {
@@ -1271,7 +1215,7 @@ export class EggFryGame {
           icon: "📣",
           label: "下一颗复读",
           text: this.effect.title,
-          family: "carnival",
+          family: "basic",
         });
       }
     }
@@ -1288,14 +1232,14 @@ export class EggFryGame {
           icon: "🎰",
           label: "大奖已装填",
           text: "下一颗必出大奖",
-          family: "carnival",
+          family: "basic",
         });
         this.pushEvent("buildBurst", {
           icon: "🎰",
           title: "大奖已装填！",
           short: "下一颗必定超级大奖",
           rarity: "legendary",
-          family: "carnival",
+          family: "basic",
         });
       }
     }
@@ -1309,43 +1253,9 @@ export class EggFryGame {
         icon: "🎆",
         label: "彩蛋礼炮",
         multiplier: confettiMultiplier,
-        family: "carnival",
+        family: "basic",
       });
       result.confettiCoinBonus = confettiStacks >= 2 ? 10 : 5;
-    }
-
-    const familyTriggers = [
-      {
-        id: "precision",
-        active: result.isPerfect,
-      },
-      {
-        id: "carnival",
-        active: this.effect.id !== "none" && result.baseScore > 0,
-      },
-      {
-        id: "gamble",
-        active: !result.isBurnt && hadSingedSide,
-      },
-      {
-        id: "tempo",
-        active: result.baseScore > 0,
-      },
-    ];
-    for (const familyTrigger of familyTriggers) {
-      if (!familyTrigger.active) continue;
-      const familyMultiplier = buildFamilyMultiplier(this.upgrades, familyTrigger.id);
-      if (familyMultiplier <= 1) continue;
-      buildMultiplier *= familyMultiplier;
-      const family = BUILD_FAMILIES[familyTrigger.id];
-      buildTriggers.push({
-        id: `family-${familyTrigger.id}`,
-        icon: family.icon,
-        label: `${family.name}牌型`,
-        multiplier: familyMultiplier,
-        family: familyTrigger.id,
-        isFamily: true,
-      });
     }
 
     if (buildMultiplier > 1 && result.awardedScore > 0) {
@@ -1379,7 +1289,7 @@ export class EggFryGame {
               ? "6 秒内每颗额外爆出 8 金币"
               : "4 秒内每颗额外爆出 4 金币",
           rarity: "legendary",
-          family: "precision",
+          family: "basic",
         });
       }
     }
@@ -1410,7 +1320,7 @@ export class EggFryGame {
         icon: "🍽️",
         label: "双份装盘",
         text: `金币 +${result.doublePlateCoinBonus}`,
-        family: "tempo",
+        family: "basic",
       });
     }
     if (lastCallStacks > 0 && this.remainingMs <= 3_000) {
@@ -1685,25 +1595,8 @@ export class EggFryGame {
     const upgrade = this.pendingChoices.find((candidate) => candidate.id === id);
     if (!upgrade) return false;
 
-    const familyBeforeCount = buildFamilyCount(this.upgrades, upgrade.family);
-    const familyBeforeMultiplier = buildFamilyMultiplier(this.upgrades, upgrade.family);
     this.upgrades[id] = (this.upgrades[id] || 0) + 1;
     const awakened = this.upgrades[id] === upgrade.maxStacks;
-    const familyCount = buildFamilyCount(this.upgrades, upgrade.family);
-    const familyMultiplier = buildFamilyMultiplier(this.upgrades, upgrade.family);
-    const family = BUILD_FAMILIES[upgrade.family];
-    if (!this.activeBuildFamily) this.activeBuildFamily = upgrade.family;
-    const familyMilestone =
-      familyMultiplier > familyBeforeMultiplier
-        ? {
-            id: upgrade.family,
-            icon: family.icon,
-            name: family.name,
-            color: family.color,
-            count: familyCount,
-            multiplier: familyMultiplier,
-          }
-        : null;
     this.pendingChoices = [];
     this.pushEvent("upgradeSelected", {
       upgrade: { ...upgrade },
@@ -1711,14 +1604,6 @@ export class EggFryGame {
       preview: getUpgradePreview(id, this.upgrades[id] - 1),
       awakened,
       awakenedCount: awakenedUpgradeCount(this.upgrades),
-      familyProgress: {
-        id: upgrade.family,
-        count: familyCount,
-        previousCount: familyBeforeCount,
-        multiplier: familyMultiplier,
-      },
-      familyMilestone,
-      activeBuildFamily: this.activeBuildFamily,
     });
     this.startNextStage();
     return true;
@@ -1793,7 +1678,7 @@ export class EggFryGame {
         title: "奇遇复读！",
         short: this.effect.title,
         rarity: "epic",
-        family: "carnival",
+        family: "basic",
       });
     }
     if (this.currentEgg.isForcedJackpot) {
@@ -1802,7 +1687,7 @@ export class EggFryGame {
         title: "保底大奖登场！",
         short: "蓄力完成，本颗 ×10",
         rarity: "legendary",
-        family: "carnival",
+        family: "basic",
       });
     }
     if (this.effect.id !== "none") {
@@ -1825,20 +1710,6 @@ export class EggFryGame {
     effect.singedAsPerfect = singedStacks > 0;
     effect.awakenedCount = awakenedCount;
     effect.awakenedMultiplier = 1;
-    effect.activeBuildFamily = this.activeBuildFamily;
-    effect.routeMultiplier = 1;
-    if (this.activeBuildFamily === "precision") {
-      effect.perfectMin = clamp(effect.perfectMin - 6, 45, 90);
-      effect.perfectMax = clamp(effect.perfectMax + 6, 55, 95);
-    } else if (
-      this.activeBuildFamily === "carnival" &&
-      this.effect.id !== "none"
-    ) {
-      effect.scoreMultiplier *= 1.25;
-      effect.routeMultiplier = 1.25;
-    } else if (this.activeBuildFamily === "gamble") {
-      effect.speedMultiplier *= 1.12;
-    }
     if (panPerk.id === "iron-steady" && this.stageEggs < 2) {
       effect.perfectMin = clamp(effect.perfectMin - 6, 45, 90);
       effect.perfectMax = clamp(effect.perfectMax + 6, 55, 95);
@@ -1923,44 +1794,14 @@ export class EggFryGame {
       choices.push(pool.splice(poolIndex, 1)[0]);
     };
 
-    const representedFamilies = Object.keys(BUILD_FAMILIES)
-      .map((family) => ({
-        family,
-        count: buildFamilyCount(this.upgrades, family),
-      }))
-      .filter(({ count }) => count > 0)
-      .sort((a, b) => b.count - a.count);
-    const synergyFamily =
-      this.activeBuildFamily || representedFamilies[0]?.family || null;
-    if (synergyFamily) {
-      const unownedSynergy = pool.filter(
-        (upgrade) =>
-          upgrade.family === synergyFamily && !this.upgrades[upgrade.id],
-      );
-      takeChoice(
-        unownedSynergy.length > 0
-          ? unownedSynergy
-          : pool.filter((upgrade) => upgrade.family === synergyFamily),
-      );
-      takeChoice(
-        pool.filter((upgrade) => upgrade.family === synergyFamily),
-      );
-    }
-
     const awakeningCandidates = pool.filter(
       (upgrade) => (this.upgrades[upgrade.id] || 0) === upgrade.maxStacks - 1,
     );
     takeChoice(awakeningCandidates);
 
     while (pool.length > 0 && choices.length < 3) {
-      const usedFamilies = new Set(choices.map((choice) => choice.family));
-      const diversePool =
-        this.activeBuildFamily || usedFamilies.size === 0
-          ? pool
-          : pool.filter((choice) => !usedFamilies.has(choice.family));
-      const candidates = diversePool.length > 0 ? diversePool : pool;
-      const selected = candidates[
-        clamp(Math.floor(this.random() * candidates.length), 0, candidates.length - 1)
+      const selected = pool[
+        clamp(Math.floor(this.random() * pool.length), 0, pool.length - 1)
       ];
       const index = pool.findIndex((choice) => choice.id === selected.id);
       choices.push(pool.splice(index, 1)[0]);
@@ -2166,7 +2007,6 @@ export class EggFryGame {
       pendingChoices: this.pendingChoices.map((choice) => ({ ...choice })),
       draftRerolls: this.draftRerolls,
       awakenedCount: awakenedUpgradeCount(this.upgrades),
-      activeBuildFamily: this.activeBuildFamily,
       coinsEarned: this.coinsEarned,
       currentEgg: egg ? { ...egg, sideOne, sideTwo } : null,
       currentMultiplier: comboMultiplier(this.combo),

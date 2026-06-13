@@ -297,21 +297,8 @@ export class GameRenderer {
 
     const buildTriggers = result.buildTriggers || [];
     if (buildTriggers.length > 0) {
-      const dominantTrigger =
-        buildTriggers.findLast?.((trigger) => trigger.isFamily) ||
-        [...buildTriggers].reverse().find((trigger) => trigger.isFamily) ||
-        buildTriggers[0];
-      const palettes = {
-        precision: ["#f4ffff", "#55d8ff", "#4677ff"],
-        carnival: ["#fff0fb", "#ff65c3", "#a95cff"],
-        gamble: ["#fff0b8", "#ff793d", "#e8394f"],
-        tempo: ["#fffad0", "#ffd63b", "#42cdb3"],
-      };
-      const palette = palettes[dominantTrigger.family] || [
-        "#fff8b5",
-        "#ff8e45",
-        "#ef4e83",
-      ];
+      const dominantTrigger = buildTriggers[buildTriggers.length - 1];
+      const palette = ["#fff8b5", "#ff8e45", "#ef4e83"];
       this.addSparkBurst(
         Math.min(72, 24 + buildTriggers.length * 12 + result.buildMultiplier * 2),
         palette,

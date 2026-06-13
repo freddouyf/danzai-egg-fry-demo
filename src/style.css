@@ -26,6 +26,12 @@ body {
   overscroll-behavior: none;
 }
 
+html,
+body,
+.game-shell {
+  touch-action: manipulation;
+}
+
 body {
   display: grid;
   place-items: center;
@@ -3177,26 +3183,6 @@ h1 span {
   font-size: 10px;
 }
 
-.recipe-family {
-  display: grid;
-  min-width: 28px;
-  height: 28px;
-  place-items: center;
-  border: 2px solid rgba(255, 255, 255, 0.92);
-  border-radius: 10px;
-  color: #815137;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 3px 8px rgba(87, 43, 24, 0.12);
-  font-size: 10px;
-  font-weight: 1000;
-}
-
-.recipe-family.is-active {
-  color: white;
-  background: linear-gradient(135deg, #ef6235, #e53e78);
-  animation: recipe-family-pulse 1.7s ease-in-out infinite;
-}
-
 .upgrade-card {
   padding-top: 13px;
 }
@@ -3225,18 +3211,6 @@ h1 span {
   font-size: 29px;
 }
 
-.upgrade-family {
-  align-self: flex-start;
-  width: fit-content;
-  padding: 2px 7px;
-  border-radius: 999px;
-  color: #815137;
-  background: rgba(255, 255, 255, 0.78);
-  font-size: 9px;
-  font-weight: 1000;
-  line-height: 1.25;
-}
-
 .upgrade-name-row strong {
   margin-top: 2px;
   font-size: 17px;
@@ -3262,51 +3236,6 @@ h1 span {
   box-shadow: 0 3px 8px rgba(199, 53, 74, 0.24);
   font-size: 9px;
   font-weight: 1000;
-}
-
-.upgrade-option.is-synergy {
-  border-color: #fff17b;
-  background: linear-gradient(105deg, #fff9cf, #ffd87e);
-  box-shadow:
-    0 0 0 4px rgba(255, 220, 63, 0.24),
-    0 8px 0 rgba(170, 95, 28, 0.15);
-}
-
-.upgrade-option.is-synergy .upgrade-option-icon {
-  animation: synergy-icon-pop 1.15s ease-in-out infinite;
-}
-
-.family-blue .upgrade-family {
-  color: #246c9d;
-  background: #dff5ff;
-}
-
-.family-pink .upgrade-family {
-  color: #a53f83;
-  background: #ffe3f5;
-}
-
-.family-red .upgrade-family {
-  color: #b3402d;
-  background: #ffe1cf;
-}
-
-.family-gold .upgrade-family {
-  color: #916015;
-  background: #fff1bd;
-}
-
-@keyframes recipe-family-pulse {
-  50% {
-    transform: translateY(-2px) scale(1.07);
-    box-shadow: 0 5px 13px rgba(229, 62, 120, 0.3);
-  }
-}
-
-@keyframes synergy-icon-pop {
-  50% {
-    transform: rotate(-5deg) scale(1.08);
-  }
 }
 
 @media (max-height: 720px) {
@@ -5263,23 +5192,6 @@ body {
   animation-delay: 130ms;
 }
 
-.score-burst .score-trigger.family-blue {
-  background: linear-gradient(135deg, #46cce9, #5169ec);
-}
-
-.score-burst .score-trigger.family-pink {
-  background: linear-gradient(135deg, #ff73b8, #9d5ee8);
-}
-
-.score-burst .score-trigger.family-red {
-  background: linear-gradient(135deg, #ff953e, #e83b58);
-}
-
-.score-burst .score-trigger.family-gold {
-  color: #633a14;
-  background: linear-gradient(135deg, #fff06d, #f5ad28);
-}
-
 .score-burst .score-trigger.is-awakened {
   color: #6f390d;
   background: linear-gradient(135deg, #fff989, #ffbc2d);
@@ -5397,45 +5309,6 @@ body {
   content: "";
 }
 
-.build-target-zone {
-  position: absolute;
-  z-index: 2;
-  top: -2px;
-  bottom: -2px;
-  display: none;
-  border: 4px solid #fff179;
-  border-radius: 9px;
-  background: rgba(255, 84, 40, 0.42);
-  box-shadow:
-    inset 0 0 9px rgba(255, 255, 255, 0.7),
-    0 0 15px rgba(255, 78, 34, 0.75);
-}
-
-.build-target-zone.is-visible {
-  display: block;
-  animation: build-zone-pulse 560ms ease-in-out infinite alternate;
-}
-
-.build-route-badge {
-  grid-column: 2;
-  justify-self: end;
-  margin: -2px 4px 0 0;
-  padding: 3px 8px;
-  border: 2px solid white;
-  border-radius: 999px;
-  color: white;
-  background: #8d6a58;
-  box-shadow: 0 3px 7px rgba(78, 42, 26, 0.16);
-  font-size: 10px;
-  font-weight: 1000;
-  line-height: 1;
-}
-
-.build-route-badge[hidden],
-.action-build-badge[hidden] {
-  display: none !important;
-}
-
 .action-button {
   overflow: visible;
 }
@@ -5443,107 +5316,6 @@ body {
 #actionLabel {
   font-size: 28px;
   font-weight: 1000;
-}
-
-.action-build-badge {
-  position: absolute;
-  top: -10px;
-  right: 13px;
-  display: block;
-  margin: 0;
-  padding: 5px 10px;
-  border: 3px solid white;
-  border-radius: 999px;
-  opacity: 1;
-  color: white;
-  background: #8d6a58;
-  box-shadow: 0 5px 10px rgba(78, 42, 26, 0.2);
-  font-size: 10px;
-  font-weight: 1000;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.game-shell[data-build="precision"] .heat-panel,
-.game-shell[data-build="precision"] .stage-wrap {
-  border-color: #83ddff;
-  box-shadow: 0 0 22px rgba(64, 169, 240, 0.28);
-}
-
-.game-shell[data-build="precision"] .perfect-zone {
-  border-color: #eaffff;
-  background: rgba(68, 206, 255, 0.42);
-  box-shadow:
-    inset 0 0 10px white,
-    0 0 16px rgba(61, 187, 255, 0.85);
-}
-
-.game-shell[data-build="precision"] .action-button,
-.game-shell[data-build="precision"] .build-route-badge,
-.game-shell[data-build="precision"] .action-build-badge {
-  background: linear-gradient(135deg, #4ed6ec, #4f70e8);
-}
-
-.game-shell[data-build="carnival"] .heat-panel,
-.game-shell[data-build="carnival"] .stage-wrap {
-  border-color: #ff8fd0;
-  box-shadow: 0 0 24px rgba(225, 70, 181, 0.28);
-}
-
-.game-shell[data-build="carnival"] .heat-track {
-  background:
-    linear-gradient(90deg, #a8e9d4, #ffe27c 38%, #ff92ca 70%, #9b72ee);
-}
-
-.game-shell[data-build="carnival"] .action-button,
-.game-shell[data-build="carnival"] .build-route-badge,
-.game-shell[data-build="carnival"] .action-build-badge {
-  background: linear-gradient(135deg, #ff78bc, #955fe7);
-}
-
-.game-shell[data-build="gamble"] .heat-panel,
-.game-shell[data-build="gamble"] .stage-wrap {
-  border-color: #ff8a51;
-  box-shadow: 0 0 25px rgba(226, 62, 39, 0.32);
-}
-
-.game-shell[data-build="gamble"] .perfect-zone {
-  opacity: 0.42;
-}
-
-.game-shell[data-build="gamble"] .action-button,
-.game-shell[data-build="gamble"] .build-route-badge,
-.game-shell[data-build="gamble"] .action-build-badge {
-  background: linear-gradient(135deg, #ff973b, #df3650);
-}
-
-.game-shell[data-build="tempo"] .heat-panel,
-.game-shell[data-build="tempo"] .stage-wrap {
-  border-color: #ffe065;
-  box-shadow: 0 0 24px rgba(244, 174, 34, 0.3);
-}
-
-.game-shell[data-build="tempo"] .heat-marker {
-  filter: drop-shadow(0 0 7px #ffe237);
-}
-
-.game-shell[data-build="tempo"] .action-button,
-.game-shell[data-build="tempo"] .build-route-badge,
-.game-shell[data-build="tempo"] .action-build-badge {
-  color: #61370e;
-  background: linear-gradient(135deg, #fff16b, #f4a72e);
-}
-
-.action-button.is-build-ready {
-  filter: brightness(1.13) saturate(1.22);
-  animation: build-button-ready 430ms ease-in-out infinite alternate;
-}
-
-.heat-row.is-build-ready .heat-track {
-  box-shadow:
-    inset 0 3px 7px rgba(75, 45, 24, 0.18),
-    0 0 0 5px rgba(255, 243, 89, 0.24),
-    0 0 20px rgba(255, 183, 35, 0.68);
 }
 
 .upgrade-set.is-building {
@@ -5819,12 +5591,6 @@ body {
   gap: 1px;
 }
 
-.upgrade-family {
-  width: fit-content;
-  padding: 2px 7px;
-  font-size: 9px;
-}
-
 .upgrade-name-row strong {
   margin-top: 1px;
   font-size: 18px;
@@ -5959,8 +5725,7 @@ body {
 }
 
 /* V23: single-tap cooking and low-noise decision screens. */
-.heat-track,
-.game-shell[data-build="carnival"] .heat-track {
+.heat-track {
   overflow: visible;
   border: 0;
   border-radius: 999px;
@@ -5968,9 +5733,7 @@ body {
   box-shadow: inset 0 3px 7px rgba(113, 73, 20, 0.22);
 }
 
-.perfect-zone,
-.game-shell[data-build="precision"] .perfect-zone,
-.game-shell[data-build="gamble"] .perfect-zone {
+.perfect-zone {
   top: 0;
   bottom: 0;
   border: 0;
@@ -5981,9 +5744,7 @@ body {
 }
 
 .perfect-zone::after,
-.heat-fill,
-.build-target-zone,
-.build-route-badge {
+.heat-fill {
   display: none !important;
 }
 
@@ -5997,25 +5758,12 @@ body {
   box-shadow: 0 2px 5px rgba(66, 42, 22, 0.28);
 }
 
-.heat-row.is-build-ready .heat-track {
-  box-shadow: inset 0 3px 7px rgba(113, 73, 20, 0.22);
-}
-
-.game-shell[data-build="tempo"] .heat-marker {
-  filter: none;
-}
-
 .upgrade-copy {
   display: none;
 }
 
 .upgrade-card > h2 {
   margin-bottom: 8px;
-}
-
-.upgrade-family {
-  min-width: 24px;
-  font-size: 18px;
 }
 
 .result-grid,
@@ -6053,9 +5801,7 @@ body {
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.34);
 }
 
-.perfect-zone,
-.game-shell[data-build="precision"] .perfect-zone,
-.game-shell[data-build="gamble"] .perfect-zone {
+.perfect-zone {
   z-index: 2;
   background: #2fbd68;
   box-shadow:
@@ -6169,4 +5915,80 @@ body {
   .game-shell[data-combo-mood="fever"] #comboCard {
     animation: none;
   }
+}
+
+/* V25: touch-first controls and a compact, family-free upgrade summary. */
+.event-bubble,
+.impact-banner,
+.action-button,
+.upgrade-option,
+.upgrade-reroll,
+.current-upgrades {
+  touch-action: manipulation;
+}
+
+canvas,
+img,
+.event-icon,
+.impact-banner img,
+.action-button {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.action-button {
+  min-height: 92px;
+}
+
+.action-button.is-coin-rush {
+  min-height: 98px;
+}
+
+.current-upgrades {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 9px 10px;
+  border: 2px solid rgba(255, 255, 255, 0.86);
+  border-radius: 16px;
+  background: rgba(255, 250, 221, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(126, 75, 39, 0.08);
+}
+
+.current-upgrades[hidden] {
+  display: none;
+}
+
+.current-upgrades > span {
+  color: #9b6848;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.current-upgrade-list {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.current-upgrade-list::-webkit-scrollbar {
+  display: none;
+}
+
+.current-upgrade-chip {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #6f432c;
+  background: white;
+  box-shadow: 0 2px 0 rgba(118, 67, 31, 0.12);
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.upgrade-option-copy {
+  grid-template-columns: 1fr;
 }

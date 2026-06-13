@@ -6,9 +6,6 @@ import {
   loadAssets,
 } from "./assets.js";
 import {
-  awakenedUpgradeCount,
-  BUILD_FAMILIES,
-  buildFamilyCount,
   classifyHeat,
   EggFryGame,
   EVENT_DEFINITIONS,
@@ -32,6 +29,15 @@ import {
   normalizeProgress,
   recordRun,
 } from "./progression.js";
+
+// 阻止双击触发默认缩放。
+document.addEventListener(
+  "dblclick",
+  (event) => {
+    event.preventDefault();
+  },
+  { passive: false },
+);
 
 const RARITY_LABELS = {
   normal: "普通",
@@ -60,6 +66,8 @@ const elements = {
   resultCard: document.querySelector("#resultOverlay .result-card"),
   upgradeOptions: document.querySelector("#upgradeOptions"),
   upgradeCopy: document.querySelector("#upgradeCopy"),
+  currentUpgrades: document.querySelector("#currentUpgrades"),
+  currentUpgradeList: document.querySelector("#currentUpgradeList"),
   upgradeRerollButton: document.querySelector("#upgradeRerollButton"),
   upgradeRerollCount: document.querySelector("#upgradeRerollCount"),
   startButton: document.querySelector("#startButton"),
@@ -87,7 +95,6 @@ const elements = {
   combo: document.querySelector("#comboValue"),
   comboCard: document.querySelector("#comboCard"),
   level: document.querySelector("#levelValue"),
-  shield: document.querySelector("#shieldValue"),
   eventBubble: document.querySelector("#eventBubble"),
   eventIcon: document.querySelector("#eventIcon"),
   eventTitle: document.querySelector("#eventTitle"),
@@ -107,15 +114,11 @@ const elements = {
   panAwakenGoal: document.querySelector("#panAwakenGoal"),
   panAwakenTrait: document.querySelector("#panAwakenTrait"),
   panReadyButton: document.querySelector("#panReadyButton"),
-  recipeStrip: document.querySelector("#recipeStrip"),
   heatRow: document.querySelector("#heatRow"),
   heatFill: document.querySelector("#heatFill"),
   heatMarker: document.querySelector("#heatMarker"),
   goodZone: document.querySelector("#goodZone"),
   perfectZone: document.querySelector("#perfectZone"),
-  buildTargetZone: document.querySelector("#buildTargetZone"),
-  buildRouteBadge: document.querySelector("#buildRouteBadge"),
-  actionBuildBadge: document.querySelector("#actionBuildBadge"),
   finalScoreLabel: document.querySelector("#finalScoreLabel"),
   finalScore: document.querySelector("#finalScore"),
   finalEggs: document.querySelector("#finalEggs"),
@@ -525,11 +528,10 @@ function resetTransientGameUi() {
   window.clearTimeout(impactTimer);
   window.clearTimeout(scoreBurstTimer);
   window.clearTimeout(panAwakenTimer);
-  elements.heatRow.classList.remove("is-blind", "is-coin-rush", "is-build-ready");
+  elements.heatRow.classList.remove("is-blind", "is-coin-rush");
   elements.heatRow.dataset.status = "raw";
   elements.actionButton.classList.remove(
     "is-coin-rush",
-    "is-build-ready",
     "is-awakening",
   );
   elements.actionButton.disabled = false;
@@ -785,8 +787,6 @@ function handleGameEvents() {
         break;
       case "upgradeSelected":
         elements.upgradeOverlay.classList.remove("is-visible");
-        const selectedFamily =
-          BUILD_FAMILIES[event.activeBuildFamily || event.upgrade.family];
         const upgradeImpact = event.awakened
           ? {
               icon: event.upgrade.icon,
@@ -795,30 +795,18 @@ function handleGameEvents() {
               rarity: "legendary",
               duration: 1550,
             }
-          : event.familyMilestone
-            ? {
-                icon: event.familyMilestone.icon,
-                title:
-                  event.familyMilestone.count >= 3
-                    ? `${event.familyMilestone.name}流派完全体！`
-                    : `${event.familyMilestone.name}联动启动！`,
-                short: BUILD_FAMILIES[event.familyMilestone.id].stance,
-                rarity:
-                  event.familyMilestone.multiplier >= 4 ? "legendary" : "epic",
-                duration: 1450,
-              }
-            : {
-                icon: event.upgrade.icon,
-                title: `${event.upgrade.name}装入锅具！`,
-                short: event.preview.headline,
-                rarity: event.upgrade.rarity,
-                duration: 1150,
-              };
+          : {
+              icon: event.upgrade.icon,
+              title: `${event.upgrade.name}装入锅具！`,
+              short: event.preview.headline,
+              rarity: event.upgrade.rarity,
+              duration: 1150,
+            };
         renderer.triggerUpgrade(upgradeImpact.title, upgradeImpact.short);
         playCue("upgrade");
         showImpactBanner(upgradeImpact, upgradeImpact.duration);
         vibrate(
-          event.awakened || event.familyMilestone
+          event.awakened
             ? [65, 30, 100, 35, 80]
             : [45, 25, 75],
         );
@@ -894,24 +882,20 @@ function showUpgradeDraft({
   elements.upgradeCopy.textContent = "";
   elements.upgradeRerollCount.textContent = rerolls;
   elements.upgradeRerollButton.disabled = rerolls <= 0;
+  renderCurrentUpgrades();
   elements.upgradeOptions.replaceChildren();
   for (const choice of choices) {
     const currentStacks = game.upgrades[choice.id] || 0;
     const preview = getUpgradePreview(choice.id, currentStacks);
-    const family = BUILD_FAMILIES[choice.family];
-    const isMainRoute =
-      !game.activeBuildFamily || game.activeBuildFamily === choice.family;
     const button = document.createElement("button");
     button.type = "button";
     button.className =
-      `upgrade-option rarity-${choice.rarity} family-${family.color}` +
-      (isMainRoute ? " is-synergy" : "") +
+      `upgrade-option rarity-${choice.rarity}` +
       (preview.awakening ? " is-awakening-card" : "");
     button.dataset.upgradeId = choice.id;
     button.innerHTML = `
       <span class="upgrade-option-icon">${choice.icon}</span>
       <span class="upgrade-option-copy">
-        <span class="upgrade-family" aria-label="${family.name}">${family.icon}</span>
         <span class="upgrade-name-row"><strong>${choice.name}</strong></span>
         <em>${preview.headline}</em>
         ${preview.awakening ? `<b class="upgrade-awakening">完全体</b>` : ""}
@@ -924,6 +908,19 @@ function showUpgradeDraft({
     elements.upgradeOptions.append(button);
   }
   elements.upgradeOverlay.classList.add("is-visible");
+}
+
+function renderCurrentUpgrades() {
+  const upgrades = game.getUpgradeSummary();
+  elements.currentUpgrades.hidden = upgrades.length === 0;
+  elements.currentUpgradeList.replaceChildren();
+  for (const upgrade of upgrades) {
+    const chip = document.createElement("span");
+    chip.className = "current-upgrade-chip";
+    chip.title = `${upgrade.name}：${upgrade.rule}`;
+    chip.textContent = `${upgrade.icon} ${upgrade.name}${upgrade.stacks > 1 ? ` ×${upgrade.stacks}` : ""}`;
+    elements.currentUpgradeList.append(chip);
+  }
 }
 
 function rerollUpgradeDraft() {
@@ -1020,15 +1017,6 @@ function showScoreBurst(result) {
       : "稳稳出锅";
   elements.scoreBurstReasons.replaceChildren();
   const reasons = [];
-  if (result.routeTriggered && result.activeBuildFamily) {
-    const routeFamily = BUILD_FAMILIES[result.activeBuildFamily];
-    reasons.push({
-      icon: routeFamily.icon,
-      label:
-        `${routeFamily.name}流派命中`,
-      family: result.activeBuildFamily,
-    });
-  }
   for (const trigger of result.buildTriggers || []) {
     const multiplier = trigger.multiplier
       ? Number.isInteger(trigger.multiplier)
@@ -1038,15 +1026,11 @@ function showScoreBurst(result) {
     reasons.push({
       icon: trigger.icon,
       label: trigger.text || (multiplier ? `${trigger.label} ×${multiplier}` : trigger.label),
-      family: trigger.family,
     });
   }
   for (const reason of reasons.slice(0, 3)) {
     const chip = document.createElement("b");
-    const familyColor = BUILD_FAMILIES[reason.family]?.color;
-    chip.className = familyColor
-      ? `score-trigger family-${familyColor}`
-      : "score-trigger is-awakened";
+    chip.className = "score-trigger is-awakened";
     chip.textContent = `${reason.icon} ${reason.label}`;
     elements.scoreBurstReasons.append(chip);
   }
@@ -1120,23 +1104,6 @@ function updateInterface(snapshot) {
   elements.app.dataset.comboMood = snapshot.comboMood;
   elements.app.dataset.lastHitQuality = snapshot.lastHitQuality || "none";
   elements.app.dataset.goalSecured = "false";
-  elements.shield.textContent = `🛡 回魂 ${snapshot.shieldCharges}`;
-  elements.shield.classList.toggle("is-hidden", snapshot.shieldCharges <= 0);
-
-  renderRecipeChips(elements.recipeStrip, snapshot.upgrades, true, true);
-  const buildVisual = getBuildVisual(snapshot);
-  elements.app.dataset.build = buildVisual?.id || "none";
-  elements.app.dataset.buildTier = String(buildVisual?.multiplier || 1);
-  elements.buildRouteBadge.hidden = !buildVisual;
-  elements.actionBuildBadge.hidden = !buildVisual;
-  if (buildVisual) {
-    elements.buildRouteBadge.textContent = getBuildStatusText(
-      buildVisual,
-      snapshot,
-    );
-    elements.actionBuildBadge.textContent =
-      `${buildVisual.family.icon} ${buildVisual.family.name}流派`;
-  }
 
   const egg = snapshot.currentEgg;
   const coinRushActive = snapshot.coinRushRemainingMs > 0;
@@ -1159,7 +1126,6 @@ function updateInterface(snapshot) {
   elements.eventBubble.classList.add(`rarity-${displayedEffect.rarity}`);
 
   updateHitZones(snapshot.effect);
-  updateBuildTargetZone(buildVisual, snapshot.effect);
   const currentHeat = egg.heat;
   const isBlind =
     snapshot.baseEffect.hiddenHeatAfter !== null &&
@@ -1176,9 +1142,6 @@ function updateInterface(snapshot) {
     blind: isBlind,
   });
 
-  const buildReady = isBuildTriggerReady(buildVisual, snapshot, currentHeat);
-  elements.actionButton.classList.toggle("is-build-ready", buildReady);
-  elements.heatRow.classList.toggle("is-build-ready", buildReady);
   elements.actionButton.classList.add("is-serve");
   elements.actionButton.classList.toggle(
     "is-awakening",
@@ -1198,121 +1161,6 @@ function updateInterface(snapshot) {
   );
 }
 
-function renderRecipeChips(container, upgrades, showEmpty = false, compact = false) {
-  container.replaceChildren();
-  if (compact) {
-    const upgradeMap = Object.fromEntries(
-      upgrades.map((upgrade) => [upgrade.id, upgrade.stacks]),
-    );
-    for (const [familyId, family] of Object.entries(BUILD_FAMILIES)) {
-      const count = buildFamilyCount(upgradeMap, familyId);
-      if (count <= 0) continue;
-      const chip = document.createElement("span");
-      chip.className = `recipe-family family-${family.color}${count >= 2 ? " is-active" : ""}`;
-      chip.textContent = `${family.icon}${count}`;
-      chip.title =
-        count >= 3
-          ? `${family.name}牌型完全成型`
-          : count >= 2
-            ? `${family.name}牌型已联动`
-            : `${family.name} 1/3`;
-      container.append(chip);
-    }
-    const awakened = awakenedUpgradeCount(upgradeMap);
-    if (awakened > 0) {
-      const chip = document.createElement("span");
-      chip.className = "recipe-family is-awakened";
-      chip.textContent = `🌟${awakened}`;
-      chip.title = `觉醒牌 ×${awakened}`;
-      container.append(chip);
-    }
-    return;
-  }
-  if (upgrades.length === 0 && showEmpty) {
-    const empty = document.createElement("span");
-    empty.className = "recipe-empty";
-    empty.textContent = "过关后选择 1 份秘制配方";
-    container.append(empty);
-    return;
-  }
-  for (const upgrade of upgrades) {
-    const chip = document.createElement("span");
-    chip.className = "recipe-chip";
-    chip.textContent = `${upgrade.icon} ${upgrade.name} ×${upgrade.stacks}`;
-    container.append(chip);
-  }
-}
-
-function getBuildVisual(snapshot) {
-  const upgradeMap = Object.fromEntries(
-    snapshot.upgrades.map((upgrade) => [upgrade.id, upgrade.stacks]),
-  );
-  const candidates = Object.entries(BUILD_FAMILIES)
-    .map(([id, family]) => ({
-      id,
-      family,
-      count: buildFamilyCount(upgradeMap, id),
-    }))
-    .filter((candidate) => candidate.count > 0)
-    .sort((left, right) => right.count - left.count);
-  if (candidates.length === 0) return null;
-  const selected =
-    candidates.find((candidate) => candidate.id === snapshot.activeBuildFamily) ||
-    candidates[0];
-  return {
-    ...selected,
-    multiplier: selected.count >= 3 ? 4 : selected.count >= 2 ? 2 : 1,
-    trigger: selected.family.trigger,
-    upgradeMap,
-  };
-}
-
-function getBuildStatusText(buildVisual, snapshot) {
-  const upgrades = buildVisual.upgradeMap;
-  if (buildVisual.id === "precision") {
-    if (snapshot.overdriveRemainingMs > 0) {
-      return `⚡ 超频 ${(snapshot.overdriveRemainingMs / 1000).toFixed(1)}s`;
-    }
-    const stacks = upgrades["perfect-chain"] || 0;
-    if (stacks > 0) {
-      const target = stacks >= 2 ? 2 : 3;
-      return `🖨️ 复印 ${snapshot.perfectChain || 0}/${target}`;
-    }
-    return "🧲 绿区自动出锅";
-  }
-  if (buildVisual.id === "carnival") {
-    if (snapshot.forcedJackpotPending) return "🎰 大奖待发";
-    const stacks = upgrades["event-album"] || 0;
-    if (stacks > 0) {
-      const target = stacks >= 2 ? 2 : 3;
-      return `🎰 大奖 ${snapshot.eventMeter}/${target}`;
-    }
-    return "📣 成功事件会续演";
-  }
-  if (buildVisual.id === "gamble") {
-    if (snapshot.riskStreak > 0) return `🌋 红温 ${snapshot.riskStreak} 层`;
-    if (snapshot.shieldCharges > 0) return `🛟 回魂 ${snapshot.shieldCharges}`;
-    return "🥩 微焦就是 Perfect";
-  }
-  if (snapshot.remainingMs <= 3_000 && upgrades["last-call"]) {
-    return "🚨 末秒狂飙";
-  }
-  if (upgrades["opening-jackpot"]) return "🍽️ 定期金币装盘";
-  return "❤️ 连中恢复生命";
-}
-
-function isBuildTriggerReady(buildVisual, snapshot, heat) {
-  if (!buildVisual) return false;
-  if (buildVisual.id === "precision") {
-    return heat >= snapshot.effect.perfectMin && heat <= snapshot.effect.perfectMax;
-  }
-  if (buildVisual.id === "carnival") return snapshot.baseEffect.id !== "none";
-  if (buildVisual.id === "gamble") {
-    return heat > snapshot.effect.perfectMax && heat <= 95;
-  }
-  return true;
-}
-
 function updatePerfectZone(min, max) {
   elements.perfectZone.style.left = `${min}%`;
   elements.perfectZone.style.width = `${max - min}%`;
@@ -1323,16 +1171,6 @@ function updateHitZones(effect) {
   elements.goodZone.style.left = `${goodMin}%`;
   elements.goodZone.style.width = `${goodMax - goodMin}%`;
   updatePerfectZone(perfectMin, perfectMax);
-}
-
-function updateBuildTargetZone(buildVisual, effect) {
-  const isGambleRoute =
-    buildVisual?.id === "gamble";
-  elements.buildTargetZone.classList.toggle("is-visible", isGambleRoute);
-  if (!isGambleRoute) return;
-  const start = Math.min(95, effect.perfectMax + 1);
-  elements.buildTargetZone.style.left = `${start}%`;
-  elements.buildTargetZone.style.width = `${Math.max(0, 95 - start)}%`;
 }
 
 function updateHeatRow({

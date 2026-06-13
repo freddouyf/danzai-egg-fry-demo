@@ -4,9 +4,6 @@ import assert from "node:assert/strict";
 import {
   adaptiveLevelTarget,
   awakenedUpgradeCount,
-  BUILD_FAMILIES,
-  buildFamilyCount,
-  buildFamilyMultiplier,
   classifyHeat,
   COMBO_MOOD,
   comboMultiplier,
@@ -180,7 +177,7 @@ test("暴躁炉火提高速度和分数，慢悠悠蛋降低速度", () => {
 test("全部随机事件与配方均可按定义读取", () => {
   assert.equal(EVENT_DEFINITIONS.length, 13);
   assert.equal(UPGRADE_DEFINITIONS.length, 13);
-  assert.equal(Object.keys(BUILD_FAMILIES).length, 4);
+  assert.ok(UPGRADE_DEFINITIONS.every((upgrade) => upgrade.family === "basic"));
   assert.equal(PAN_PERKS.length, 5);
   for (const event of EVENT_DEFINITIONS) {
     assert.equal(createEvent(event.id).id, event.id);
@@ -448,7 +445,7 @@ test("强化预览只显示会直接改变玩法的结果", () => {
   );
 });
 
-test("三选一会保证一张牌续上当前最强牌型", () => {
+test("三选一不再按流派偏置，选项保持唯一", () => {
   const game = new EggFryGame({ random: () => 0, eventChance: 0 });
   game.start();
   game.upgrades["steady-hand"] = 1;
@@ -456,22 +453,18 @@ test("三选一会保证一张牌续上当前最强牌型", () => {
 
   assert.equal(game.state, "choosing");
   assert.equal(game.pendingChoices.length, 3);
-  assert.ok(
-    game.pendingChoices.some(
-      (choice) => choice.family === "precision" && choice.id !== "steady-hand",
-    ),
-  );
+  assert.equal(new Set(game.pendingChoices.map((choice) => choice.id)).size, 3);
+  assert.ok(game.pendingChoices.every((choice) => choice.family === "basic"));
 });
 
-test("确定主流派后每次选牌至少提供两张主路线组件", () => {
+test("遗留流派字段不会影响强化选项", () => {
   const game = new EggFryGame({ random: () => 0, eventChance: 0 });
   game.start();
   game.activeBuildFamily = "precision";
   game.openUpgradeDraft();
 
-  assert.ok(
-    game.pendingChoices.filter((choice) => choice.family === "precision").length >= 2,
-  );
+  assert.equal(game.pendingChoices.length, 3);
+  assert.ok(game.pendingChoices.every((choice) => choice.family === "basic"));
 });
 
 test("每关强化可免费换一批一次，并尽量避开原三张", () => {
@@ -525,18 +518,11 @@ test("规则型强化会直接改变火速和微焦判定", () => {
   assert.equal(effect.singedAsPerfect, true);
 });
 
-test("同牌型收集两张和三张会形成乘区", () => {
-  const upgrades = {
-    "steady-hand": 1,
-    "perfect-chain": 1,
-  };
-  assert.equal(buildFamilyCount(upgrades, "precision"), 2);
-  assert.equal(buildFamilyMultiplier(upgrades, "precision"), 2);
-  upgrades["combo-engine"] = 1;
-  assert.equal(buildFamilyMultiplier(upgrades, "precision"), 4);
+test("多张强化不会再产生隐藏流派倍率", () => {
+  assert.ok(UPGRADE_DEFINITIONS.every((upgrade) => upgrade.family === "basic"));
 });
 
-test("精准牌型会在第三颗 Perfect 触发复印爆分", () => {
+test("完美复印机仍会在第三颗 Perfect 触发自身效果", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
   game.upgrades["steady-hand"] = 1;
@@ -548,17 +534,17 @@ test("精准牌型会在第三颗 Perfect 触发复印爆分", () => {
 
   const third = cookAt(game, 80);
 
-  assert.equal(first.buildMultiplier, 2);
-  assert.equal(second.buildMultiplier, 2);
-  assert.equal(third.buildMultiplier, 6);
+  assert.equal(first.buildMultiplier, undefined);
+  assert.equal(second.buildMultiplier, undefined);
+  assert.equal(third.buildMultiplier, 3);
   assert.deepEqual(
     third.buildTriggers.map((trigger) => trigger.id),
-    ["perfect-chain", "family-precision"],
+    ["perfect-chain"],
   );
   assert.ok(third.awardedScore > second.awardedScore);
 });
 
-test("收集第二和第三张同牌型卡会发出成型里程碑", () => {
+test("选择强化只提升卡牌本身，不再发出流派里程碑", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
   game.upgrades["steady-hand"] = 1;
@@ -571,14 +557,8 @@ test("收集第二和第三张同牌型卡会发出成型里程碑", () => {
   const twoPiece = game
     .drainEvents()
     .find((event) => event.type === "upgradeSelected");
-  assert.deepEqual(twoPiece.familyMilestone, {
-    id: "precision",
-    icon: "🎯",
-    name: "精准",
-    color: "blue",
-    count: 2,
-    multiplier: 2,
-  });
+  assert.equal(twoPiece.familyMilestone, undefined);
+  assert.equal(twoPiece.familyProgress, undefined);
 
   game.state = "choosing";
   game.pendingChoices = [
@@ -588,28 +568,26 @@ test("收集第二和第三张同牌型卡会发出成型里程碑", () => {
   const threePiece = game
     .drainEvents()
     .find((event) => event.type === "upgradeSelected");
-  assert.equal(threePiece.familyMilestone.count, 3);
-  assert.equal(threePiece.familyMilestone.multiplier, 4);
+  assert.equal(threePiece.familyMilestone, undefined);
+  assert.equal(threePiece.familyProgress, undefined);
 });
 
-test("豪赌牌型会把微焦路线变成高倍率构筑", () => {
+test("微焦强化只触发卡牌自身奖励，不再叠流派倍率", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
   game.upgrades["singed-gourmet"] = 1;
   game.upgrades["danger-chef"] = 1;
   game.upgrades["combo-armor"] = 1;
-  game.activeBuildFamily = "gamble";
   game.stageEggs = 2;
   const result = cookAt(game, 90);
 
   assert.equal(result.isGood, true);
-  assert.equal(result.routeMultiplier, 2);
-  assert.equal(result.buildMultiplier, 7);
+  assert.equal(result.routeMultiplier, undefined);
+  assert.equal(result.buildMultiplier, 1.75);
   assert.match(result.buildLabel, /红温 1 层/);
-  assert.match(result.buildLabel, /豪赌牌型 ×4/);
   assert.deepEqual(
     result.buildTriggers.map((trigger) => trigger.family),
-    ["gamble", "gamble"],
+    ["basic"],
   );
 });
 
@@ -863,7 +841,7 @@ test("爱心便当通过连续成功回血，回魂锅盖每关补充次数", ()
   game.state = "choosing";
   assert.equal(game.selectUpgrade("time-seasoning"), true);
   assert.equal(game.level, 2);
-  assert.equal(game.activeBuildFamily, "tempo");
+  assert.equal(game.activeBuildFamily, undefined);
   assert.equal(game.remainingMs, 10_000);
   game.health = 2;
   game.stageEggs = 4;
@@ -905,7 +883,7 @@ test("读条烧到底会立即扣除一颗心并换蛋", () => {
   assert.ok(game.drainEvents().some((event) => event.type === "heartLost"));
 });
 
-test("过关后选择一次强化，再保留构筑进入下一关", () => {
+test("过关后选择一次强化，并保留已有强化进入下一关", () => {
   const game = new EggFryGame({ durationMs: 1_000, eventChance: 0 });
   game.start();
   game.upgrades["event-booster"] = 1;
@@ -926,7 +904,7 @@ test("过关后选择一次强化，再保留构筑进入下一关", () => {
   assert.equal(game.remainingMs, 1_000);
   assert.equal(levelScoreMultiplier(2), 1.75);
   assert.ok(game.getActiveEffect().speedMultiplier > 1);
-  assert.ok(game.getActiveEffect().perfectMin < 70);
+  assert.ok(game.getActiveEffect().perfectMin > 70);
   assert.ok(levelTarget(2) > levelTarget(1));
 });
 
@@ -1001,30 +979,33 @@ test("成功煎蛋不会提前结束本关，必须坚持到倒计时结束", ()
   assert.equal(game.stageCleared, true);
 });
 
-test("最近选择的流派会直接改变下一关操作手感", () => {
-  const precision = new EggFryGame({ eventChance: 0 });
-  precision.start();
-  precision.activeBuildFamily = "precision";
-  precision.stageEggs = 2;
-  assert.equal(precision.getActiveEffect().perfectMin, 64);
-  assert.equal(precision.getActiveEffect().perfectMax, 91);
+test("遗留流派字段不会改变火候、倍率或命中结果", () => {
+  const baseline = new EggFryGame({ eventChance: 0 });
+  baseline.start();
+  baseline.stageEggs = 2;
 
-  const carnival = new EggFryGame({ eventChance: 0 });
-  carnival.start();
-  carnival.activeBuildFamily = "carnival";
-  carnival.spawnEgg("double-yolk");
-  assert.equal(carnival.getActiveEffect().scoreMultiplier, 3.75);
+  const legacy = new EggFryGame({ eventChance: 0 });
+  legacy.start();
+  legacy.stageEggs = 2;
+  legacy.activeBuildFamily = "precision";
 
-  const gamble = new EggFryGame({ eventChance: 0 });
-  gamble.start();
-  gamble.activeBuildFamily = "gamble";
-  gamble.upgrades["singed-gourmet"] = 1;
-  gamble.stageEggs = 2;
-  assert.equal(gamble.getActiveEffect().speedMultiplier, 1.12);
-  const gambleResult = cookAt(gamble, 90);
-  assert.equal(gambleResult.routeTriggered, true);
-  assert.equal(gambleResult.routeMultiplier, 2);
-  assert.equal(gambleResult.awardedScore, 40);
+  assert.deepEqual(
+    {
+      perfectMin: legacy.getActiveEffect().perfectMin,
+      perfectMax: legacy.getActiveEffect().perfectMax,
+      speedMultiplier: legacy.getActiveEffect().speedMultiplier,
+      scoreMultiplier: legacy.getActiveEffect().scoreMultiplier,
+    },
+    {
+      perfectMin: baseline.getActiveEffect().perfectMin,
+      perfectMax: baseline.getActiveEffect().perfectMax,
+      speedMultiplier: baseline.getActiveEffect().speedMultiplier,
+      scoreMultiplier: baseline.getActiveEffect().scoreMultiplier,
+    },
+  );
+  const result = cookAt(legacy, 80);
+  assert.equal(result.routeTriggered, undefined);
+  assert.equal(result.routeMultiplier, undefined);
 });
 
 test("回魂锅盖会消耗一次并挡住区域外失误", () => {

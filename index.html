@@ -2,7 +2,10 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <meta name="theme-color" content="#ffca57" />
     <meta
       name="description"
@@ -48,15 +51,6 @@
             </div>
           </div>
 
-          <div class="stage-stats" aria-label="本局强化状态">
-            <div class="run-stats">
-              <span class="shield-badge" id="shieldValue">🛡 护盾 0</span>
-              <div class="recipe-strip" id="recipeStrip" aria-label="本局秘制配方">
-                <span class="recipe-empty">配方 0</span>
-              </div>
-            </div>
-          </div>
-
           <div class="toast" id="toast" role="status" aria-live="polite"></div>
           <div class="score-burst" id="scoreBurst" aria-hidden="true">
             <strong id="scoreBurstValue">🪙 +4</strong>
@@ -85,11 +79,9 @@
             <div class="heat-track" aria-hidden="true">
               <span class="good-zone" id="goodZone"></span>
               <span class="perfect-zone" id="perfectZone"></span>
-              <span class="build-target-zone" id="buildTargetZone"></span>
               <span class="heat-fill" id="heatFill"></span>
               <span class="heat-marker" id="heatMarker"></span>
             </div>
-            <span class="build-route-badge" id="buildRouteBadge" hidden></span>
           </div>
         </section>
 
@@ -97,7 +89,6 @@
           <button class="action-button" id="actionButton" type="button">
             <span class="button-icon" id="actionIcon" aria-hidden="true">✓</span>
             <span id="actionLabel">出锅</span>
-            <small class="action-build-badge" id="actionBuildBadge" hidden></small>
           </button>
         </div>
 
@@ -236,6 +227,10 @@
         <div class="upgrade-card">
           <h2 id="upgradeTitle">选个新花样</h2>
           <p class="upgrade-copy" id="upgradeCopy"></p>
+          <div class="current-upgrades" id="currentUpgrades" hidden>
+            <span>当前强化</span>
+            <div class="current-upgrade-list" id="currentUpgradeList"></div>
+          </div>
           <div class="upgrade-tools">
             <button class="upgrade-reroll" id="upgradeRerollButton" type="button">
               ↻ 换一批 <b id="upgradeRerollCount">1</b>
