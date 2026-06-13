@@ -5,6 +5,7 @@ export const EVENT_CHANCE = 0.72;
 export const LEVEL_SPEED_STEP = 0.14;
 export const LEVEL_SCORE_STEP = 0.75;
 export const MAX_STAGE_EARNED_TIME_MS = 0;
+export const COIN_RUSH_END_GRACE_MS = 700;
 export const EARLY_LEVEL_TARGETS = Object.freeze([
   7,
   8,
@@ -750,6 +751,7 @@ export class EggFryGame {
     this.runCoins = 0;
     this.stageCoins = 0;
     this.coinRushRemainingMs = 0;
+    this.coinRushGraceRemainingMs = 0;
     this.coinRushTaps = 0;
     this.stageGuardCharges = this.characterBuff.stageGuard || 0;
     this.eventGuardUsed = false;
@@ -846,11 +848,24 @@ export class EggFryGame {
         this.coinRushRemainingMs - rawElapsedMs,
       );
       if (this.coinRushRemainingMs <= 0) {
+        this.coinRushGraceRemainingMs = COIN_RUSH_END_GRACE_MS;
         this.pushEvent("coinRushEnded", {
           taps: this.coinRushTaps,
           coins: this.stageCoins,
+          graceMs: this.coinRushGraceRemainingMs,
         });
         this.spawnEgg();
+      }
+      return this.getSnapshot();
+    }
+
+    if (this.coinRushGraceRemainingMs > 0) {
+      this.coinRushGraceRemainingMs = Math.max(
+        0,
+        this.coinRushGraceRemainingMs - rawElapsedMs,
+      );
+      if (this.coinRushGraceRemainingMs === 0) {
+        this.pushEvent("coinRushGraceEnded");
       }
       return this.getSnapshot();
     }
@@ -1484,6 +1499,7 @@ export class EggFryGame {
     this.runEndReason = reason;
     this.currentEgg = null;
     this.coinRushRemainingMs = 0;
+    this.coinRushGraceRemainingMs = 0;
     this.remainingMs = 0;
     this.coinsEarned = this.calculateCoins();
     this.pushEvent("gameEnded", {
@@ -1719,6 +1735,7 @@ export class EggFryGame {
     this.remainingMs = 0;
     this.currentEgg = null;
     this.coinRushRemainingMs = 0;
+    this.coinRushGraceRemainingMs = 0;
     if (this.stageCleared) {
       const clearBonus = 8 + this.level * 2;
       this.runCoins += clearBonus;
@@ -1770,6 +1787,7 @@ export class EggFryGame {
     this.stagePerfects = 0;
     this.stageEarnedTimeMs = 0;
     this.panCharge = 0;
+    this.coinRushGraceRemainingMs = 0;
     this.panGuardCharges = getPanPerk(this.level).guardCharges || 0;
     this.riskStreak = 0;
     this.overdriveRemainingMs = 0;
@@ -1797,6 +1815,10 @@ export class EggFryGame {
   }
 
   ensurePlaying() {
+    if (this.state === "playing" && this.coinRushGraceRemainingMs > 0) {
+      this.pushEvent("invalidAction", { message: "准备出锅！" });
+      return false;
+    }
     if (this.state === "playing" && this.panIntroRemainingMs > 0) {
       this.pushEvent("invalidAction", { message: "先确认本关特殊目标。" });
       return false;
@@ -1857,6 +1879,7 @@ export class EggFryGame {
       runCoins: this.runCoins,
       stageCoins: this.stageCoins,
       coinRushRemainingMs: this.coinRushRemainingMs,
+      coinRushGraceRemainingMs: this.coinRushGraceRemainingMs,
       coinRushTaps: this.coinRushTaps,
       totalScore: this.totalScore,
       stageScore: this.stageScore,

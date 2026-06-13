@@ -867,21 +867,6 @@ export class GameRenderer {
     }
     ctx.restore();
 
-    ctx.save();
-    ctx.translate(348, 224);
-    ctx.fillStyle = theme.rim;
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(0, 0, 17, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = theme.inner;
-    ctx.font = "900 9px Microsoft YaHei";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(`LV${theme.level}`, 0, 0);
-    ctx.restore();
   }
 
   drawPanUpgradeAnimation(ctx, now) {

@@ -6,6 +6,7 @@ import {
   awakenedUpgradeCount,
   classifyHeat,
   COMBO_MOOD,
+  COIN_RUSH_END_GRACE_MS,
   comboMultiplier,
   createEvent,
   createRandomEvent,
@@ -758,6 +759,20 @@ test("金币狂欢冻结关卡倒计时，狂点会连续掉币并触发十连�
   assert.equal(game.coinRushRemainingMs, 2_500);
   game.update(2_500);
   assert.ok(game.currentEgg);
+  assert.equal(game.remainingMs, remaining);
+  assert.equal(game.coinRushGraceRemainingMs, COIN_RUSH_END_GRACE_MS);
+
+  const health = game.health;
+  assert.equal(game.cook(), false);
+  assert.equal(game.health, health);
+  assert.ok(
+    game
+      .drainEvents()
+      .some((event) => event.type === "invalidAction" && event.message === "准备出锅！"),
+  );
+
+  game.update(COIN_RUSH_END_GRACE_MS);
+  assert.equal(game.coinRushGraceRemainingMs, 0);
   assert.equal(game.remainingMs, remaining);
 });
 

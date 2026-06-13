@@ -162,6 +162,7 @@ let loadedAssets = {};
 let lastFrameAt = performance.now();
 let toastTimer = null;
 let impactTimer = null;
+let eventBubbleTimer = null;
 let scoreBurstTimer = null;
 let panAwakenTimer = null;
 let stageResultTimer = null;
@@ -527,12 +528,16 @@ function closeMechanics({ resume = false } = {}) {
 function resetTransientGameUi() {
   window.clearTimeout(toastTimer);
   window.clearTimeout(impactTimer);
+  window.clearTimeout(eventBubbleTimer);
   window.clearTimeout(scoreBurstTimer);
   window.clearTimeout(panAwakenTimer);
   elements.heatRow.classList.remove("is-blind", "is-coin-rush");
   elements.heatRow.dataset.status = "raw";
   elements.actionButton.classList.remove(
     "is-coin-rush",
+    "is-coin-rush-ending",
+    "is-coin-rush-grace",
+    "is-coin-tapping",
     "is-awakening",
   );
   elements.actionButton.disabled = false;
@@ -586,6 +591,12 @@ function performAction() {
     handleGameEvents();
     return;
   }
+  if (game.coinRushGraceRemainingMs > 0) {
+    showToast("准备出锅！", 650);
+    replayClass(elements.actionButton, "is-coin-tapping");
+    window.setTimeout(() => elements.actionButton.classList.remove("is-coin-tapping"), 220);
+    return;
+  }
   game.cook();
   handleGameEvents();
 }
@@ -594,24 +605,28 @@ function presentEventTrigger(event) {
   const discovery = discoverEvent(progress, event.effect.id, EVENT_IDS);
   if (discovery.isNew) {
     saveProgress(discovery.progress);
-    showToast(`📖 图鉴解锁：${event.effect.title}`);
+    showToast(`图鉴解锁：${event.effect.title}`, 900);
   }
-  elements.eventBubble.hidden = false;
-  setEventArt(elements.eventIcon, event.effect);
-  elements.eventTitle.textContent = event.effect.short || event.effect.title;
-  elements.eventBubble.classList.remove(...RARITY_CLASSES);
-  elements.eventBubble.classList.add(`rarity-${event.effect.rarity}`);
-  replayClass(elements.eventBubble, "is-popping");
+
+  if (event.effect.specialMode === "coin-rush") return;
+
+  const important = isImportantEvent(event.effect);
+  showToast(getEventToast(event.effect), important ? 1_050 : 850);
+  playCue(important ? "event" : "good", event.effect.rarity);
+  vibrate(important ? [35, 20, 55] : 12);
+
+  if (!important) return;
+
+  showEventBubble(event.effect, 1_050);
   replayClass(elements.app, "is-event-struck");
   renderer.triggerEvent(event.effect);
-  showImpactBanner(event.effect, 1650);
-  playCue("event", event.effect.rarity);
-  vibrate(
-    event.effect.rarity === "legendary"
-      ? [70, 35, 110, 35, 70]
-      : ["epic", "danger"].includes(event.effect.rarity)
-        ? [55, 25, 80]
-        : [35, 20, 45],
+  showImpactBanner(
+    {
+      ...event.effect,
+      title: getEventToast(event.effect),
+      short: event.effect.short,
+    },
+    1_000,
   );
 }
 
@@ -714,9 +729,9 @@ function handleGameEvents() {
         showImpactBanner({
           icon: "🤑",
           title: "金币狂欢！",
-          short: "狂点按钮，把金币敲出来！",
+          short: "最后倒数结束前狂点！",
           rarity: "legendary",
-        }, 1200);
+        }, 1_000);
         playCue("perfect");
         vibrate([45, 20, 70, 25, 90]);
         break;
@@ -731,7 +746,7 @@ function handleGameEvents() {
         }
         break;
       case "coinRushEnded":
-        showToast(`金币狂欢结束！共点击 ${event.taps} 次`);
+        showToast("狂欢结束，准备出锅！", 900);
         break;
       case "served":
         renderer.triggerServe(event.result);
@@ -957,6 +972,37 @@ function setEventArt(element, effect) {
   }
 }
 
+function isImportantEvent(effect) {
+  return (
+    effect?.specialMode === "coin-rush" ||
+    effect?.rarity === "danger" ||
+    effect?.rarity === "legendary" ||
+    ["jackpot", "devil-fire", "blind-heat"].includes(effect?.id)
+  );
+}
+
+function getEventToast(effect) {
+  if (effect?.specialMode === "coin-rush") return "金币狂欢开始！";
+  if (effect?.rarity === "danger") return "危险火候！";
+  if (effect?.id === "jackpot") return "超级大奖！";
+  if (effect?.id === "time-warp") return "成功回血！";
+  if (effect?.id === "lucky-scallion") return "金币加成！";
+  return effect?.short || "事件触发！";
+}
+
+function showEventBubble(effect, duration = 1_000) {
+  window.clearTimeout(eventBubbleTimer);
+  elements.eventBubble.hidden = false;
+  setEventArt(elements.eventIcon, effect);
+  elements.eventTitle.textContent = effect.short || effect.title;
+  elements.eventBubble.classList.remove(...RARITY_CLASSES);
+  elements.eventBubble.classList.add(`rarity-${effect.rarity}`);
+  replayClass(elements.eventBubble, "is-popping");
+  eventBubbleTimer = window.setTimeout(() => {
+    elements.eventBubble.hidden = true;
+  }, duration);
+}
+
 function maybeShowLevelIntro(event) {
   if (!event?.specialGoal) return false;
   game.beginPanIntro(Number.POSITIVE_INFINITY);
@@ -1002,13 +1048,13 @@ function confirmPanReady() {
   handleGameEvents();
 }
 
-function showToast(message) {
+function showToast(message, duration = 1_750) {
   window.clearTimeout(toastTimer);
   elements.toast.textContent = message;
   elements.toast.classList.add("is-visible");
   toastTimer = window.setTimeout(() => {
     elements.toast.classList.remove("is-visible");
-  }, 1750);
+  }, duration);
 }
 
 function showScoreBurst(result) {
@@ -1065,10 +1111,10 @@ function showScoreBurst(result) {
 
 function showCoinTap(event) {
   window.clearTimeout(scoreBurstTimer);
-  elements.scoreBurstValue.textContent = "金币雨！";
+  elements.scoreBurstValue.textContent = `+${event.reward}`;
   elements.scoreBurstLabel.textContent = event.milestone
-    ? "大奖加码！"
-    : "继续点击";
+    ? "十连加码！"
+    : "金币雨！";
   elements.scoreBurstReasons.replaceChildren();
   elements.scoreBurst.classList.remove(
     "is-visible",
@@ -1080,9 +1126,24 @@ function showCoinTap(event) {
     "is-goal",
   );
   elements.scoreBurst.classList.add("is-visible", "is-perfect", "is-build");
+  replayClass(elements.actionButton, "is-coin-tapping");
+  window.setTimeout(() => elements.actionButton.classList.remove("is-coin-tapping"), 220);
+  spawnCoinTapFloat(event);
   scoreBurstTimer = window.setTimeout(() => {
     elements.scoreBurst.classList.remove("is-visible");
-  }, 280);
+  }, event.milestone ? 420 : 260);
+}
+
+function spawnCoinTapFloat(event) {
+  const float = document.createElement("span");
+  const drift = ((event.taps % 7) - 3) * 9;
+  float.className = event.milestone
+    ? "coin-tap-float is-milestone"
+    : "coin-tap-float";
+  float.textContent = event.milestone ? `+${event.reward} 爆!` : `+${event.reward}`;
+  float.style.setProperty("--coin-drift", `${drift}px`);
+  elements.actionButton.append(float);
+  window.setTimeout(() => float.remove(), 720);
 }
 
 function replayClass(element, className) {
@@ -1112,27 +1173,26 @@ function updateInterface(snapshot) {
 
   const egg = snapshot.currentEgg;
   const coinRushActive = snapshot.coinRushRemainingMs > 0;
+  const coinRushGraceActive =
+    !coinRushActive && snapshot.coinRushGraceRemainingMs > 0;
+  const coinRushEnding = coinRushActive && snapshot.coinRushRemainingMs <= 1_000;
   elements.app.dataset.coinRush = String(coinRushActive);
+  elements.app.dataset.coinRushEnding = String(coinRushEnding);
+  elements.app.dataset.coinRushGrace = String(coinRushGraceActive);
   elements.actionButton.classList.toggle("is-coin-rush", coinRushActive);
+  elements.actionButton.classList.toggle("is-coin-rush-ending", coinRushEnding);
+  elements.actionButton.classList.toggle("is-coin-rush-grace", coinRushGraceActive);
   elements.heatRow.classList.toggle("is-coin-rush", coinRushActive);
   if (coinRushActive) {
     elements.actionButton.disabled = false;
     elements.actionIcon.textContent = "🪙";
-    elements.actionLabel.textContent = "狂点金币";
+    elements.actionLabel.textContent = coinRushEnding
+      ? "最后 1 秒！"
+      : `狂点金币！${Math.ceil(snapshot.coinRushRemainingMs / 1000)}`;
     elements.actionButton.setAttribute("aria-label", "狂点金币");
     return;
   }
   if (!egg) return;
-
-  const displayedEffect = snapshot.baseEffect;
-  const hasVisibleEvent = displayedEffect.id !== "none";
-  elements.eventBubble.hidden = !hasVisibleEvent;
-  if (hasVisibleEvent) {
-    setEventArt(elements.eventIcon, displayedEffect);
-    elements.eventTitle.textContent = displayedEffect.short || displayedEffect.title;
-    elements.eventBubble.classList.remove(...RARITY_CLASSES);
-    elements.eventBubble.classList.add(`rarity-${displayedEffect.rarity}`);
-  }
 
   updateHitZones(snapshot.effect);
   const currentHeat = egg.heat;
@@ -1159,12 +1219,16 @@ function updateInterface(snapshot) {
   elements.actionButton.disabled = snapshot.panIntroRemainingMs > 0;
   elements.actionIcon.textContent = "✓";
   elements.actionLabel.textContent =
-    snapshot.panIntroRemainingMs > 0
+    coinRushGraceActive
+      ? "准备..."
+      : snapshot.panIntroRemainingMs > 0
       ? "读规则"
       : "出锅";
   elements.actionButton.setAttribute(
     "aria-label",
-    snapshot.panIntroRemainingMs > 0
+    coinRushGraceActive
+      ? "准备出锅"
+      : snapshot.panIntroRemainingMs > 0
       ? "特殊目标确认中"
       : "出锅",
   );
