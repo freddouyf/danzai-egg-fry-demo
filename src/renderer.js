@@ -261,17 +261,7 @@ export class GameRenderer {
       if (result.buildMultiplier >= 4) {
         this.activateCostume(now, 1_350);
       }
-      const multiplier = Number.isInteger(dominantTrigger.multiplier)
-        ? dominantTrigger.multiplier
-        : dominantTrigger.multiplier.toFixed(1);
-      this.scorePopups.push({
-        label: `${dominantTrigger.icon} ${dominantTrigger.label} ×${multiplier}`,
-        color: palette[1],
-        startedAt: now,
-        duration: 1_250,
-        large: result.buildMultiplier >= 4,
-        offsetY: 34,
-      });
+      void dominantTrigger;
     }
   }
 

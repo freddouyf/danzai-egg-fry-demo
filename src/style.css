@@ -6382,3 +6382,176 @@ img,
 .heat-row.is-active:not(.is-coin-rush) .perfect-zone {
   visibility: visible !important;
 }
+
+/* V29: reduce center feedback clutter and tighten the active play layout. */
+.game-screen {
+  gap: clamp(3px, 0.55svh, 5px);
+  padding:
+    max(6px, env(safe-area-inset-top))
+    8px
+    max(6px, env(safe-area-inset-bottom));
+}
+
+.stage-wrap {
+  width: 100%;
+  max-height: min(52svh, calc(100svh - 248px));
+  flex: 0 0 auto;
+  aspect-ratio: 1 / 1;
+  border-radius: 25px;
+}
+
+.combat-readout {
+  top: 58px;
+}
+
+.score-burst {
+  top: 39%;
+  width: min(330px, 86vw);
+}
+
+.score-burst strong {
+  font-size: clamp(44px, 12vw, 58px);
+  letter-spacing: -0.03em;
+  text-align: center;
+}
+
+.score-burst.is-perfect strong,
+.score-burst.is-build strong {
+  font-size: clamp(50px, 13.5vw, 64px);
+}
+
+.score-burst.is-miss strong {
+  color: #6e4438;
+}
+
+.score-burst.is-event strong,
+.score-burst.is-coin-rush strong {
+  color: #ef3f75;
+  text-shadow:
+    0 5px 0 white,
+    0 0 18px rgba(255, 221, 58, 0.72),
+    0 10px 24px rgba(118, 42, 70, 0.3);
+}
+
+.score-burst span {
+  max-width: min(300px, 78vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.score-burst span:empty {
+  display: none;
+}
+
+.score-burst-reasons {
+  display: none !important;
+}
+
+.impact-banner {
+  top: 43%;
+  width: min(72%, 272px);
+  min-height: 78px;
+  padding: 8px 12px;
+  border-width: 3px;
+  border-radius: 22px;
+}
+
+.impact-banner > span {
+  font-size: 25px;
+}
+
+.impact-banner > span.has-art {
+  width: 54px;
+  height: 54px;
+  margin: -20px 0 0;
+  border-radius: 17px;
+}
+
+.impact-banner strong {
+  font-size: 19px;
+}
+
+.impact-banner small {
+  font-size: 10px;
+}
+
+.heat-panel {
+  padding: 10px 10px 11px;
+  border-radius: 25px;
+}
+
+.heat-row {
+  min-height: 82px;
+}
+
+.heat-track {
+  height: 56px;
+  box-shadow:
+    inset 0 4px 8px rgba(113, 73, 20, 0.22),
+    0 4px 10px rgba(102, 61, 31, 0.12);
+}
+
+.perfect-zone {
+  box-shadow:
+    inset 0 0 0 4px rgba(255, 255, 255, 0.48),
+    0 0 14px rgba(46, 190, 104, 0.5);
+}
+
+.heat-marker {
+  width: 13px;
+  height: 68px;
+  transform: translate(-6px, -50%);
+  border-width: 4px;
+  box-shadow:
+    0 3px 7px rgba(66, 42, 22, 0.34),
+    0 0 0 3px rgba(255, 255, 255, 0.28);
+}
+
+.controls {
+  margin-top: 0;
+}
+
+.action-button {
+  min-height: 90px;
+  border-radius: 25px;
+}
+
+.keyboard-tip {
+  margin-block: 1px 0;
+  line-height: 1.1;
+}
+
+@media (max-height: 720px) {
+  .stage-wrap {
+    max-height: min(49svh, calc(100svh - 232px));
+  }
+
+  .combat-readout {
+    top: 54px;
+  }
+
+  .heat-panel {
+    padding-block: 8px;
+  }
+
+  .heat-row {
+    min-height: 70px;
+  }
+
+  .heat-track {
+    height: 48px;
+  }
+
+  .heat-marker {
+    width: 12px;
+    height: 60px;
+  }
+
+  .action-button {
+    min-height: 80px;
+  }
+
+  .score-burst {
+    top: 38%;
+  }
+}

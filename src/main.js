@@ -568,6 +568,9 @@ function resetTransientGameUi() {
     "is-visible",
     "is-perfect",
     "is-good",
+    "is-miss",
+    "is-event",
+    "is-coin-rush",
     "is-fever",
     "is-burnt",
     "is-build",
@@ -627,17 +630,16 @@ function presentEventTrigger(event) {
 
   if (!important) return;
 
-  showEventBubble(event.effect, 1_050);
   replayClass(elements.app, "is-event-struck");
-  renderer.triggerEvent(event.effect);
-  showImpactBanner(
-    {
-      ...event.effect,
+  if (event.effect.rarity === "legendary" || event.effect.id === "devil-fire") {
+    showActionFeedback({
       title: getEventToast(event.effect),
-      short: event.effect.short,
-    },
-    1_000,
-  );
+      summary: event.effect.short,
+      rarity: event.effect.rarity,
+      quality: "event",
+      duration: 820,
+    });
+  }
 }
 
 function handleGameEvents() {
@@ -664,18 +666,12 @@ function handleGameEvents() {
         }
         break;
       case "autoServed":
-        showImpactBanner({
-          icon: event.upgrade?.icon || "🧲",
-          title: "自动出锅！",
-          short: "进入绿区，自动完成",
-          rarity: "legendary",
-        }, 700);
+        showToast(`${event.upgrade?.icon || "🧲"} 自动出锅！`, 700);
         playCue("perfect");
         vibrate([30, 15, 55]);
         break;
       case "buildBurst":
-        renderer.triggerUpgrade(event.title, event.short);
-        showImpactBanner(event, 1050);
+        showToast(`${event.icon || "✨"} ${event.title}`, 850);
         playCue(event.rarity === "legendary" ? "perfect" : "upgrade");
         vibrate(
           event.rarity === "legendary"
@@ -692,12 +688,13 @@ function handleGameEvents() {
       case "heartLost":
         renderer.triggerBurn();
         replayClass(elements.app, "is-heart-hit");
-        showImpactBanner({
-          icon: "💔",
-          title: event.missLabel || "失误啦！",
-          short: `还剩 ${event.health} 颗心`,
+        showActionFeedback({
+          quality: HIT_QUALITY.MISS,
+          title: event.missLabel || "Miss!",
+          summary: `还剩 ${event.health} 颗心`,
           rarity: "danger",
-        }, 900);
+          duration: 760,
+        });
         playCue("burn");
         vibrate([80, 40, 100]);
         break;
@@ -706,42 +703,36 @@ function handleGameEvents() {
           const savedByEvent = event.source === "event";
           const savedByCharacter = event.source === "character";
           const savedByPan = event.source === "pan";
-        showImpactBanner({
-          icon: savedByEvent || savedByCharacter ? "💛" : savedByPan ? "🛡️" : "🛟",
-          title: event.missLabel
-            ? `${event.missLabel.replace("！", "")}，但没扣心！`
-            : "这次没扣心！",
-          short: savedByEvent
-            ? "旦仔鼓励接住了这颗蛋"
+        showActionFeedback({
+          quality: HIT_QUALITY.MISS,
+          title: event.missLabel ? event.missLabel.replace("！", "") : "失误",
+          summary: savedByEvent
+            ? "没扣心 · 旦仔鼓励"
             : savedByCharacter
-              ? "角色被动挡住失误"
+              ? "没扣心 · 角色被动"
               : savedByPan
-                ? "特殊保护挡住失误"
-              : "回魂锅盖挡住失误",
+                ? "没扣心 · 保护生效"
+              : "没扣心 · 回魂锅盖",
           rarity: "epic",
-        }, 850);
+          duration: 760,
+        });
         playCue("upgrade");
         vibrate([35, 20, 55]);
         break;
         }
       case "heartRestored":
-        showImpactBanner({
-          icon: "❤️",
-          title: "恢复 1 颗心！",
-          short: event.source === "event" ? "爱心回锅生效" : "爱心便当生效",
-          rarity: "epic",
-        }, 850);
+        showToast(`❤️ 恢复 1 颗心`, 850);
         playCue("perfect");
         vibrate([35, 20, 55]);
         break;
       case "coinRushStarted":
-        renderer.triggerUpgrade("金币狂欢！", "狂点金币");
-        showImpactBanner({
-          icon: "🤑",
+        showActionFeedback({
+          quality: "coin-rush",
           title: "金币狂欢！",
-          short: "最后倒数结束前狂点！",
+          summary: "狂点按钮爆金币",
           rarity: "legendary",
-        }, 1_000);
+          duration: 900,
+        });
         playCue("perfect");
         vibrate([45, 20, 70, 25, 90]);
         break;
@@ -760,7 +751,7 @@ function handleGameEvents() {
         break;
       case "served":
         renderer.triggerServe(event.result);
-        showScoreBurst(event.result);
+        showActionFeedback({ result: event.result });
         showServeFeedback(event.result);
         if (event.result.combo > 0) replayClass(elements.comboCard, "is-bumping");
         if (event.result.isPerfect) {
@@ -1100,81 +1091,97 @@ function showToast(message, duration = 1_750) {
   }, duration);
 }
 
-function showScoreBurst(result) {
+function buildActionSummary(result) {
+  if (!result) return "";
+  const parts = [];
+  if (result.coinReward > 0) parts.push(`金币 +${result.coinReward}`);
+  const triggers = result.buildTriggers || [];
+  if (triggers.length > 2) {
+    parts.push(`触发 ${triggers.length} 项加成`);
+  } else {
+    for (const trigger of triggers) {
+      const multiplier = trigger.multiplier
+        ? Number.isInteger(trigger.multiplier)
+          ? trigger.multiplier
+          : trigger.multiplier.toFixed(1)
+        : null;
+      parts.push(trigger.text || (multiplier ? `${trigger.label} ×${multiplier}` : trigger.label));
+    }
+  }
+  return parts.slice(0, 2).join(" · ");
+}
+
+function showActionFeedback({
+  result = null,
+  quality = result?.hitQuality,
+  title = null,
+  summary = null,
+  rarity = "normal",
+  duration = null,
+} = {}) {
   window.clearTimeout(scoreBurstTimer);
-  elements.scoreBurstValue.textContent =
-    result.hitQuality === HIT_QUALITY.PERFECT ? "Perfect!" : "Good!";
-  elements.scoreBurstLabel.textContent =
-    result.hitQuality === HIT_QUALITY.PERFECT
-      ? `Perfect 连中 ×${result.perfectStreak}`
-      : "稳稳出锅";
+  const isPerfect = Boolean(quality === HIT_QUALITY.PERFECT || result?.isPerfect);
+  const isGood = quality === HIT_QUALITY.GOOD;
+  const isMiss = quality === HIT_QUALITY.MISS;
+  const isCoinRush = quality === "coin-rush";
+  const isEvent = quality === "event";
+  const defaultTitle = isPerfect
+    ? "Perfect!"
+    : isGood
+      ? "Good!"
+      : isMiss
+        ? "Miss!"
+        : isCoinRush
+          ? "金币狂欢！"
+          : isEvent
+            ? "事件触发！"
+            : "大丰收！";
+  const summaryText =
+    summary ??
+    (result
+      ? buildActionSummary(result) ||
+        (isPerfect ? `Perfect 连中 ×${result.perfectStreak}` : "稳稳出锅")
+      : "");
+
+  elements.scoreBurstValue.textContent = title || defaultTitle;
+  elements.scoreBurstLabel.textContent = summaryText;
   elements.scoreBurstReasons.replaceChildren();
-  const reasons = [];
-  for (const trigger of result.buildTriggers || []) {
-    const multiplier = trigger.multiplier
-      ? Number.isInteger(trigger.multiplier)
-        ? trigger.multiplier
-        : trigger.multiplier.toFixed(1)
-      : null;
-    reasons.push({
-      icon: trigger.icon,
-      label: trigger.text || (multiplier ? `${trigger.label} ×${multiplier}` : trigger.label),
-    });
-  }
-  for (const reason of reasons.slice(0, 3)) {
-    const chip = document.createElement("b");
-    chip.className = "score-trigger is-awakened";
-    chip.textContent = `${reason.icon} ${reason.label}`;
-    elements.scoreBurstReasons.append(chip);
-  }
   elements.scoreBurst.classList.remove(
     "is-visible",
     "is-perfect",
     "is-good",
+    "is-miss",
+    "is-event",
+    "is-coin-rush",
     "is-fever",
     "is-burnt",
     "is-build",
     "is-goal",
   );
-  elements.scoreBurst.classList.toggle("is-perfect", result.isPerfect);
-  elements.scoreBurst.classList.toggle(
-    "is-good",
-    result.hitQuality === HIT_QUALITY.GOOD,
-  );
-  elements.scoreBurst.classList.toggle("is-fever", result.comboMood === "fever");
+  elements.scoreBurst.classList.toggle("is-perfect", isPerfect);
+  elements.scoreBurst.classList.toggle("is-good", isGood);
+  elements.scoreBurst.classList.toggle("is-miss", isMiss);
+  elements.scoreBurst.classList.toggle("is-event", isEvent || rarity !== "normal");
+  elements.scoreBurst.classList.toggle("is-coin-rush", isCoinRush);
+  elements.scoreBurst.classList.toggle("is-fever", result?.comboMood === "fever");
   elements.scoreBurst.classList.toggle("is-burnt", false);
-  elements.scoreBurst.classList.toggle("is-build", reasons.length > 0);
+  elements.scoreBurst.classList.toggle(
+    "is-build",
+    Boolean(result?.buildTriggers?.length) || isCoinRush || isEvent,
+  );
   elements.scoreBurst.classList.remove("is-goal");
   void elements.scoreBurst.offsetWidth;
   elements.scoreBurst.classList.add("is-visible");
   scoreBurstTimer = window.setTimeout(() => {
     elements.scoreBurst.classList.remove("is-visible");
-  }, reasons.length > 0 ? 1250 : 900);
+  }, duration ?? (result?.buildTriggers?.length ? 1_050 : 820));
 }
 
 function showCoinTap(event) {
-  window.clearTimeout(scoreBurstTimer);
-  elements.scoreBurstValue.textContent = `+${event.reward}`;
-  elements.scoreBurstLabel.textContent = event.milestone
-    ? "十连加码！"
-    : "金币雨！";
-  elements.scoreBurstReasons.replaceChildren();
-  elements.scoreBurst.classList.remove(
-    "is-visible",
-    "is-perfect",
-    "is-good",
-    "is-fever",
-    "is-burnt",
-    "is-build",
-    "is-goal",
-  );
-  elements.scoreBurst.classList.add("is-visible", "is-perfect", "is-build");
   replayClass(elements.actionButton, "is-coin-tapping");
   window.setTimeout(() => elements.actionButton.classList.remove("is-coin-tapping"), 220);
   spawnCoinTapFloat(event);
-  scoreBurstTimer = window.setTimeout(() => {
-    elements.scoreBurst.classList.remove("is-visible");
-  }, event.milestone ? 420 : 260);
+  if (event.milestone) showToast(`金币 +${event.reward} · 十连加码`, 450);
 }
 
 function spawnCoinTapFloat(event) {
