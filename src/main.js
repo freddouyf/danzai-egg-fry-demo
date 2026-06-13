@@ -95,6 +95,7 @@ const elements = {
   combo: document.querySelector("#comboValue"),
   comboCard: document.querySelector("#comboCard"),
   level: document.querySelector("#levelValue"),
+  levelBadge: document.querySelector(".level-badge"),
   eventBubble: document.querySelector("#eventBubble"),
   eventIcon: document.querySelector("#eventIcon"),
   eventTitle: document.querySelector("#eventTitle"),
@@ -544,6 +545,7 @@ function resetTransientGameUi() {
   elements.app.dataset.lastHitQuality = "";
   elements.eventBubble.classList.remove(...RARITY_CLASSES);
   elements.eventBubble.classList.add("rarity-normal");
+  elements.eventBubble.hidden = true;
   elements.toast.classList.remove("is-visible");
   elements.impactBanner.classList.remove("is-visible", ...RARITY_CLASSES);
   elements.impactBanner.setAttribute("aria-hidden", "true");
@@ -572,7 +574,6 @@ function startGame() {
   elements.resultOverlay.classList.remove("is-visible");
   game.setCharacterBuff(getSkinBuff(wardrobe.equipped));
   game.start();
-  game.beginPanIntro(Number.POSITIVE_INFINITY);
   lastFrameAt = performance.now();
   handleGameEvents();
   updateInterface(game.getSnapshot());
@@ -595,6 +596,11 @@ function presentEventTrigger(event) {
     saveProgress(discovery.progress);
     showToast(`📖 图鉴解锁：${event.effect.title}`);
   }
+  elements.eventBubble.hidden = false;
+  setEventArt(elements.eventIcon, event.effect);
+  elements.eventTitle.textContent = event.effect.short || event.effect.title;
+  elements.eventBubble.classList.remove(...RARITY_CLASSES);
+  elements.eventBubble.classList.add(`rarity-${event.effect.rarity}`);
   replayClass(elements.eventBubble, "is-popping");
   replayClass(elements.app, "is-event-struck");
   renderer.triggerEvent(event.effect);
@@ -616,10 +622,7 @@ function handleGameEvents() {
         renderer.triggerEggStart();
         break;
       case "gameStarted":
-        renderer.triggerStage(event.level, event.scoreMultiplier, event.panPerk);
-        showPanAwaken(event.panPerk, event.level, event.target);
-        playCue("upgrade");
-        vibrate([35, 20, 55]);
+        maybeShowLevelIntro(event);
         break;
       case "eventTriggered":
         if (game.panIntroRemainingMs > 0) {
@@ -688,7 +691,7 @@ function handleGameEvents() {
             : savedByCharacter
               ? "角色被动挡住失误"
               : savedByPan
-                ? "铜锅护心挡住本关第一次失误"
+                ? "特殊保护挡住失误"
               : "回魂锅盖挡住失误",
           rarity: "epic",
         }, 850);
@@ -814,18 +817,8 @@ function handleGameEvents() {
       case "panPerkTriggered":
         renderer.triggerPanPerk(event);
         showToast(`${event.panPerk.icon} ${event.label}：${event.message}`);
-        playCue(
-          ["golden-feast", "legendary-resonance"].includes(event.kind)
-            ? "perfect"
-            : "upgrade",
-        );
-        vibrate(
-          event.kind === "legendary-resonance"
-            ? [55, 25, 90]
-            : event.kind === "crystal-charge"
-              ? [35, 20, 55]
-              : 24,
-        );
+        playCue("upgrade");
+        vibrate(24);
         break;
       case "invalidAction":
         showToast(event.message);
@@ -855,12 +848,8 @@ function handleGameEvents() {
       case "stageStarted":
         elements.resultOverlay.classList.remove("is-visible");
         pendingPanIntroEvent = null;
-        game.beginPanIntro(Number.POSITIVE_INFINITY);
         lastFrameAt = performance.now();
-        renderer.triggerStage(event.level, event.scoreMultiplier, event.panPerk);
-        showPanAwaken(event.panPerk, event.level, event.target);
-        playCue("perfect");
-        vibrate([50, 30, 85]);
+        maybeShowLevelIntro(event);
         break;
       case "gamePaused":
         elements.pauseOverlay.classList.add("is-visible");
@@ -968,23 +957,38 @@ function setEventArt(element, effect) {
   }
 }
 
-function showPanAwaken(panPerk, level) {
+function maybeShowLevelIntro(event) {
+  if (!event?.specialGoal) return false;
+  game.beginPanIntro(Number.POSITIVE_INFINITY);
+  showPanAwaken({
+    panPerk: event.panPerk,
+    level: event.level,
+    goal: event.specialGoal,
+    trait: event.specialTrait,
+  });
+  playCue("upgrade");
+  vibrate([35, 20, 55]);
+  return true;
+}
+
+function showPanAwaken({ panPerk, level, goal, trait }) {
   window.clearTimeout(panAwakenTimer);
-  const panImage = choosePanAsset(loadedAssets, level);
+  const displayPerk = panPerk || { id: "basic-pan", icon: "🍳", short: "特殊规则" };
+  const panImage = choosePanAsset(loadedAssets, 1);
   elements.panAwakenIcon.classList.toggle("has-art", Boolean(panImage));
   if (panImage) {
     elements.panAwakenIcon.textContent = "";
     elements.panAwakenIcon.style.backgroundImage = `url("${panImage.src}")`;
   } else {
-    elements.panAwakenIcon.textContent = panPerk.icon;
+    elements.panAwakenIcon.textContent = displayPerk.icon;
     elements.panAwakenIcon.style.removeProperty("background-image");
   }
   elements.panAwakenKicker.textContent = `第 ${level} 关`;
-  elements.panAwakenName.textContent = "守住三颗心";
-  elements.panAwakenGoal.textContent = "坚持 10 秒";
-  elements.panAwakenTrait.textContent = `${panPerk.icon} ${panPerk.short}`;
+  elements.panAwakenName.textContent = "特殊目标";
+  elements.panAwakenGoal.textContent = goal || "准备开火";
+  elements.panAwakenTrait.textContent = trait || `${displayPerk.icon} ${displayPerk.short}`;
   elements.panReadyButton.textContent = "确认开火";
-  elements.panAwaken.className = `pan-awaken pan-${panPerk.id}`;
+  elements.panAwaken.className = `pan-awaken pan-${displayPerk.id}`;
   elements.panAwaken.setAttribute("aria-hidden", "false");
   void elements.panAwaken.offsetWidth;
   elements.panAwaken.classList.add("is-visible");
@@ -1099,6 +1103,7 @@ function updateInterface(snapshot) {
   elements.combo.textContent = snapshot.perfectStreak;
   elements.comboCard.hidden = snapshot.perfectStreak <= 0;
   elements.level.textContent = `第 ${snapshot.level} 关`;
+  elements.levelBadge.dataset.levelSkin = `level-${snapshot.level}`;
   elements.app.dataset.event = snapshot.baseEffect.id;
   elements.app.dataset.pan = snapshot.panPerk.id;
   elements.app.dataset.comboMood = snapshot.comboMood;
@@ -1120,10 +1125,14 @@ function updateInterface(snapshot) {
   if (!egg) return;
 
   const displayedEffect = snapshot.baseEffect;
-  setEventArt(elements.eventIcon, displayedEffect);
-  elements.eventTitle.textContent = displayedEffect.short || displayedEffect.title;
-  elements.eventBubble.classList.remove(...RARITY_CLASSES);
-  elements.eventBubble.classList.add(`rarity-${displayedEffect.rarity}`);
+  const hasVisibleEvent = displayedEffect.id !== "none";
+  elements.eventBubble.hidden = !hasVisibleEvent;
+  if (hasVisibleEvent) {
+    setEventArt(elements.eventIcon, displayedEffect);
+    elements.eventTitle.textContent = displayedEffect.short || displayedEffect.title;
+    elements.eventBubble.classList.remove(...RARITY_CLASSES);
+    elements.eventBubble.classList.add(`rarity-${displayedEffect.rarity}`);
+  }
 
   updateHitZones(snapshot.effect);
   const currentHeat = egg.heat;
@@ -1151,12 +1160,12 @@ function updateInterface(snapshot) {
   elements.actionIcon.textContent = "✓";
   elements.actionLabel.textContent =
     snapshot.panIntroRemainingMs > 0
-      ? "新锅觉醒"
+      ? "读规则"
       : "出锅";
   elements.actionButton.setAttribute(
     "aria-label",
     snapshot.panIntroRemainingMs > 0
-      ? "新锅觉醒中"
+      ? "特殊目标确认中"
       : "出锅",
   );
 }

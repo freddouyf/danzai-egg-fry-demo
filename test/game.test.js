@@ -178,19 +178,17 @@ test("全部随机事件与配方均可按定义读取", () => {
   assert.equal(EVENT_DEFINITIONS.length, 13);
   assert.equal(UPGRADE_DEFINITIONS.length, 13);
   assert.ok(UPGRADE_DEFINITIONS.every((upgrade) => upgrade.family === "basic"));
-  assert.equal(PAN_PERKS.length, 5);
+  assert.equal(PAN_PERKS.length, 1);
   for (const event of EVENT_DEFINITIONS) {
     assert.equal(createEvent(event.id).id, event.id);
   }
 });
 
-test("五档煎锅会按关卡解锁，并在第五关后保持传奇能力", () => {
-  assert.equal(getPanPerk(1).id, "iron-steady");
-  assert.equal(getPanPerk(2).id, "copper-guard");
-  assert.equal(getPanPerk(3).id, "golden-feast");
-  assert.equal(getPanPerk(4).id, "crystal-charge");
-  assert.equal(getPanPerk(5).id, "legendary-resonance");
-  assert.equal(getPanPerk(9).id, "legendary-resonance");
+test("煎锅不再按关卡自动升级", () => {
+  assert.equal(getPanPerk(1).id, "basic-pan");
+  assert.equal(getPanPerk(2).id, "basic-pan");
+  assert.equal(getPanPerk(9).id, "basic-pan");
+  assert.equal(getPanPerk(9).level, 0);
 });
 
 test("随机事件可命中无事件与事件列表两端", () => {
@@ -591,58 +589,54 @@ test("微焦强化只触发卡牌自身奖励，不再叠流派倍率", () => {
   );
 });
 
-test("铁锅前两颗扩大完美区，第三颗恢复普通范围", () => {
+test("基础煎锅不会在前两颗自动扩大完美区", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
-  assert.equal(game.getActiveEffect().perfectMin, 64);
-  assert.equal(game.getActiveEffect().perfectMax, 91);
+  assert.equal(game.getActiveEffect().perfectMin, 70);
+  assert.equal(game.getActiveEffect().perfectMax, 85);
   game.stageEggs = 2;
   assert.equal(game.getActiveEffect().perfectMin, 70);
   assert.equal(game.getActiveEffect().perfectMax, 85);
 });
 
-test("铁锅会把前两颗蛋擦边火候吸附进 Perfect", () => {
+test("基础煎锅不会把擦边火候吸附进 Perfect", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
-  const result = cookAt(game, 61);
-  assert.equal(result.sideOne, 64);
-  assert.equal(result.sideTwo, 64);
-  assert.equal(result.isPerfect, true);
+  const result = cookAt(game, 63);
+  assert.equal(result.sideOne, 63);
+  assert.equal(result.sideTwo, 63);
+  assert.equal(result.hitQuality, HIT_QUALITY.GOOD);
   assert.equal(
     game.drainEvents().filter((event) => event.type === "panPerkTriggered").length,
-    1,
+    0,
   );
 });
 
-test("铜锅每关第一次失误会免伤", () => {
-  const copper = new EggFryGame({ eventChance: 0 });
-  copper.start();
-  copper.startNextStage();
-  assert.equal(copper.level, 2);
-  assert.equal(copper.panGuardCharges, 1);
+test("过关后不会获得铜锅免伤", () => {
+  const game = new EggFryGame({ eventChance: 0 });
+  game.start();
+  game.startNextStage();
+  assert.equal(game.level, 2);
+  assert.equal(game.panGuardCharges, 0);
 
-  copper.currentEgg.heat = 20;
-  assert.equal(copper.cook(), false);
-  assert.equal(copper.health, MAX_HEALTH);
-  assert.equal(copper.panGuardCharges, 0);
-  assert.ok(
-    copper
-      .drainEvents()
-      .some((event) => event.type === "heartSaved" && event.source === "pan"),
+  game.currentEgg.heat = 20;
+  assert.equal(game.cook(), false);
+  assert.equal(game.health, MAX_HEALTH - 1);
+  assert.equal(
+    game.drainEvents().filter((event) => event.type === "heartSaved" && event.source === "pan").length,
+    0,
   );
-
-  copper.currentEgg.heat = 20;
-  assert.equal(copper.cook(), false);
-  assert.equal(copper.health, MAX_HEALTH - 1);
 });
 
-test("黄金锅让 Perfect 额外掉落金币", () => {
+test("高关卡 Perfect 不再因为黄金锅额外掉落金币", () => {
   const golden = new EggFryGame({ eventChance: 0 });
   golden.start();
   golden.level = 3;
   golden.stageTarget = levelTarget(3);
-  const goldenResult = cookAt(golden, 80);
-  assert.equal(goldenResult.coinReward, 8);
+  const targetHeat =
+    (golden.getActiveEffect().perfectMin + golden.getActiveEffect().perfectMax) / 2;
+  const goldenResult = cookAt(golden, targetHeat);
+  assert.equal(goldenResult.coinReward, 4);
 });
 
 test("成功出锅不会延长固定的十秒倒计时", () => {
@@ -657,7 +651,14 @@ test("成功出锅不会延长固定的十秒倒计时", () => {
   assert.equal(game.health, 3);
 });
 
-test("传奇锅让事件成功额外掉落金币", () => {
+test("事件成功不再因为传奇锅额外掉落金币", () => {
+  const basic = new EggFryGame({ eventChance: 0 });
+  basic.start();
+  basic.spawnEgg("double-yolk");
+  const basicTargetHeat =
+    (basic.getActiveEffect().perfectMin + basic.getActiveEffect().perfectMax) / 2;
+  const basicReward = cookAt(basic, basicTargetHeat).coinReward;
+
   const legendary = new EggFryGame({ eventChance: 0 });
   legendary.start();
   legendary.level = 5;
@@ -667,33 +668,34 @@ test("传奇锅让事件成功额外掉落金币", () => {
     (legendary.getActiveEffect().perfectMin +
       legendary.getActiveEffect().perfectMax) /
     2;
-  assert.ok(cookAt(legendary, targetHeat).coinReward >= 8);
+  assert.equal(cookAt(legendary, targetHeat).coinReward, basicReward);
 });
 
-test("晶能锅每两次成功触发晶爆并补充一层护盾", () => {
+test("高关卡不会触发晶能锅护盾", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
   game.level = 4;
   game.stageTarget = levelTarget(4);
 
-  const first = cookAt(game, 80);
-  assert.equal(game.panCharge, 1);
+  const firstHeat =
+    (game.getActiveEffect().perfectMin + game.getActiveEffect().perfectMax) / 2;
+  cookAt(game, firstHeat);
+  assert.equal(game.panCharge, 0);
 
-  const result = cookAt(game, 80);
-  assert.equal(result.panCrystalShieldBonus, 1);
-  assert.equal(game.shieldCharges, 1);
+  const secondHeat =
+    (game.getActiveEffect().perfectMin + game.getActiveEffect().perfectMax) / 2;
+  const result = cookAt(game, secondHeat);
+  assert.equal(result.panCrystalShieldBonus, undefined);
+  assert.equal(game.shieldCharges, 0);
   assert.equal(game.panCharge, 0);
   assert.ok(
-    game
+    !game
       .drainEvents()
-      .some(
-        (event) =>
-          event.type === "panPerkTriggered" && event.kind === "crystal-charge",
-      ),
+      .some((event) => event.type === "panPerkTriggered"),
   );
 });
 
-test("传奇锅每两次事件成功触发额外金币袋", () => {
+test("高关卡事件不会触发传奇锅金币袋", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
   game.level = 5;
@@ -707,13 +709,13 @@ test("传奇锅每两次事件成功触发额外金币袋", () => {
       2;
     const result = cookAt(game, targetHeat);
     if (index === 0) {
-      assert.equal(game.panCharge, 1);
+      assert.equal(game.panCharge, 0);
       assert.equal(result.panResonanceCoinBonus, undefined);
       firstReward = result.coinReward;
     } else {
       assert.equal(game.panCharge, 0);
-      assert.equal(result.panResonanceCoinBonus, 10);
-      assert.ok(result.coinReward >= firstReward + 10);
+      assert.equal(result.panResonanceCoinBonus, undefined);
+      assert.equal(result.coinReward, firstReward);
     }
   }
 });
@@ -804,7 +806,7 @@ test("旦仔鼓励事件可以挡住本颗蛋的一次失误", () => {
   );
 });
 
-test("煎锅升级演出期间冻结倒计时和火候", () => {
+test("特殊关卡提示期间仍可冻结倒计时和火候", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
   game.beginPanIntro(1_000);
@@ -819,7 +821,7 @@ test("煎锅升级演出期间冻结倒计时和火候", () => {
   assert.ok(game.drainEvents().some((event) => event.type === "panReady"));
 });
 
-test("玩家确认锅具说明后才正式开火", () => {
+test("玩家确认特殊关卡提示后才正式开火", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
   game.beginPanIntro(Number.POSITIVE_INFINITY);

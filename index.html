@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#ffca57" />
     <meta
       name="description"
-      content="10 秒内守住三颗心，煎蛋闯关、赚金币、解锁新旦仔！"
+      content="看准火候点击出锅，煎蛋闯关、赚金币、解锁新旦仔！"
     />
     <title>旦仔煎蛋挑战</title>
   </head>
@@ -20,7 +20,7 @@
 
       <section class="game-screen" aria-label="旦仔煎蛋挑战游戏">
         <header class="hud" aria-label="游戏数据">
-          <div class="level-badge">
+          <div class="level-badge level-skin-base" data-level-skin="level-1">
             <strong id="levelValue">第 1 关</strong>
           </div>
           <div class="combo-hud" id="comboCard" hidden>
@@ -32,11 +32,11 @@
 
         <div class="stage-wrap">
           <canvas id="gameCanvas" aria-label="旦仔正在平底锅里煎蛋"></canvas>
-          <div class="event-bubble rarity-normal" id="eventBubble" role="status" aria-live="polite">
+          <div class="event-bubble rarity-normal" id="eventBubble" role="status" aria-live="polite" hidden>
             <span class="event-icon" id="eventIcon">✨</span>
             <span class="event-copy">
-              <b>奇遇发动</b>
-              <strong id="eventTitle">普通蛋</strong>
+              <b>事件触发</b>
+              <strong id="eventTitle">特殊事件</strong>
             </span>
           </div>
 
@@ -65,10 +65,10 @@
           <div class="pan-awaken" id="panAwaken" aria-hidden="true">
             <span class="pan-awaken-icon" id="panAwakenIcon">🍳</span>
             <span class="pan-awaken-copy">
-              <small id="panAwakenKicker">煎锅觉醒</small>
+              <small id="panAwakenKicker">特殊目标</small>
               <strong id="panAwakenName">第 1 关</strong>
-              <em id="panAwakenGoal">坚持 10 秒</em>
-              <b id="panAwakenTrait">前 2 颗更容易 Perfect</b>
+              <em id="panAwakenGoal">准备开火</em>
+              <b id="panAwakenTrait">本关有特殊规则</b>
               <button class="pan-ready-button" id="panReadyButton" type="button">开火</button>
             </span>
           </div>

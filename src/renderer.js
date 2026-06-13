@@ -23,59 +23,17 @@ function clamp01(value) {
 }
 
 export function getPanEvolution(level) {
-  const safeLevel = Math.max(1, Math.floor(Number(level) || 1));
-  const fixedThemes = [
-    {
-      name: "铁锅",
-      body: "#4b3633",
-      rim: "#806057",
-      inner: "#352a29",
-      handle: "#5b392e",
-      accent: "#c39a83",
-      glow: "rgba(255, 145, 62, 0.08)",
-    },
-    {
-      name: "铜锅",
-      body: "#a6532c",
-      rim: "#ffb45f",
-      inner: "#71391f",
-      handle: "#8b4427",
-      accent: "#ffe09a",
-      glow: "rgba(255, 129, 42, 0.24)",
-    },
-    {
-      name: "黄金锅",
-      body: "#d89a1f",
-      rim: "#fff078",
-      inner: "#98600f",
-      handle: "#b76d18",
-      accent: "#fffbd0",
-      glow: "rgba(255, 217, 50, 0.34)",
-    },
-    {
-      name: "晶能锅",
-      body: "#3679ad",
-      rim: "#8ff7ff",
-      inner: "#274c7a",
-      handle: "#315f91",
-      accent: "#e1ffff",
-      glow: "rgba(66, 228, 255, 0.34)",
-    },
-  ];
-  if (safeLevel <= fixedThemes.length) {
-    return { ...fixedThemes[safeLevel - 1], level: safeLevel, tier: safeLevel };
-  }
-  const hue = (safeLevel * 37) % 360;
+  void level;
   return {
-    level: safeLevel,
-    tier: 5,
-    name: "传奇锅",
-    body: `hsl(${hue} 58% 43%)`,
-    rim: `hsl(${(hue + 58) % 360} 96% 72%)`,
-    inner: `hsl(${hue} 55% 25%)`,
-    handle: `hsl(${hue} 48% 34%)`,
-    accent: "#fff6a0",
-    glow: `hsla(${(hue + 35) % 360}, 95%, 62%, 0.4)`,
+    level: 1,
+    tier: 1,
+    name: "基础锅",
+    body: "#4b3633",
+    rim: "#806057",
+    inner: "#352a29",
+    handle: "#5b392e",
+    accent: "#c39a83",
+    glow: "rgba(255, 145, 62, 0.08)",
   };
 }
 
@@ -199,26 +157,19 @@ export class GameRenderer {
   }
 
   triggerStage(level, multiplier, panPerk = null, now = performance.now()) {
+    void multiplier;
+    void panPerk;
     this.animations.stageAt = now;
-    this.animations.panUpgradeAt = now;
+    this.animations.panUpgradeAt = -Infinity;
     this.animations.panUpgradeLevel = level;
-    this.animations.panUpgradeId = panPerk?.id || "iron-steady";
+    this.animations.panUpgradeId = "basic-pan";
     this.activateCostume(now, 1800, level - 1);
-    const palette = {
-      "iron-steady": ["#fff3d0", "#a98d7b", "#66544b"],
-      "copper-guard": ["#fff0ad", "#ff9f43", "#bd562d"],
-      "golden-feast": ["#fffbd0", "#ffd83d", "#f39b22"],
-      "crystal-charge": ["#e7ffff", "#75efff", "#4a8cff"],
-      "legendary-resonance": ["#fff477", "#ff6aac", "#9d70ff", "#62e4ff"],
-    }[this.animations.panUpgradeId];
-    this.addSparkBurst(58, palette);
+    this.addSparkBurst(34, ["#fff3d0", "#ff9a43", "#ff6b92"]);
     this.scorePopups.push({
-      label: panPerk
-        ? `新锅！${panPerk.name}`
-        : `第 ${level} 关  火力升级`,
+      label: `第 ${level} 关`,
       color: "#e33c78",
       startedAt: now,
-      duration: 1700,
+      duration: 900,
       large: true,
     });
   }
@@ -834,7 +785,7 @@ export class GameRenderer {
       ctx.restore();
     }
 
-    const image = choosePanAsset(this.assets, level);
+    const image = choosePanAsset(this.assets, 1);
     if (image) {
       this.drawImageContain(ctx, image, 116, 153, 278, 205);
       ctx.save();

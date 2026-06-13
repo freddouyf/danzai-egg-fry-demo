@@ -5992,3 +5992,50 @@ img,
 .upgrade-option-copy {
   grid-template-columns: 1fr;
 }
+
+/* V26: simplify level start and keep the top level badge prominent. */
+.hud {
+  grid-template-columns: minmax(104px, 1.1fr) minmax(0, 1fr) 42px;
+}
+
+.level-badge {
+  min-width: 104px;
+  height: 60px;
+  padding: 7px 12px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #ff8b3d 0%, #f0447d 58%, #8f63ff 100%);
+  box-shadow:
+    0 6px 0 rgba(122, 53, 40, 0.17),
+    0 0 0 5px rgba(255, 255, 255, 0.22);
+}
+
+.level-badge strong {
+  font-size: clamp(18px, 5.1vw, 23px);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-shadow: 0 2px 0 rgba(117, 46, 37, 0.18);
+}
+
+.level-badge[data-level-skin] {
+  isolation: isolate;
+}
+
+.event-bubble[hidden] {
+  display: none !important;
+}
+
+@media (max-height: 720px) {
+  .hud {
+    grid-template-columns: minmax(96px, 1.05fr) minmax(0, 1fr) 38px;
+  }
+
+  .level-badge {
+    min-width: 96px;
+    height: 52px;
+    padding-inline: 10px;
+  }
+
+  .level-badge strong {
+    font-size: clamp(17px, 4.9vw, 21px);
+  }
+}

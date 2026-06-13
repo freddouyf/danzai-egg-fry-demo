@@ -15,47 +15,11 @@ export const EARLY_LEVEL_TARGETS = Object.freeze([
 
 export const PAN_PERKS = Object.freeze([
   Object.freeze({
-    id: "iron-steady",
-    icon: "🎯",
-    name: "铁锅稳火",
-    description: "前 2 颗蛋扩大完美区，擦边 4 点内自动吸附",
-    short: "前 2 颗更容易 Perfect",
-    snapDistance: 4,
-  }),
-  Object.freeze({
-    id: "copper-guard",
-    icon: "🛡️",
-    name: "铜锅护心",
-    description: "每关第一次失误不扣心",
-    short: "每关挡住一次失误",
-    guardCharges: 1,
-  }),
-  Object.freeze({
-    id: "golden-feast",
-    icon: "🪙",
-    name: "黄金赏味",
-    description: "每颗 Perfect 额外获得 4 金币",
-    short: "Perfect 额外 +4 金币",
-    perfectCoinBonus: 4,
-  }),
-  Object.freeze({
-    id: "crystal-charge",
-    icon: "💎",
-    name: "晶能爆炒",
-    description: "每 2 次成功触发晶爆，补充 1 层护盾",
-    short: "每 2 次成功获得护盾",
-    chargeTarget: 2,
-    chargeShieldBonus: 1,
-  }),
-  Object.freeze({
-    id: "legendary-resonance",
-    icon: "👑",
-    name: "传奇共鸣",
-    description: "事件成功额外掉金币；连续 2 次再爆一袋",
-    short: "事件成功掉更多金币",
-    eventCoinBonus: 3,
-    chargeTarget: 2,
-    resonanceCoinBonus: 10,
+    id: "basic-pan",
+    icon: "🍳",
+    name: "基础煎锅",
+    description: "基础款煎锅，不随关卡自动升级。",
+    short: "基础款",
   }),
 ]);
 
@@ -596,9 +560,8 @@ export function levelScoreMultiplier(level) {
 }
 
 export function getPanPerk(level) {
-  const safeLevel = Math.max(1, Math.floor(Number(level) || 1));
-  const index = Math.min(PAN_PERKS.length - 1, safeLevel - 1);
-  return { ...PAN_PERKS[index], level: safeLevel };
+  void level;
+  return { ...PAN_PERKS[0], level: 0 };
 }
 
 export function levelTarget(level) {
@@ -996,7 +959,6 @@ export class EggFryGame {
       this.currentEgg.sideOne = this.currentEgg.sideTwo;
       this.currentEgg.phase = "second";
     }
-    const panPerk = getPanPerk(this.level);
     const originalSideOne = this.currentEgg.sideOne;
     const originalSideTwo = this.currentEgg.sideTwo;
     const hasBurntSide = originalSideOne >= 96 || originalSideTwo >= 96;
@@ -1055,39 +1017,6 @@ export class EggFryGame {
     result.levelMultiplier = levelScoreMultiplier(this.level);
     result.rawAwardedScore = result.awardedScore;
     result.awardedScore = Math.round(result.awardedScore * result.levelMultiplier);
-    const panTriggers = [];
-
-    if (
-      panPerk.id === "legendary-resonance" &&
-      result.baseScore > 0 &&
-      this.effect.id !== "none"
-    ) {
-      this.panCharge += 1;
-      if (this.panCharge >= panPerk.chargeTarget) {
-        this.panCharge = 0;
-        result.panResonanceCoinBonus = panPerk.resonanceCoinBonus;
-        panTriggers.push({
-          kind: "legendary-resonance",
-          label: `传奇共鸣 +${panPerk.resonanceCoinBonus} 金币`,
-          message: "连续两次事件成功，额外爆出一袋金币！",
-        });
-      }
-    }
-
-    if (panPerk.id === "crystal-charge" && result.baseScore > 0) {
-      this.panCharge += 1;
-      if (this.panCharge >= panPerk.chargeTarget) {
-        this.panCharge = 0;
-        this.shieldCharges += panPerk.chargeShieldBonus;
-        result.panCrystalShieldBonus = panPerk.chargeShieldBonus;
-        panTriggers.push({
-          kind: "crystal-charge",
-          label: "晶能爆炒 +1 护盾",
-          message: "连续两次成功，晶锅补充一层护盾！",
-        });
-      }
-    }
-
     const buildTriggers = [];
     let buildMultiplier = 1;
 
@@ -1366,11 +1295,6 @@ export class EggFryGame {
       Math.floor(Math.log2(Math.max(1, result.buildMultiplier || 1))),
     );
     let coinReward = 2 + (result.isPerfect ? 2 : 0) + rarityCoins + buildCoins;
-    if (result.isPerfect) coinReward += panPerk.perfectCoinBonus || 0;
-    if (this.effect.id !== "none") {
-      coinReward += panPerk.eventCoinBonus || 0;
-    }
-    coinReward += result.panResonanceCoinBonus || 0;
     coinReward += result.singedCoinBonus || 0;
     coinReward += result.riskCoinBonus || 0;
     coinReward += result.encoreCoinBonus || 0;
@@ -1437,20 +1361,6 @@ export class EggFryGame {
       this.pushEvent("perfectStreakFever", {
         perfectStreak: this.perfectStreak,
         comboMood: this.comboMood,
-      });
-    }
-    if (panPerk.id === "golden-feast" && result.isPerfect) {
-      panTriggers.push({
-        kind: "golden-feast",
-        label: `黄金赏味 +${panPerk.perfectCoinBonus} 金币`,
-        message: "精准命中，黄金锅降下金币雨！",
-      });
-    }
-    for (const trigger of panTriggers) {
-      this.pushEvent("panPerkTriggered", {
-        ...trigger,
-        panPerk: { ...panPerk },
-        charge: this.panCharge,
       });
     }
     if (this.remainingMs <= 0) {
@@ -1697,7 +1607,6 @@ export class EggFryGame {
 
   getActiveEffect() {
     const effect = { ...this.effect };
-    const panPerk = getPanPerk(this.level);
     const dangerStacks = this.upgrades["danger-chef"] || 0;
     const singedStacks = this.upgrades["singed-gourmet"] || 0;
     const awakenedCount = awakenedUpgradeCount(this.upgrades);
@@ -1710,17 +1619,6 @@ export class EggFryGame {
     effect.singedAsPerfect = singedStacks > 0;
     effect.awakenedCount = awakenedCount;
     effect.awakenedMultiplier = 1;
-    if (panPerk.id === "iron-steady" && this.stageEggs < 2) {
-      effect.perfectMin = clamp(effect.perfectMin - 6, 45, 90);
-      effect.perfectMax = clamp(effect.perfectMax + 6, 55, 95);
-    }
-    if (panPerk.perfectBonus) {
-      effect.perfectBonus += panPerk.perfectBonus;
-    }
-    if (panPerk.eventScoreMultiplier && this.effect.id !== "none") {
-      effect.scoreMultiplier *= panPerk.eventScoreMultiplier;
-    }
-
     const levelPressure = Math.max(0, this.level - 1);
     effect.speedMultiplier *= 1 + levelPressure * LEVEL_SPEED_STEP;
     const perfectShrink = Math.min(10, levelPressure * 1.5);
@@ -1730,36 +1628,8 @@ export class EggFryGame {
     return effect;
   }
 
-  applyPanHeatAssist(heat, effect, sideLabel) {
-    const panPerk = getPanPerk(this.level);
-    if (
-      panPerk.id !== "iron-steady" ||
-      this.stageEggs >= 2 ||
-      !panPerk.snapDistance
-    ) {
-      return heat;
-    }
-
-    let adjustedHeat = heat;
-    if (heat < effect.perfectMin && heat >= effect.perfectMin - panPerk.snapDistance) {
-      adjustedHeat = effect.perfectMin;
-    } else if (
-      heat > effect.perfectMax &&
-      heat <= Math.min(95, effect.perfectMax + panPerk.snapDistance)
-    ) {
-      adjustedHeat = effect.perfectMax;
-    }
-
-    if (adjustedHeat !== heat) {
-      this.pushEvent("panPerkTriggered", {
-        kind: "iron-steady",
-        label: "稳火吸附 Perfect",
-        message: `${sideLabel}擦边，铁锅自动校准火候！`,
-        panPerk: { ...panPerk },
-        charge: 0,
-      });
-    }
-    return adjustedHeat;
+  applyPanHeatAssist(heat) {
+    return heat;
   }
 
   openUpgradeDraft() {
@@ -1928,7 +1798,7 @@ export class EggFryGame {
 
   ensurePlaying() {
     if (this.state === "playing" && this.panIntroRemainingMs > 0) {
-      this.pushEvent("invalidAction", { message: "新锅觉醒中，马上开火！" });
+      this.pushEvent("invalidAction", { message: "先确认本关特殊目标。" });
       return false;
     }
     if (this.state === "playing" && this.currentEgg) return true;
