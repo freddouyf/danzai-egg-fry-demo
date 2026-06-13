@@ -171,6 +171,17 @@ if (elements.hud && elements.combatReadout && elements.pauseButton) {
   elements.hud.insertBefore(elements.combatReadout, elements.pauseButton);
 }
 
+const pauseUpgradePanel = document.createElement("section");
+pauseUpgradePanel.className = "pause-upgrades";
+pauseUpgradePanel.innerHTML = `
+  <strong>当前强化</strong>
+  <div class="pause-upgrade-list"></div>
+`;
+elements.pauseOverlay
+  ?.querySelector(".pause-card")
+  ?.insertBefore(pauseUpgradePanel, elements.resumeButton);
+elements.pauseUpgradeList = pauseUpgradePanel.querySelector(".pause-upgrade-list");
+
 export const game = new EggFryGame();
 if (import.meta.env.DEV) window.__danzaiGame = game;
 const renderer = new GameRenderer(elements.canvas);
@@ -742,7 +753,6 @@ function handleGameEvents() {
       case "served":
         renderer.triggerServe(event.result);
         showActionFeedback({ result: event.result });
-        showServeFeedback(event.result);
         if (event.result.combo > 0) replayClass(elements.comboCard, "is-bumping");
         if (event.result.isPerfect) {
           vibrate([35, 25, 65]);
@@ -853,6 +863,7 @@ function handleGameEvents() {
         maybeShowLevelIntro(event);
         break;
       case "gamePaused":
+        renderPauseUpgrades();
         elements.pauseOverlay.classList.add("is-visible");
         break;
       case "gameResumed":
@@ -920,6 +931,31 @@ function renderCurrentUpgrades() {
     chip.textContent = `${upgrade.icon} ${upgrade.name}${upgrade.stacks > 1 ? ` ×${upgrade.stacks}` : ""}`;
     chip.addEventListener("click", () => showUpgradeDetail(upgrade));
     elements.currentUpgradeList.append(chip);
+  }
+}
+
+function renderPauseUpgrades() {
+  const list = elements.pauseUpgradeList;
+  if (!list) return;
+  const upgrades = game.getUpgradeSummary();
+  list.replaceChildren();
+  if (upgrades.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "pause-upgrade-empty";
+    empty.textContent = "当前暂无强化";
+    list.append(empty);
+    return;
+  }
+  for (const upgrade of upgrades) {
+    const preview = getUpgradePreview(upgrade.id, Math.max(0, upgrade.stacks - 1));
+    const item = document.createElement("article");
+    item.className = "pause-upgrade-item";
+    item.innerHTML = `
+      <span>${upgrade.icon}</span>
+      <b>${upgrade.name} Lv.${upgrade.stacks}</b>
+      <small>${preview.after || upgrade.rule}</small>
+    `;
+    list.append(item);
   }
 }
 

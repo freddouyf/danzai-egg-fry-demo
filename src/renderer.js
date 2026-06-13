@@ -401,10 +401,7 @@ export class GameRenderer {
         ctx.fillRect(-5, -2, 10, 4);
         ctx.restore();
       }
-      ctx.globalAlpha = 0.12;
-      ctx.fillStyle = "#d42d7d";
-      ctx.font = "1000 76px Microsoft YaHei";
-      ctx.textAlign = "center";
+      ctx.globalAlpha = 0;
       ctx.fillText("×10", 257, 178);
     } else if (effect.id === "golden-heat") {
       const glow = ctx.createRadialGradient(250, 250, 20, 250, 250, 175);
@@ -537,12 +534,6 @@ export class GameRenderer {
     ctx.save();
     ctx.fillStyle = `hsla(${hue}, 85%, 55%, ${pulse})`;
     ctx.fillRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
-    ctx.fillStyle = `hsla(${hue}, 95%, 62%, 0.7)`;
-    for (let index = 0; index < Math.min(8, level - 1); index += 1) {
-      ctx.beginPath();
-      ctx.arc(184 + index * 17, 365, 4, 0, Math.PI * 2);
-      ctx.fill();
-    }
     ctx.restore();
   }
 

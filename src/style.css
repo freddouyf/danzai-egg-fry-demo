@@ -2169,6 +2169,78 @@ h1 span {
   width: 100%;
 }
 
+.pause-upgrades {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.86);
+  border-radius: 18px;
+  background: rgba(255, 251, 229, 0.68);
+  text-align: left;
+}
+
+.pause-upgrades > strong {
+  color: #7b4b2f;
+  font-size: 12px;
+  font-weight: 1000;
+}
+
+.pause-upgrade-list {
+  display: grid;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.pause-upgrade-empty {
+  margin: 0;
+  color: #9b6a47;
+  font-size: 12px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.pause-upgrade-item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 2px 8px;
+  align-items: center;
+  padding: 7px 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.pause-upgrade-item > span {
+  grid-row: span 2;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(255, 213, 84, 0.36);
+  font-size: 18px;
+}
+
+.pause-upgrade-item b {
+  overflow: hidden;
+  color: #6d3f29;
+  font-size: 12px;
+  font-weight: 1000;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pause-upgrade-item small {
+  overflow: hidden;
+  color: #8b5b3d;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .text-button {
   min-height: 30px;
   border: 0;
