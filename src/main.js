@@ -56,6 +56,8 @@ const EVENT_IDS = EVENT_DEFINITIONS.map((event) => event.id);
 
 const elements = {
   app: document.querySelector("#app"),
+  hud: document.querySelector(".hud"),
+  combatReadout: document.querySelector(".combat-readout"),
   startOverlay: document.querySelector("#startOverlay"),
   shopOverlay: document.querySelector("#shopOverlay"),
   recordsOverlay: document.querySelector("#recordsOverlay"),
@@ -164,6 +166,10 @@ const elements = {
   careerSummary: document.querySelector("#careerSummary"),
   eventCodex: document.querySelector("#eventCodex"),
 };
+
+if (elements.hud && elements.combatReadout && elements.pauseButton) {
+  elements.hud.insertBefore(elements.combatReadout, elements.pauseButton);
+}
 
 export const game = new EggFryGame();
 if (import.meta.env.DEV) window.__danzaiGame = game;

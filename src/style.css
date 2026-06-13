@@ -6717,3 +6717,150 @@ img,
     padding-block: 8px;
   }
 }
+
+/* V33: rebalance mobile zones. A absorbs status, B grows, E shrinks. */
+.game-screen {
+  gap: clamp(3px, 0.55svh, 6px);
+  padding:
+    max(6px, env(safe-area-inset-top))
+    6px
+    max(1px, env(safe-area-inset-bottom));
+}
+
+.hud {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(86px, 1fr) minmax(112px, 1.2fr) 46px;
+  grid-template-areas:
+    "level combo pause"
+    "status status pause";
+  gap: 5px;
+  align-items: stretch;
+  min-height: 88px;
+}
+
+.level-badge {
+  grid-area: level;
+}
+
+#comboCard:not([hidden]) {
+  grid-area: combo;
+}
+
+.pause-button {
+  grid-area: pause;
+  width: 46px;
+  height: 100%;
+  min-height: 88px;
+}
+
+.hud > .combat-readout {
+  position: static;
+  z-index: auto;
+  grid-area: status;
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(86px, 0.62fr) minmax(128px, 1fr);
+  gap: 5px;
+  transform: none;
+  color: #623921;
+  pointer-events: none;
+}
+
+.combat-time,
+.combat-score {
+  min-height: 31px;
+  border-width: 2px;
+  border-radius: 13px;
+  box-shadow:
+    0 3px 0 rgba(140, 72, 34, 0.1),
+    0 5px 12px rgba(94, 53, 29, 0.1);
+}
+
+.combat-time {
+  flex-direction: row;
+  gap: 5px;
+}
+
+.combat-time small,
+.combat-score small {
+  font-size: 8px;
+  line-height: 1;
+}
+
+.combat-time strong {
+  font-size: clamp(18px, 5vw, 22px);
+}
+
+.combat-time i {
+  font-size: 10px;
+}
+
+.combat-score {
+  padding: 3px 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.combat-score strong {
+  font-size: clamp(19px, 5.4vw, 24px);
+}
+
+.stage-wrap {
+  max-height: min(57svh, calc(100svh - 214px));
+}
+
+.score-burst {
+  top: 55%;
+}
+
+.heat-panel {
+  margin-bottom: 5px;
+}
+
+.controls {
+  margin-top: 4px;
+}
+
+.action-button {
+  min-height: 112px;
+}
+
+.keyboard-tip {
+  display: none !important;
+}
+
+@media (max-height: 720px) {
+  .hud {
+    min-height: 78px;
+    grid-template-columns: minmax(78px, 1fr) minmax(104px, 1.2fr) 42px;
+    gap: 4px;
+  }
+
+  .pause-button {
+    width: 42px;
+    min-height: 78px;
+  }
+
+  .hud > .combat-readout {
+    grid-template-columns: minmax(76px, 0.6fr) minmax(116px, 1fr);
+    gap: 4px;
+  }
+
+  .combat-time,
+  .combat-score {
+    min-height: 27px;
+  }
+
+  .stage-wrap {
+    max-height: min(53svh, calc(100svh - 194px));
+  }
+
+  .score-burst {
+    top: 54%;
+  }
+
+  .action-button {
+    min-height: 94px;
+  }
+}
