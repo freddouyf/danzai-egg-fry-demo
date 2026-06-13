@@ -21,7 +21,7 @@
             <strong id="levelValue">第 1 关</strong>
           </div>
           <div class="combo-hud" id="comboCard" hidden>
-            <span>COMBO</span>
+            <span>PERFECT</span>
             <strong>×<i id="comboValue">0</i></strong>
           </div>
           <button class="pause-button" id="pauseButton" type="button" aria-label="暂停游戏">Ⅱ</button>
@@ -83,6 +83,7 @@
         <section class="heat-panel" aria-label="当前火候">
           <div class="heat-row is-active" id="heatRow">
             <div class="heat-track" aria-hidden="true">
+              <span class="good-zone" id="goodZone"></span>
               <span class="perfect-zone" id="perfectZone"></span>
               <span class="build-target-zone" id="buildTargetZone"></span>
               <span class="heat-fill" id="heatFill"></span>

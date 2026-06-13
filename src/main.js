@@ -12,7 +12,10 @@ import {
   classifyHeat,
   EggFryGame,
   EVENT_DEFINITIONS,
+  getHitQuality,
+  getHitWindow,
   getUpgradePreview,
+  HIT_QUALITY,
 } from "./game.js";
 import { GameRenderer } from "./renderer.js";
 import {
@@ -108,6 +111,7 @@ const elements = {
   heatRow: document.querySelector("#heatRow"),
   heatFill: document.querySelector("#heatFill"),
   heatMarker: document.querySelector("#heatMarker"),
+  goodZone: document.querySelector("#goodZone"),
   perfectZone: document.querySelector("#perfectZone"),
   buildTargetZone: document.querySelector("#buildTargetZone"),
   buildRouteBadge: document.querySelector("#buildRouteBadge"),
@@ -255,12 +259,21 @@ function playTone(frequency, duration = 0.08, options = {}) {
 
 function playCue(name, rarity = "normal") {
   if (!audioContext) return;
-  if (name === "flip") {
+  if (name === "good") {
     playTone(410, 0.08, { endFrequency: 720, type: "triangle" });
   } else if (name === "perfect") {
     playTone(660, 0.12, { gain: 0.045 });
     playTone(880, 0.16, { delay: 0.07, gain: 0.04 });
     playTone(1100, 0.18, { delay: 0.14, gain: 0.035 });
+  } else if (name === "streak3") {
+    playTone(620, 0.1, { gain: 0.045, type: "triangle" });
+    playTone(840, 0.13, { delay: 0.06, gain: 0.045, type: "triangle" });
+    playTone(1080, 0.16, { delay: 0.12, gain: 0.04, type: "triangle" });
+  } else if (name === "fever") {
+    playTone(440, 0.14, { gain: 0.05, type: "square" });
+    playTone(660, 0.18, { delay: 0.07, gain: 0.05, type: "triangle" });
+    playTone(990, 0.24, { delay: 0.14, gain: 0.055, type: "triangle" });
+    playTone(1320, 0.28, { delay: 0.22, gain: 0.045, type: "triangle" });
   } else if (name === "burn") {
     playTone(150, 0.24, { endFrequency: 62, type: "sawtooth", gain: 0.035 });
   } else if (name === "upgrade") {
@@ -525,6 +538,8 @@ function resetTransientGameUi() {
   elements.actionButton.setAttribute("aria-label", "出锅");
   elements.app.dataset.event = "none";
   elements.app.dataset.coinRush = "false";
+  elements.app.dataset.comboMood = "normal";
+  elements.app.dataset.lastHitQuality = "";
   elements.eventBubble.classList.remove(...RARITY_CLASSES);
   elements.eventBubble.classList.add("rarity-normal");
   elements.toast.classList.remove("is-visible");
@@ -533,6 +548,8 @@ function resetTransientGameUi() {
   elements.scoreBurst.classList.remove(
     "is-visible",
     "is-perfect",
+    "is-good",
+    "is-fever",
     "is-burnt",
     "is-build",
     "is-goal",
@@ -616,11 +633,6 @@ function handleGameEvents() {
           presentEventTrigger(deferredEvent);
         }
         break;
-      case "flipped":
-        renderer.triggerFlip();
-        playCue("flip");
-        vibrate(22);
-        break;
       case "autoServed":
         showImpactBanner({
           icon: event.upgrade?.icon || "🧲",
@@ -652,11 +664,8 @@ function handleGameEvents() {
         replayClass(elements.app, "is-heart-hit");
         showImpactBanner({
           icon: "💔",
-          title: `失误！还剩 ${event.health} 颗心`,
-          short:
-            event.reason === "overheat"
-              ? "火候烧到底了"
-              : "没有点在目标区域",
+          title: event.missLabel || "失误啦！",
+          short: `还剩 ${event.health} 颗心`,
           rarity: "danger",
         }, 900);
         playCue("burn");
@@ -669,7 +678,9 @@ function handleGameEvents() {
           const savedByPan = event.source === "pan";
         showImpactBanner({
           icon: savedByEvent || savedByCharacter ? "💛" : savedByPan ? "🛡️" : "🛟",
-          title: "这次没扣心！",
+          title: event.missLabel
+            ? `${event.missLabel.replace("！", "")}，但没扣心！`
+            : "这次没扣心！",
           short: savedByEvent
             ? "旦仔鼓励接住了这颗蛋"
             : savedByCharacter
@@ -694,7 +705,7 @@ function handleGameEvents() {
         vibrate([35, 20, 55]);
         break;
       case "coinRushStarted":
-        renderer.triggerUpgrade("金币狂欢！", "疯狂点击按钮");
+        renderer.triggerUpgrade("金币狂欢！", "狂点金币");
         showImpactBanner({
           icon: "🤑",
           title: "金币狂欢！",
@@ -710,7 +721,7 @@ function handleGameEvents() {
           playCue("perfect");
           vibrate([25, 15, 45]);
         } else {
-          playCue("flip");
+          playCue("good");
           vibrate(10);
         }
         break;
@@ -725,7 +736,32 @@ function handleGameEvents() {
         if (event.result.isPerfect) {
           vibrate([35, 25, 65]);
           playCue("perfect");
+        } else if (event.result.hitQuality === HIT_QUALITY.GOOD) {
+          vibrate(18);
+          playCue("good");
         }
+        break;
+      case "perfectStreakLively":
+        renderer.triggerComboMood("lively", event.perfectStreak);
+        showImpactBanner({
+          icon: "✨",
+          title: "Perfect x3 活力开锅！",
+          short: "背景和旦仔都热起来了",
+          rarity: "epic",
+        }, 1150);
+        playCue("streak3");
+        vibrate([35, 20, 55]);
+        break;
+      case "perfectStreakFever":
+        renderer.triggerComboMood("fever", event.perfectStreak);
+        showImpactBanner({
+          icon: "🎉",
+          title: "Perfect x5 大狂欢！",
+          short: "保持节奏，继续连中",
+          rarity: "legendary",
+        }, 1500);
+        playCue("fever");
+        vibrate([55, 25, 85, 30, 110]);
         break;
       case "stageGoalReached":
         renderer.triggerStageGoal(event.target);
@@ -744,7 +780,7 @@ function handleGameEvents() {
         break;
       case "upgradeDraftRerolled":
         showUpgradeDraft(event);
-        playCue("flip");
+        playCue("good");
         vibrate([25, 15, 35]);
         break;
       case "upgradeSelected":
@@ -976,8 +1012,12 @@ function showToast(message) {
 
 function showScoreBurst(result) {
   window.clearTimeout(scoreBurstTimer);
-  elements.scoreBurstValue.textContent = result.isPerfect ? "Perfect!" : "出锅！";
-  elements.scoreBurstLabel.textContent = "命中绿色区域";
+  elements.scoreBurstValue.textContent =
+    result.hitQuality === HIT_QUALITY.PERFECT ? "Perfect!" : "Good!";
+  elements.scoreBurstLabel.textContent =
+    result.hitQuality === HIT_QUALITY.PERFECT
+      ? `Perfect 连中 ×${result.perfectStreak}`
+      : "稳稳出锅";
   elements.scoreBurstReasons.replaceChildren();
   const reasons = [];
   if (result.routeTriggered && result.activeBuildFamily) {
@@ -1013,11 +1053,18 @@ function showScoreBurst(result) {
   elements.scoreBurst.classList.remove(
     "is-visible",
     "is-perfect",
+    "is-good",
+    "is-fever",
     "is-burnt",
     "is-build",
     "is-goal",
   );
   elements.scoreBurst.classList.toggle("is-perfect", result.isPerfect);
+  elements.scoreBurst.classList.toggle(
+    "is-good",
+    result.hitQuality === HIT_QUALITY.GOOD,
+  );
+  elements.scoreBurst.classList.toggle("is-fever", result.comboMood === "fever");
   elements.scoreBurst.classList.toggle("is-burnt", false);
   elements.scoreBurst.classList.toggle("is-build", reasons.length > 0);
   elements.scoreBurst.classList.remove("is-goal");
@@ -1038,6 +1085,8 @@ function showCoinTap(event) {
   elements.scoreBurst.classList.remove(
     "is-visible",
     "is-perfect",
+    "is-good",
+    "is-fever",
     "is-burnt",
     "is-build",
     "is-goal",
@@ -1063,10 +1112,13 @@ function updateInterface(snapshot) {
   elements.scoreLabel.textContent = "生命";
   elements.score.textContent =
     "♥".repeat(snapshot.health) + "♡".repeat(snapshot.maxHealth - snapshot.health);
-  elements.combo.textContent = snapshot.combo;
+  elements.combo.textContent = snapshot.perfectStreak;
+  elements.comboCard.hidden = snapshot.perfectStreak <= 0;
   elements.level.textContent = `第 ${snapshot.level} 关`;
   elements.app.dataset.event = snapshot.baseEffect.id;
   elements.app.dataset.pan = snapshot.panPerk.id;
+  elements.app.dataset.comboMood = snapshot.comboMood;
+  elements.app.dataset.lastHitQuality = snapshot.lastHitQuality || "none";
   elements.app.dataset.goalSecured = "false";
   elements.shield.textContent = `🛡 回魂 ${snapshot.shieldCharges}`;
   elements.shield.classList.toggle("is-hidden", snapshot.shieldCharges <= 0);
@@ -1094,8 +1146,8 @@ function updateInterface(snapshot) {
   if (coinRushActive) {
     elements.actionButton.disabled = false;
     elements.actionIcon.textContent = "🪙";
-    elements.actionLabel.textContent = "疯狂点击";
-    elements.actionButton.setAttribute("aria-label", "疯狂点击赚金币");
+    elements.actionLabel.textContent = "狂点金币";
+    elements.actionButton.setAttribute("aria-label", "狂点金币");
     return;
   }
   if (!egg) return;
@@ -1106,7 +1158,7 @@ function updateInterface(snapshot) {
   elements.eventBubble.classList.remove(...RARITY_CLASSES);
   elements.eventBubble.classList.add(`rarity-${displayedEffect.rarity}`);
 
-  updatePerfectZone(snapshot.effect.perfectMin, snapshot.effect.perfectMax);
+  updateHitZones(snapshot.effect);
   updateBuildTargetZone(buildVisual, snapshot.effect);
   const currentHeat = egg.heat;
   const isBlind =
@@ -1266,6 +1318,13 @@ function updatePerfectZone(min, max) {
   elements.perfectZone.style.width = `${max - min}%`;
 }
 
+function updateHitZones(effect) {
+  const { goodMin, goodMax, perfectMin, perfectMax } = getHitWindow(effect);
+  elements.goodZone.style.left = `${goodMin}%`;
+  elements.goodZone.style.width = `${goodMax - goodMin}%`;
+  updatePerfectZone(perfectMin, perfectMax);
+}
+
 function updateBuildTargetZone(buildVisual, effect) {
   const isGambleRoute =
     buildVisual?.id === "gamble";
@@ -1295,7 +1354,11 @@ function updateHeatRow({
   marker.style.left = `${heat}%`;
 
   const status = blind ? "blind" : classifyHeat(heat, perfectMin, perfectMax);
+  const hitQuality = blind
+    ? "blind"
+    : getHitQuality(heat, { perfectMin, perfectMax });
   row.dataset.status = status;
+  row.dataset.quality = hitQuality;
 }
 
 function showStageResults(result) {

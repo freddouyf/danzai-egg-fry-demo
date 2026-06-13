@@ -67,6 +67,18 @@ export const HEAT_STATUS = Object.freeze({
   BURNT: "burnt",
 });
 
+export const HIT_QUALITY = Object.freeze({
+  MISS: "miss",
+  GOOD: "good",
+  PERFECT: "perfect",
+});
+
+export const COMBO_MOOD = Object.freeze({
+  NORMAL: "normal",
+  LIVELY: "lively",
+  FEVER: "fever",
+});
+
 export const HEAT_LABELS = Object.freeze({
   [HEAT_STATUS.RAW]: "太生",
   [HEAT_STATUS.NORMAL]: "普通",
@@ -222,8 +234,8 @@ export const EVENT_DEFINITIONS = Object.freeze([
     id: "coin-rush",
     icon: "🤑",
     title: "金币狂欢机！",
-    short: "疯狂点击",
-    message: "大奖时间！疯狂点击按钮，把金币全敲出来！",
+    short: "狂点金币",
+    message: "大奖时间！狂点按钮，把金币全敲出来！",
     rarity: "legendary",
     weight: 5,
     specialMode: "coin-rush",
@@ -576,6 +588,49 @@ export function classifyHeat(value, perfectMin = 70, perfectMax = 85) {
   return HEAT_STATUS.RAW;
 }
 
+export function getHitWindow(effect = createEvent(), goodPadding = 8) {
+  const perfectMin = clamp(Number(effect.perfectMin) || 70, 0, 95);
+  const perfectMax = clamp(
+    Number(effect.perfectMax) || 85,
+    perfectMin,
+    95,
+  );
+  const padding = Math.max(0, Number(goodPadding) || 0);
+  return {
+    goodMin: clamp(perfectMin - padding, 0, perfectMin),
+    goodMax: clamp(perfectMax + padding, perfectMax, 95),
+    perfectMin,
+    perfectMax,
+  };
+}
+
+export function getHitQuality(value, effect = createEvent()) {
+  const heat = clamp(Number(value) || 0, 0, 100);
+  const window = getHitWindow(effect);
+  if (heat >= window.perfectMin && heat <= window.perfectMax) {
+    return HIT_QUALITY.PERFECT;
+  }
+  if (heat >= window.goodMin && heat <= window.goodMax) {
+    return HIT_QUALITY.GOOD;
+  }
+  return HIT_QUALITY.MISS;
+}
+
+export function getMissFeedback(value, effect = createEvent()) {
+  const heat = clamp(Number(value) || 0, 0, 100);
+  const { goodMin } = getHitWindow(effect);
+  if (heat >= 96) return { id: "burnt", label: "糊锅啦！" };
+  if (heat < goodMin) return { id: "early", label: "太早啦！" };
+  return { id: "late", label: "太晚啦！" };
+}
+
+export function getComboMood(perfectStreak) {
+  const streak = Math.max(0, Math.floor(Number(perfectStreak) || 0));
+  if (streak >= 5) return COMBO_MOOD.FEVER;
+  if (streak >= 3) return COMBO_MOOD.LIVELY;
+  return COMBO_MOOD.NORMAL;
+}
+
 export function comboMultiplier(combo) {
   return 1 + Math.floor(Math.max(0, combo) / 3) * 0.5;
 }
@@ -692,6 +747,50 @@ export function scoreEgg(sideOne, sideTwo, effect = createEvent(), currentCombo 
   };
 }
 
+export function scoreSingleTap(heat, effect = createEvent(), currentCombo = 0) {
+  const safeHeat = clamp(Number(heat) || 0, 0, 100);
+  const status = classifyHeat(safeHeat, effect.perfectMin, effect.perfectMax);
+  const hitQuality = getHitQuality(safeHeat, effect);
+  const isPerfect = hitQuality === HIT_QUALITY.PERFECT;
+  const isGood = hitQuality === HIT_QUALITY.GOOD;
+  const isBurnt = safeHeat >= 96;
+  const baseScore = isPerfect ? 100 : isGood ? 40 : 0;
+
+  let nextCombo = currentCombo;
+  let preservedCombo = false;
+  if (baseScore > 0) {
+    nextCombo += 1;
+  } else if (effect.preserveCombo) {
+    preservedCombo = true;
+  } else {
+    nextCombo = 0;
+  }
+
+  let scoreBeforeCombo = baseScore * effect.scoreMultiplier;
+  if (baseScore > 0) {
+    scoreBeforeCombo += effect.successBonus;
+    if (isPerfect) scoreBeforeCombo += effect.perfectBonus;
+  }
+  const multiplier = comboMultiplier(nextCombo);
+  return {
+    sideOne: safeHeat,
+    sideTwo: safeHeat,
+    firstStatus: status,
+    secondStatus: status,
+    baseScore,
+    awardedScore: Math.round(scoreBeforeCombo * multiplier),
+    combo: nextCombo,
+    comboMultiplier: multiplier,
+    hitQuality,
+    isGood,
+    isPerfect,
+    isBurnt,
+    preservedCombo,
+    effectId: effect.id,
+    rarity: effect.rarity,
+  };
+}
+
 function upgradePower(stacks, multiplier) {
   return stacks > 0 ? multiplier ** stacks : 1;
 }
@@ -744,6 +843,9 @@ export class EggFryGame {
     this.combo = 0;
     this.bestCombo = 0;
     this.perfectChain = 0;
+    this.perfectStreak = 0;
+    this.comboMood = COMBO_MOOD.NORMAL;
+    this.lastHitQuality = null;
     this.riskStreak = 0;
     this.eventMeter = 0;
     this.queuedEventId = null;
@@ -894,7 +996,7 @@ export class EggFryGame {
   flip() {
     if (!this.ensurePlaying()) return false;
     if (this.currentEgg.phase !== "first") {
-      this.pushEvent("invalidAction", { message: "已经翻过面啦，下一步该出锅！" });
+      this.pushEvent("invalidAction", { message: "这颗蛋已经进入下一阶段。" });
       return false;
     }
 
@@ -905,7 +1007,10 @@ export class EggFryGame {
       "第一面",
     );
     if (!this.isHeatSuccessful(this.currentEgg.heat, activeEffect)) {
-      this.loseHeart("missed-zone");
+      this.loseHeart("missed-zone", {
+        heat: this.currentEgg.heat,
+        feedback: getMissFeedback(this.currentEgg.heat, activeEffect),
+      });
       if (this.state === "playing") this.spawnEgg();
       return false;
     }
@@ -921,7 +1026,7 @@ export class EggFryGame {
   serve({ singleTap = false } = {}) {
     if (!this.ensurePlaying()) return false;
     if (!singleTap && this.currentEgg.phase !== "second") {
-      this.pushEvent("invalidAction", { message: "先翻面，再出锅才会两面香！" });
+      this.pushEvent("invalidAction", { message: "请使用单次出锅操作。" });
       return false;
     }
 
@@ -940,10 +1045,8 @@ export class EggFryGame {
     const originalSideOne = this.currentEgg.sideOne;
     const originalSideTwo = this.currentEgg.sideTwo;
     const hasBurntSide = originalSideOne >= 96 || originalSideTwo >= 96;
-    const missedSecondSide = !this.isHeatSuccessful(
-      originalSideTwo,
-      activeEffect,
-    );
+    const initialHitQuality = getHitQuality(originalSideTwo, activeEffect);
+    const missedSecondSide = initialHitQuality === HIT_QUALITY.MISS;
     const rescuedByShield = missedSecondSide && this.shieldCharges > 0;
     if (rescuedByShield) {
       this.shieldCharges -= 1;
@@ -951,18 +1054,37 @@ export class EggFryGame {
         (activeEffect.perfectMin + activeEffect.perfectMax) / 2;
       if (singleTap) this.currentEgg.sideOne = this.currentEgg.sideTwo;
     } else if (missedSecondSide) {
-      this.loseHeart("missed-zone");
+      this.loseHeart("missed-zone", {
+        heat: originalSideTwo,
+        feedback: getMissFeedback(originalSideTwo, activeEffect),
+      });
       if (this.state === "playing") this.spawnEgg();
       return false;
     }
     this.registerSuccessfulAction("serve");
 
-    const result = scoreEgg(
-      this.currentEgg.sideOne,
-      this.currentEgg.sideTwo,
-      activeEffect,
-      this.combo,
-    );
+    const result = singleTap
+      ? scoreSingleTap(this.currentEgg.sideTwo, activeEffect, this.combo)
+      : scoreEgg(
+          this.currentEgg.sideOne,
+          this.currentEgg.sideTwo,
+          activeEffect,
+          this.combo,
+        );
+    if (!result.hitQuality) {
+      result.hitQuality = result.isPerfect
+        ? HIT_QUALITY.PERFECT
+        : HIT_QUALITY.GOOD;
+      result.isGood = result.hitQuality === HIT_QUALITY.GOOD;
+    }
+    const previousComboMood = this.comboMood;
+    if (result.hitQuality === HIT_QUALITY.PERFECT) {
+      this.perfectStreak += 1;
+    }
+    this.lastHitQuality = result.hitQuality;
+    this.comboMood = getComboMood(this.perfectStreak);
+    result.perfectStreak = this.perfectStreak;
+    result.comboMood = this.comboMood;
     result.awakenedCount = activeEffect.awakenedCount;
     result.awakenedMultiplier = activeEffect.awakenedMultiplier;
     result.activeBuildFamily = this.activeBuildFamily;
@@ -1390,6 +1512,23 @@ export class EggFryGame {
     }
 
     this.pushEvent("served", { result, eggNumber: this.eggsCooked });
+    if (
+      previousComboMood === COMBO_MOOD.NORMAL &&
+      this.comboMood === COMBO_MOOD.LIVELY
+    ) {
+      this.pushEvent("perfectStreakLively", {
+        perfectStreak: this.perfectStreak,
+        comboMood: this.comboMood,
+      });
+    } else if (
+      previousComboMood !== COMBO_MOOD.FEVER &&
+      this.comboMood === COMBO_MOOD.FEVER
+    ) {
+      this.pushEvent("perfectStreakFever", {
+        perfectStreak: this.perfectStreak,
+        comboMood: this.comboMood,
+      });
+    }
     if (panPerk.id === "golden-feast" && result.isPerfect) {
       panTriggers.push({
         kind: "golden-feast",
@@ -1413,11 +1552,7 @@ export class EggFryGame {
   }
 
   isHeatSuccessful(heat, effect = this.getActiveEffect()) {
-    const status = classifyHeat(heat, effect.perfectMin, effect.perfectMax);
-    return (
-      status === HEAT_STATUS.PERFECT ||
-      (effect.singedAsPerfect && status === HEAT_STATUS.SINGED)
-    );
+    return getHitQuality(heat, effect) !== HIT_QUALITY.MISS;
   }
 
   registerSuccessfulAction(action) {
@@ -1429,46 +1564,62 @@ export class EggFryGame {
     });
   }
 
-  loseHeart(reason = "missed-zone") {
+  loseHeart(reason = "missed-zone", detail = {}) {
     const phase = this.currentEgg?.phase || "first";
+    const feedback =
+      detail.feedback ||
+      (reason === "overheat"
+        ? { id: "burnt", label: "糊锅啦！" }
+        : getMissFeedback(detail.heat ?? this.currentEgg?.heat ?? 0, this.getActiveEffect()));
     this.currentEgg = null;
     this.combo = 0;
     this.perfectChain = 0;
+    this.perfectStreak = 0;
+    this.comboMood = COMBO_MOOD.NORMAL;
+    this.lastHitQuality = HIT_QUALITY.MISS;
     this.riskStreak = 0;
 
     if (this.stageGuardCharges > 0) {
       this.stageGuardCharges -= 1;
       this.pushEvent("heartSaved", {
-        reason,
-        phase,
-        source: "character",
+          reason,
+          phase,
+          missReason: feedback.id,
+          missLabel: feedback.label,
+          source: "character",
       });
       return false;
     }
     if (this.panGuardCharges > 0) {
       this.panGuardCharges -= 1;
       this.pushEvent("heartSaved", {
-        reason,
-        phase,
-        source: "pan",
+          reason,
+          phase,
+          missReason: feedback.id,
+          missLabel: feedback.label,
+          source: "pan",
       });
       return false;
     }
     if (this.effect.guardHeart && !this.eventGuardUsed) {
       this.eventGuardUsed = true;
       this.pushEvent("heartSaved", {
-        reason,
-        phase,
-        source: "event",
+          reason,
+          phase,
+          missReason: feedback.id,
+          missLabel: feedback.label,
+          source: "event",
       });
       return false;
     }
     if (this.shieldCharges > 0) {
       this.shieldCharges -= 1;
       this.pushEvent("heartSaved", {
-        reason,
-        phase,
-        source: "upgrade",
+          reason,
+          phase,
+          missReason: feedback.id,
+          missLabel: feedback.label,
+          source: "upgrade",
       });
       return false;
     }
@@ -1477,6 +1628,8 @@ export class EggFryGame {
     this.pushEvent("heartLost", {
       reason,
       phase,
+      missReason: feedback.id,
+      missLabel: feedback.label,
       health: this.health,
       maxHealth: this.maxHealth,
     });
@@ -2001,6 +2154,9 @@ export class EggFryGame {
       combo: this.combo,
       bestCombo: this.bestCombo,
       perfectChain: this.perfectChain,
+      perfectStreak: this.perfectStreak,
+      comboMood: this.comboMood,
+      lastHitQuality: this.lastHitQuality,
       eggsCooked: this.eggsCooked,
       perfectEggs: this.perfectEggs,
       effect: this.getActiveEffect(),

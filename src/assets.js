@@ -4,7 +4,12 @@ export const ASSET_CANDIDATES = Object.freeze({
   danzaiStart: ["origin/资源 4.png", "danzai_start.png"],
   danzaiIdle: ["origin/资源 6.png", "danzai_idle.png", "旦仔_待机.png", "旦仔.png"],
   danzaiHappy: ["origin/资源 3.png", "danzai_happy.png", "旦仔_开心.png"],
-  danzaiFlip: ["origin/资源 7.png", "danzai_flip.png", "旦仔_翻面.png"],
+  danzaiAction: [
+    "origin/资源 7.png",
+    "danzai_action.png",
+    "旦仔_出锅.png",
+    "danzai_flip.png",
+  ],
   danzaiFail: ["origin/资源 1.png", "danzai_fail.png", "旦仔_失败.png"],
   danzaiCheer: ["origin/资源 2.png", "danzai_cheer.png"],
   danzaiCalm: ["origin/资源 5.png", "danzai_calm.png"],
@@ -87,7 +92,7 @@ export function chooseDanzaiAsset(assets, mood = "idle") {
   const moodMap = {
     start: assets.danzaiStart,
     idle: assets.danzaiIdle,
-    flip: assets.danzaiFlip,
+    action: assets.danzaiAction,
     happy: assets.danzaiHappy,
     fail: assets.danzaiFail,
     cheer: assets.danzaiCheer,

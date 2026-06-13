@@ -87,7 +87,6 @@ export class GameRenderer {
     this.equippedSkinKey = null;
     this.animations = {
       eggDropAt: -Infinity,
-      flipAt: -Infinity,
       burnAt: -Infinity,
       upgradeAt: -Infinity,
       costumeUntil: -Infinity,
@@ -128,10 +127,6 @@ export class GameRenderer {
 
   triggerEggStart(now = performance.now()) {
     this.animations.eggDropAt = now;
-  }
-
-  triggerFlip(now = performance.now()) {
-    this.animations.flipAt = now;
   }
 
   triggerBurn(now = performance.now()) {
@@ -283,6 +278,10 @@ export class GameRenderer {
         : `Perfect!  +${result.awardedScore}`;
       color = "#ef5d72";
       this.addSparkBurst();
+    } else if (result.hitQuality === "good") {
+      label = `Good!  +${result.awardedScore}`;
+      color = "#35aa73";
+      this.addSparkBurst(14, ["#d9ff91", "#6ed88b", "#fff06a"]);
     } else if (result.isBurnt) {
       label = result.preservedCombo ? "糊了，但连击保住！" : "糊锅啦！";
       color = "#734439";
@@ -334,6 +333,27 @@ export class GameRenderer {
     }
   }
 
+  triggerComboMood(mood, streak, now = performance.now()) {
+    const isFever = mood === "fever";
+    this.addSparkBurst(
+      isFever ? 72 : 38,
+      isFever
+        ? ["#fff36a", "#ff5b8f", "#6fe4ff", "#9a72ff", "#64df88"]
+        : ["#fff36a", "#ff9c56", "#79dfff", "#ff79a8"],
+    );
+    this.activateCostume(now, isFever ? 1_900 : 1_100, streak);
+    this.scorePopups.push({
+      label: isFever
+        ? `PERFECT x${streak}！大狂欢！`
+        : `PERFECT x${streak}！活力开锅！`,
+      color: isFever ? "#e93e86" : "#ff783f",
+      startedAt: now,
+      duration: isFever ? 1_800 : 1_350,
+      large: true,
+      offsetY: -26,
+    });
+  }
+
   render(snapshot, now = performance.now()) {
     const ctx = this.context;
     const rect = this.canvas.getBoundingClientRect();
@@ -360,6 +380,7 @@ export class GameRenderer {
 
     this.drawKitchen(ctx);
     this.drawLevelAtmosphere(ctx, snapshot.level, now);
+    this.drawComboAtmosphere(ctx, snapshot.comboMood, now);
 
     const egg = snapshot.currentEgg;
     const currentHeat = egg?.heat ?? 0;
@@ -367,14 +388,9 @@ export class GameRenderer {
     const status = egg
       ? classifyHeat(currentHeat, snapshot.effect.perfectMin, snapshot.effect.perfectMax)
       : HEAT_STATUS.RAW;
-    const mood =
-      now - this.animations.flipAt < 600
-        ? "flip"
-        : status === HEAT_STATUS.BURNT
-          ? "fail"
-          : "idle";
+    const mood = status === HEAT_STATUS.BURNT ? "fail" : "idle";
 
-    this.drawDanzai(ctx, mood, now);
+    this.drawDanzai(ctx, mood, now, snapshot.comboMood);
     this.drawFire(ctx, currentHeat, snapshot.effect, now);
     this.drawPan(ctx, snapshot.level, now);
 
@@ -600,7 +616,41 @@ export class GameRenderer {
     ctx.restore();
   }
 
-  drawDanzai(ctx, mood, now) {
+  drawComboAtmosphere(ctx, comboMood, now) {
+    if (comboMood === "normal") return;
+
+    const isFever = comboMood === "fever";
+    ctx.save();
+    const pulse = 0.04 + (Math.sin(now / (isFever ? 85 : 145)) + 1) * 0.025;
+    ctx.fillStyle = isFever
+      ? `rgba(255, 62, 139, ${pulse})`
+      : `rgba(255, 202, 55, ${pulse})`;
+    ctx.fillRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
+
+    const count = isFever ? 18 : 8;
+    const colors = ["#fff36a", "#ff6f91", "#65dfff", "#8be06f", "#9b75ff"];
+    for (let index = 0; index < count; index += 1) {
+      const travel = (now / (isFever ? 7 : 12) + index * 67) % 460;
+      const x = index % 2 === 0 ? 10 + (index % 4) * 14 : DESIGN_WIDTH - 12 - (index % 4) * 13;
+      const y = travel - 35;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(now / 250 + index);
+      ctx.fillStyle = colors[index % colors.length];
+      if (index % 3 === 0) {
+        ctx.beginPath();
+        ctx.arc(0, 0, isFever ? 5 : 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillRect(-4, -2, 8, 4);
+      }
+      ctx.restore();
+    }
+    if (isFever) this.drawFeverAura(ctx, now);
+    ctx.restore();
+  }
+
+  drawDanzai(ctx, mood, now, comboMood = "normal") {
     const costumeKeys = [
       "costumeDrummer",
       "costumeSwordsman",
@@ -617,7 +667,9 @@ export class GameRenderer {
       ? this.assets[this.equippedSkinKey]
       : null;
     const image = costume || equipped || chooseDanzaiAsset(this.assets, mood);
-    const bob = Math.sin(now / 420) * 3;
+    const bobAmplitude = comboMood === "fever" ? 8 : comboMood === "lively" ? 5 : 3;
+    const bobSpeed = comboMood === "fever" ? 150 : comboMood === "lively" ? 260 : 420;
+    const bob = Math.sin(now / bobSpeed) * bobAmplitude;
     const x = 17;
     const y = 117 + bob;
     const width = 142;
@@ -1026,18 +1078,12 @@ export class GameRenderer {
   drawEgg(ctx, heat, phase, now, effect) {
     const dropProgress = clamp01((now - this.animations.eggDropAt) / 620);
     const dropY = dropProgress < 1 ? -105 * (1 - easeOutBack(dropProgress)) : 0;
-    const flipProgress = clamp01((now - this.animations.flipAt) / 600);
-    const isFlipping = flipProgress < 1;
-    const flipAngle = isFlipping ? flipProgress * Math.PI * 2 : 0;
-    const flipScaleY = isFlipping ? Math.max(0.16, Math.abs(Math.cos(flipProgress * Math.PI))) : 1;
     const x = 249;
     const y = 253 + dropY;
     const color = this.getEggColor(heat);
 
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(flipAngle * 0.18);
-    ctx.scale(1, flipScaleY);
 
     ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
     ctx.beginPath();
@@ -1094,12 +1140,6 @@ export class GameRenderer {
       }
     }
 
-    if (phase === "second") {
-      ctx.fillStyle = "rgba(255, 191, 57, 0.15)";
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 57, 35, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
     ctx.restore();
   }
 

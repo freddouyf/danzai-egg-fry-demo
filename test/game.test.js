@@ -8,6 +8,7 @@ import {
   buildFamilyCount,
   buildFamilyMultiplier,
   classifyHeat,
+  COMBO_MOOD,
   comboMultiplier,
   createEvent,
   createRandomEvent,
@@ -15,17 +16,99 @@ import {
   EVENT_DEFINITIONS,
   EARLY_LEVEL_TARGETS,
   GAME_DURATION_MS,
+  getComboMood,
+  getHitQuality,
+  getHitWindow,
+  getMissFeedback,
   getPanPerk,
   getUpgradePreview,
   HEAT_STATUS,
+  HIT_QUALITY,
   levelScoreMultiplier,
   levelTarget,
   MAX_HEALTH,
   nextLevelTarget,
   scoreEgg,
+  scoreSingleTap,
   PAN_PERKS,
   UPGRADE_DEFINITIONS,
 } from "../src/game.js";
+
+function cookAt(game, heat) {
+  game.currentEgg.heat = heat;
+  return game.cook();
+}
+
+test("单次点击命中区分 Good、Perfect 与 Miss", () => {
+  assert.deepEqual(getHitWindow(createEvent()), {
+    goodMin: 62,
+    goodMax: 93,
+    perfectMin: 70,
+    perfectMax: 85,
+  });
+  assert.equal(getHitQuality(61), HIT_QUALITY.MISS);
+  assert.equal(getHitQuality(62), HIT_QUALITY.GOOD);
+  assert.equal(getHitQuality(69), HIT_QUALITY.GOOD);
+  assert.equal(getHitQuality(70), HIT_QUALITY.PERFECT);
+  assert.equal(getHitQuality(85), HIT_QUALITY.PERFECT);
+  assert.equal(getHitQuality(86), HIT_QUALITY.GOOD);
+  assert.equal(getHitQuality(93), HIT_QUALITY.GOOD);
+  assert.equal(getHitQuality(94), HIT_QUALITY.MISS);
+  assert.equal(getHitQuality(96), HIT_QUALITY.MISS);
+  assert.equal(getMissFeedback(20).label, "太早啦！");
+  assert.equal(getMissFeedback(94).label, "太晚啦！");
+  assert.equal(getMissFeedback(96).label, "糊锅啦！");
+});
+
+test("Good 奖励低于 Perfect，且两者都能一次出锅", () => {
+  const good = scoreSingleTap(65);
+  const perfect = scoreSingleTap(75);
+  assert.equal(good.hitQuality, HIT_QUALITY.GOOD);
+  assert.equal(good.baseScore, 40);
+  assert.equal(perfect.hitQuality, HIT_QUALITY.PERFECT);
+  assert.equal(perfect.baseScore, 100);
+  assert.ok(perfect.awardedScore > good.awardedScore);
+});
+
+test("Perfect 三连进入活力状态，五连进入狂欢，Good 保留而 Miss 清空", () => {
+  assert.equal(getComboMood(2), COMBO_MOOD.NORMAL);
+  assert.equal(getComboMood(3), COMBO_MOOD.LIVELY);
+  assert.equal(getComboMood(5), COMBO_MOOD.FEVER);
+
+  const game = new EggFryGame({ eventChance: 0 });
+  game.start();
+  game.drainEvents();
+  cookAt(game, 75);
+  cookAt(game, 75);
+  cookAt(game, 75);
+  let snapshot = game.getSnapshot();
+  assert.equal(snapshot.perfectStreak, 3);
+  assert.equal(snapshot.comboMood, COMBO_MOOD.LIVELY);
+  assert.ok(game.drainEvents().some((event) => event.type === "perfectStreakLively"));
+
+  cookAt(game, 65);
+  snapshot = game.getSnapshot();
+  assert.equal(snapshot.perfectStreak, 3);
+  assert.equal(snapshot.lastHitQuality, HIT_QUALITY.GOOD);
+
+  cookAt(game, 75);
+  cookAt(game, 75);
+  snapshot = game.getSnapshot();
+  assert.equal(snapshot.perfectStreak, 5);
+  assert.equal(snapshot.comboMood, COMBO_MOOD.FEVER);
+  assert.ok(game.drainEvents().some((event) => event.type === "perfectStreakFever"));
+
+  assert.equal(cookAt(game, 20), false);
+  snapshot = game.getSnapshot();
+  assert.equal(snapshot.perfectStreak, 0);
+  assert.equal(snapshot.comboMood, COMBO_MOOD.NORMAL);
+  assert.equal(snapshot.lastHitQuality, HIT_QUALITY.MISS);
+  assert.ok(
+    game.drainEvents().some(
+      (event) => event.type === "heartLost" && event.missLabel === "太早啦！",
+    ),
+  );
+});
 
 test("火候边界与默认完美区间正确", () => {
   assert.equal(classifyHeat(0), HEAT_STATUS.RAW);
@@ -273,10 +356,7 @@ test("双份装盘会定期爆出额外金币而不会改变读条起点", () =>
   game.spawnEgg("none");
   assert.equal(game.currentEgg.heat, 0);
   for (let index = 0; index < 3; index += 1) {
-    game.currentEgg.heat = 75;
-    game.flip();
-    game.currentEgg.heat = 80;
-    var result = game.serve();
+    var result = cookAt(game, 80);
   }
   assert.equal(result.doublePlate, true);
   assert.equal(result.doublePlateCoinBonus, 4);
@@ -288,10 +368,7 @@ test("奇遇复读机会把成功事件带到下一颗蛋", () => {
   game.start();
   game.upgrades["event-booster"] = 1;
   game.spawnEgg("double-yolk");
-  game.currentEgg.heat = 75;
-  game.flip();
-  game.currentEgg.heat = 80;
-  game.serve();
+  cookAt(game, 80);
 
   assert.equal(game.effect.id, "double-yolk");
   assert.equal(game.currentEgg.isEncore, true);
@@ -305,10 +382,7 @@ test("大奖蓄力器会在连续事件成功后强制生成大奖蛋", () => {
   game.upgrades["event-album"] = 1;
   for (let index = 0; index < 3; index += 1) {
     game.spawnEgg("double-yolk");
-    game.currentEgg.heat = 75;
-    game.flip();
-    game.currentEgg.heat = 80;
-    game.serve();
+    cookAt(game, 80);
   }
 
   assert.equal(game.effect.id, "jackpot");
@@ -321,18 +395,12 @@ test("连击超频会让下一颗成功蛋额外爆出金币", () => {
   game.start();
   game.upgrades["combo-engine"] = 1;
   game.combo = 4;
-  game.currentEgg.heat = 75;
-  game.flip();
-  game.currentEgg.heat = 80;
-  game.serve();
+  cookAt(game, 80);
 
   assert.equal(game.overdriveRemainingMs, 4_000);
   assert.equal(game.currentEgg.heat, 0);
 
-  game.currentEgg.heat = 75;
-  game.flip();
-  game.currentEgg.heat = 80;
-  const boosted = game.serve();
+  const boosted = cookAt(game, 80);
   assert.equal(boosted.overdriveCoinBonus, 4);
   assert.equal(boosted.progressGain, 1);
   assert.ok(
@@ -346,10 +414,7 @@ test("战斗中不再弹强化，过关后才出现一次三选一配方", () =>
   const game = new EggFryGame({ eventChance: 0, random: () => 0 });
   game.start();
   for (let egg = 0; egg < 2; egg += 1) {
-    game.currentEgg.heat = 75;
-    game.flip();
-    game.currentEgg.heat = 80;
-    game.serve();
+    cookAt(game, 80);
   }
 
   assert.equal(game.state, "playing");
@@ -477,20 +542,11 @@ test("精准牌型会在第三颗 Perfect 触发复印爆分", () => {
   game.upgrades["steady-hand"] = 1;
   game.upgrades["perfect-chain"] = 1;
 
-  game.currentEgg.heat = 75;
-  game.flip();
-  game.currentEgg.heat = 80;
-  const first = game.serve();
+  const first = cookAt(game, 80);
 
-  game.currentEgg.heat = 75;
-  game.flip();
-  game.currentEgg.heat = 80;
-  const second = game.serve();
+  const second = cookAt(game, 80);
 
-  game.currentEgg.heat = 75;
-  game.flip();
-  game.currentEgg.heat = 80;
-  const third = game.serve();
+  const third = cookAt(game, 80);
 
   assert.equal(first.buildMultiplier, 2);
   assert.equal(second.buildMultiplier, 2);
@@ -542,14 +598,12 @@ test("豪赌牌型会把微焦路线变成高倍率构筑", () => {
   game.upgrades["singed-gourmet"] = 1;
   game.upgrades["danger-chef"] = 1;
   game.upgrades["combo-armor"] = 1;
+  game.activeBuildFamily = "gamble";
   game.stageEggs = 2;
-  game.currentEgg.heat = 95;
-  game.flip();
-  game.currentEgg.heat = 95;
-  const result = game.serve();
+  const result = cookAt(game, 90);
 
-  assert.equal(result.isPerfect, true);
-  assert.equal(result.convertedSinged, true);
+  assert.equal(result.isGood, true);
+  assert.equal(result.routeMultiplier, 2);
   assert.equal(result.buildMultiplier, 7);
   assert.match(result.buildLabel, /红温 1 层/);
   assert.match(result.buildLabel, /豪赌牌型 ×4/);
@@ -572,17 +626,13 @@ test("铁锅前两颗扩大完美区，第三颗恢复普通范围", () => {
 test("铁锅会把前两颗蛋擦边火候吸附进 Perfect", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
-  game.currentEgg.heat = 61;
-  game.flip();
-  assert.equal(game.currentEgg.sideOne, 64);
-
-  game.currentEgg.heat = 94;
-  const result = game.serve();
-  assert.equal(result.sideTwo, 91);
+  const result = cookAt(game, 61);
+  assert.equal(result.sideOne, 64);
+  assert.equal(result.sideTwo, 64);
   assert.equal(result.isPerfect, true);
   assert.equal(
     game.drainEvents().filter((event) => event.type === "panPerkTriggered").length,
-    2,
+    1,
   );
 });
 
@@ -613,10 +663,7 @@ test("黄金锅让 Perfect 额外掉落金币", () => {
   golden.start();
   golden.level = 3;
   golden.stageTarget = levelTarget(3);
-  golden.currentEgg.heat = 75;
-  golden.flip();
-  golden.currentEgg.heat = 80;
-  const goldenResult = golden.serve();
+  const goldenResult = cookAt(golden, 80);
   assert.equal(goldenResult.coinReward, 8);
 });
 
@@ -625,10 +672,7 @@ test("成功出锅不会延长固定的十秒倒计时", () => {
   game.start();
   game.spawnEgg("time-warp");
   game.health = 2;
-  game.currentEgg.heat = 75;
-  game.flip();
-  game.currentEgg.heat = 80;
-  const result = game.serve();
+  const result = cookAt(game, 80);
 
   assert.equal(result.timeBonusMs, undefined);
   assert.equal(game.remainingMs, 10_000);
@@ -645,10 +689,7 @@ test("传奇锅让事件成功额外掉落金币", () => {
     (legendary.getActiveEffect().perfectMin +
       legendary.getActiveEffect().perfectMax) /
     2;
-  legendary.currentEgg.heat = targetHeat;
-  legendary.flip();
-  legendary.currentEgg.heat = targetHeat;
-  assert.ok(legendary.serve().coinReward >= 8);
+  assert.ok(cookAt(legendary, targetHeat).coinReward >= 8);
 });
 
 test("晶能锅每两次成功触发晶爆并补充一层护盾", () => {
@@ -657,16 +698,10 @@ test("晶能锅每两次成功触发晶爆并补充一层护盾", () => {
   game.level = 4;
   game.stageTarget = levelTarget(4);
 
-  game.currentEgg.heat = 75;
-  game.flip();
-  game.currentEgg.heat = 80;
-  const first = game.serve();
+  const first = cookAt(game, 80);
   assert.equal(game.panCharge, 1);
 
-  game.currentEgg.heat = 75;
-  game.flip();
-  game.currentEgg.heat = 80;
-  const result = game.serve();
+  const result = cookAt(game, 80);
   assert.equal(result.panCrystalShieldBonus, 1);
   assert.equal(game.shieldCharges, 1);
   assert.equal(game.panCharge, 0);
@@ -692,10 +727,7 @@ test("传奇锅每两次事件成功触发额外金币袋", () => {
     const targetHeat =
       (game.getActiveEffect().perfectMin + game.getActiveEffect().perfectMax) /
       2;
-    game.currentEgg.heat = targetHeat;
-    game.flip();
-    game.currentEgg.heat = targetHeat;
-    const result = game.serve();
+    const result = cookAt(game, targetHeat);
     if (index === 0) {
       assert.equal(game.panCharge, 1);
       assert.equal(result.panResonanceCoinBonus, undefined);
@@ -714,8 +746,7 @@ test("区域外操作会扣心，三次失误后立即结束本轮", () => {
 
   assert.equal(game.health, MAX_HEALTH);
   for (let misses = 1; misses <= MAX_HEALTH; misses += 1) {
-    game.currentEgg.heat = 20;
-    assert.equal(game.flip(), false);
+    assert.equal(cookAt(game, 20), false);
     assert.equal(game.health, MAX_HEALTH - misses);
   }
 
@@ -785,8 +816,7 @@ test("旦仔鼓励事件可以挡住本颗蛋的一次失误", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
   game.spawnEgg("danzai-cheer");
-  game.currentEgg.heat = 20;
-  game.flip();
+  cookAt(game, 20);
 
   assert.equal(game.health, MAX_HEALTH);
   assert.ok(
@@ -837,10 +867,7 @@ test("爱心便当通过连续成功回血，回魂锅盖每关补充次数", ()
   assert.equal(game.remainingMs, 10_000);
   game.health = 2;
   game.stageEggs = 4;
-  game.currentEgg.heat = 75;
-  game.flip();
-  game.currentEgg.heat = 80;
-  const healed = game.serve();
+  const healed = cookAt(game, 80);
   assert.equal(healed.heartRestored, 1);
   assert.equal(game.health, 3);
   assert.equal(game.remainingMs, 10_000);
@@ -943,10 +970,7 @@ test("关卡倍率会直接放大出锅分数", () => {
   game.start();
   game.level = 2;
   game.stageTarget = levelTarget(2);
-  game.currentEgg.heat = 75;
-  game.flip();
-  game.currentEgg.heat = 80;
-  const result = game.serve();
+  const result = cookAt(game, 80);
 
   assert.equal(result.levelMultiplier, 1.75);
   assert.equal(result.awardedScore, 175);
@@ -956,10 +980,7 @@ test("成功煎蛋不会提前结束本关，必须坚持到倒计时结束", ()
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
   game.stageProgress = levelTarget(1) - 1;
-  game.currentEgg.heat = 75;
-  game.flip();
-  game.currentEgg.heat = 80;
-  const result = game.serve();
+  const result = cookAt(game, 80);
 
   const firstEvents = game.drainEvents();
   assert.equal(result.progressGain, 1);
@@ -1000,13 +1021,10 @@ test("最近选择的流派会直接改变下一关操作手感", () => {
   gamble.upgrades["singed-gourmet"] = 1;
   gamble.stageEggs = 2;
   assert.equal(gamble.getActiveEffect().speedMultiplier, 1.12);
-  gamble.currentEgg.heat = 90;
-  gamble.flip();
-  gamble.currentEgg.heat = 90;
-  const gambleResult = gamble.serve();
+  const gambleResult = cookAt(gamble, 90);
   assert.equal(gambleResult.routeTriggered, true);
   assert.equal(gambleResult.routeMultiplier, 2);
-  assert.equal(gambleResult.awardedScore, 100);
+  assert.equal(gambleResult.awardedScore, 40);
 });
 
 test("回魂锅盖会消耗一次并挡住区域外失误", () => {
@@ -1014,10 +1032,7 @@ test("回魂锅盖会消耗一次并挡住区域外失误", () => {
   game.start();
   game.combo = 6;
   game.shieldCharges = 1;
-  game.currentEgg.heat = 75;
-  game.flip();
-  game.currentEgg.heat = 20;
-  const result = game.serve();
+  const result = cookAt(game, 20);
 
   assert.equal(result.preservedByShield, true);
   assert.equal(result.isPerfect, true);
@@ -1030,19 +1045,13 @@ test("彩蛋礼炮会复制事件得分而不是增加隐藏结算倍率", () =>
   const base = new EggFryGame({ eventChance: 0 });
   base.start();
   base.spawnEgg("double-yolk");
-  base.currentEgg.heat = 75;
-  base.flip();
-  base.currentEgg.heat = 80;
-  const baseResult = base.serve();
+  const baseResult = cookAt(base, 80);
 
   const boosted = new EggFryGame({ eventChance: 0 });
   boosted.start();
   boosted.upgrades["coin-sprout"] = 1;
   boosted.spawnEgg("double-yolk");
-  boosted.currentEgg.heat = 75;
-  boosted.flip();
-  boosted.currentEgg.heat = 80;
-  const boostedResult = boosted.serve();
+  const boostedResult = cookAt(boosted, 80);
 
   assert.equal(boostedResult.buildMultiplier, 1.5);
   assert.ok(boostedResult.awardedScore > baseResult.awardedScore);

@@ -6041,3 +6041,132 @@ body {
 .result-overlay.is-final .final-score {
   margin: 10px 0 18px;
 }
+
+/* V24: Good/Perfect windows and lightweight Perfect-streak celebration. */
+.good-zone {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: #a8e872;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.34);
+}
+
+.perfect-zone,
+.game-shell[data-build="precision"] .perfect-zone,
+.game-shell[data-build="gamble"] .perfect-zone {
+  z-index: 2;
+  background: #2fbd68;
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.42),
+    0 0 11px rgba(46, 190, 104, 0.4);
+}
+
+.heat-marker {
+  z-index: 4;
+}
+
+#comboCard:not([hidden]) {
+  display: flex !important;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 3px solid white;
+  border-radius: 999px;
+  color: #8b3b2d;
+  background: rgba(255, 247, 183, 0.95);
+  box-shadow: 0 5px 0 rgba(120, 66, 31, 0.14);
+}
+
+#comboCard span {
+  font-size: 9px;
+  font-weight: 1000;
+  letter-spacing: 0.05em;
+}
+
+#comboCard strong {
+  font-size: 17px;
+}
+
+.game-shell[data-combo-mood="lively"] {
+  background:
+    radial-gradient(circle at 12% 22%, rgba(255, 247, 111, 0.72), transparent 26%),
+    radial-gradient(circle at 87% 30%, rgba(109, 223, 255, 0.46), transparent 25%),
+    linear-gradient(165deg, #fff0a4, #ffbd68 54%, #ff8a72);
+  animation: lively-shell 1.15s ease-in-out infinite alternate;
+}
+
+.game-shell[data-combo-mood="fever"] {
+  background:
+    radial-gradient(circle at 14% 20%, rgba(255, 246, 74, 0.86), transparent 28%),
+    radial-gradient(circle at 88% 26%, rgba(99, 230, 255, 0.7), transparent 28%),
+    linear-gradient(150deg, #ffef6c, #ff7c75 47%, #ef5fc8 76%, #856ef3);
+  animation: fever-shell 520ms ease-in-out infinite alternate;
+}
+
+.game-shell[data-combo-mood="lively"] .stage-wrap {
+  box-shadow:
+    inset 0 0 28px rgba(255, 233, 76, 0.22),
+    0 0 22px rgba(255, 133, 59, 0.3);
+}
+
+.game-shell[data-combo-mood="fever"] .stage-wrap {
+  box-shadow:
+    inset 0 0 42px rgba(255, 240, 72, 0.36),
+    0 0 30px rgba(239, 71, 151, 0.48);
+}
+
+.game-shell[data-combo-mood="lively"] .action-button {
+  animation: lively-button 700ms ease-in-out infinite alternate;
+}
+
+.game-shell[data-combo-mood="fever"] .action-button,
+.game-shell[data-combo-mood="fever"] #comboCard {
+  animation: fever-button 360ms ease-in-out infinite alternate;
+}
+
+.score-burst.is-good strong,
+.score-burst.is-good span {
+  color: #258f5c;
+}
+
+.score-burst.is-fever {
+  filter: drop-shadow(0 0 14px rgba(255, 235, 68, 0.9));
+  transform: translate(-50%, -50%) scale(1.14);
+}
+
+@keyframes lively-shell {
+  to {
+    filter: saturate(1.08) brightness(1.03);
+  }
+}
+
+@keyframes fever-shell {
+  to {
+    filter: saturate(1.16) brightness(1.05);
+  }
+}
+
+@keyframes lively-button {
+  to {
+    transform: translateY(-2px) scale(1.018);
+  }
+}
+
+@keyframes fever-button {
+  to {
+    transform: translateY(-3px) scale(1.045);
+    filter: brightness(1.12) saturate(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-shell[data-combo-mood="lively"],
+  .game-shell[data-combo-mood="fever"],
+  .game-shell[data-combo-mood="lively"] .action-button,
+  .game-shell[data-combo-mood="fever"] .action-button,
+  .game-shell[data-combo-mood="fever"] #comboCard {
+    animation: none;
+  }
+}
