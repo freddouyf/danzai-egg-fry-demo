@@ -40,6 +40,13 @@ function cookAt(game, heat) {
   return game.cook();
 }
 
+function assertNoLegacyCoinFields(result) {
+  assert.deepEqual(
+    Object.keys(result).filter((key) => /coin/i.test(key)),
+    [],
+  );
+}
+
 test("单次点击命中区分 Good、Perfect 与 Miss", () => {
   assert.deepEqual(getHitWindow(createEvent()), {
     goodMin: 62,
@@ -83,7 +90,11 @@ test("Perfect 三连进入活力状态，五连进入狂欢，Good 保留而 Mis
   cookAt(game, 75);
   cookAt(game, 75);
   let snapshot = game.getSnapshot();
+  assert.equal(snapshot.combo, 3);
+  assert.equal(snapshot.currentHitCombo, 3);
   assert.equal(snapshot.perfectStreak, 3);
+  assert.equal(snapshot.bestCombo, 3);
+  assert.equal(snapshot.bestPerfectStreak, 3);
   assert.equal(snapshot.comboMood, COMBO_MOOD.LIVELY);
   assert.ok(game.drainEvents().some((event) => event.type === "perfectStreakLively"));
 
@@ -101,9 +112,13 @@ test("Perfect 三连进入活力状态，五连进入狂欢，Good 保留而 Mis
   assert.equal(snapshot.comboMood, COMBO_MOOD.FEVER);
   assert.ok(game.drainEvents().some((event) => event.type === "perfectStreakFever"));
 
+  const healthBeforeMiss = game.health;
   assert.equal(cookAt(game, 20), false);
   snapshot = game.getSnapshot();
+  assert.equal(snapshot.combo, 0);
+  assert.equal(snapshot.currentHitCombo, 0);
   assert.equal(snapshot.perfectStreak, 0);
+  assert.equal(snapshot.health, healthBeforeMiss - 1);
   assert.equal(snapshot.comboMood, COMBO_MOOD.NORMAL);
   assert.equal(snapshot.lastHitQuality, HIT_QUALITY.MISS);
   assert.ok(
@@ -352,7 +367,7 @@ test("黄色区域点击出锅会扣除一颗心", () => {
   assert.equal(game.currentEgg.phase, "first");
 });
 
-test("旧金币强化保留内部兼容但不影响最终金币", () => {
+test("旧经济强化保留内部兼容但不影响最终金币", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
   game.upgrades["opening-jackpot"] = 1;
@@ -361,8 +376,8 @@ test("旧金币强化保留内部兼容但不影响最终金币", () => {
   for (let index = 0; index < 3; index += 1) {
     var result = cookAt(game, 80);
   }
-  assert.equal(result.doublePlate, true);
-  assert.equal(result.doublePlateCoinBonus, 4);
+  assert.equal(result.doublePlate, undefined);
+  assertNoLegacyCoinFields(result);
   assert.equal(result.progressGain, 1);
 });
 
@@ -393,7 +408,7 @@ test("大奖蓄力器会在连续事件成功后强制生成大奖蛋", () => {
   assert.equal(game.eventMeter, 0);
 });
 
-test("连击超频会让下一颗成功蛋额外爆出金币", () => {
+test("连击超频会让下一颗成功蛋额外加分", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
   game.upgrades["combo-engine"] = 1;
@@ -404,7 +419,7 @@ test("连击超频会让下一颗成功蛋额外爆出金币", () => {
   assert.equal(game.currentEgg.heat, 0);
 
   const boosted = cookAt(game, 80);
-  assert.equal(boosted.overdriveCoinBonus, 4);
+  assertNoLegacyCoinFields(boosted);
   assert.equal(boosted.progressGain, 1);
   assert.ok(
     boosted.buildTriggers.some(
@@ -590,7 +605,7 @@ test("微焦强化只触发卡牌自身奖励，不再叠流派倍率", () => {
   assert.equal(result.isGood, true);
   assert.equal(result.routeMultiplier, undefined);
   assert.equal(result.buildMultiplier, 1.75);
-  assert.match(result.buildLabel, /红温 1 层/);
+  assert.equal(result.buildTriggers.at(-1).id, "danger-chef");
   assert.deepEqual(
     result.buildTriggers.map((trigger) => trigger.family),
     ["basic"],
@@ -636,7 +651,7 @@ test("过关后不会获得铜锅免伤", () => {
   );
 });
 
-test("高关卡 Perfect 不再因为黄金锅额外掉落金币", () => {
+test("高关卡 Perfect 不再产生局内经济字段", () => {
   const golden = new EggFryGame({ eventChance: 0 });
   golden.start();
   golden.level = 3;
@@ -644,7 +659,7 @@ test("高关卡 Perfect 不再因为黄金锅额外掉落金币", () => {
   const targetHeat =
     (golden.getActiveEffect().perfectMin + golden.getActiveEffect().perfectMax) / 2;
   const goldenResult = cookAt(golden, targetHeat);
-  assert.equal(goldenResult.coinReward, 0);
+  assertNoLegacyCoinFields(goldenResult);
 });
 
 test("成功出锅不会延长固定的十秒倒计时", () => {
@@ -659,13 +674,14 @@ test("成功出锅不会延长固定的十秒倒计时", () => {
   assert.equal(game.health, 3);
 });
 
-test("事件成功不再因为传奇锅额外掉落金币", () => {
+test("事件成功不再产生局内经济字段", () => {
   const basic = new EggFryGame({ eventChance: 0 });
   basic.start();
   basic.spawnEgg("double-yolk");
   const basicTargetHeat =
     (basic.getActiveEffect().perfectMin + basic.getActiveEffect().perfectMax) / 2;
-  const basicReward = cookAt(basic, basicTargetHeat).coinReward;
+  const basicResult = cookAt(basic, basicTargetHeat);
+  assertNoLegacyCoinFields(basicResult);
 
   const legendary = new EggFryGame({ eventChance: 0 });
   legendary.start();
@@ -676,7 +692,7 @@ test("事件成功不再因为传奇锅额外掉落金币", () => {
     (legendary.getActiveEffect().perfectMin +
       legendary.getActiveEffect().perfectMax) /
     2;
-  assert.equal(cookAt(legendary, targetHeat).coinReward, basicReward);
+  assertNoLegacyCoinFields(cookAt(legendary, targetHeat));
 });
 
 test("高关卡不会触发晶能锅护盾", () => {
@@ -703,13 +719,11 @@ test("高关卡不会触发晶能锅护盾", () => {
   );
 });
 
-test("高关卡事件不会触发传奇锅金币袋", () => {
+test("高关卡事件不会触发旧经济奖励", () => {
   const game = new EggFryGame({ eventChance: 0 });
   game.start();
   game.level = 5;
   game.stageTarget = levelTarget(5);
-
-  let firstReward = 0;
   for (let index = 0; index < 2; index += 1) {
     game.spawnEgg("double-yolk");
     const targetHeat =
@@ -718,12 +732,10 @@ test("高关卡事件不会触发传奇锅金币袋", () => {
     const result = cookAt(game, targetHeat);
     if (index === 0) {
       assert.equal(game.panCharge, 0);
-      assert.equal(result.panResonanceCoinBonus, undefined);
-      firstReward = result.coinReward;
+      assertNoLegacyCoinFields(result);
     } else {
       assert.equal(game.panCharge, 0);
-      assert.equal(result.panResonanceCoinBonus, undefined);
-      assert.equal(result.coinReward, firstReward);
+      assertNoLegacyCoinFields(result);
     }
   }
 });
@@ -759,7 +771,6 @@ test("连击狂欢冻结关卡倒计时，狂点会增加连击但不掉金币",
     assert.equal(game.tapCoinRush(), true);
   }
   assert.equal(game.coinRushTaps, 10);
-  assert.equal(game.runCoins, 0);
   assert.equal(game.combo, 10);
   assert.equal(game.bestCombo, 10);
 
@@ -788,13 +799,11 @@ test("连击狂欢冻结关卡倒计时，狂点会增加连击但不掉金币",
 test("鼓手旦仔让连击狂欢每次点击额外增加连击", () => {
   const game = new EggFryGame({
     eventChance: 0,
-    characterBuff: { coinRushTapBonus: 1 },
+    characterBuff: { comboRushTapBonus: 1 },
   });
   game.start();
   game.spawnEgg("coin-rush");
   game.tapCoinRush();
-
-  assert.equal(game.runCoins, 0);
   assert.equal(game.combo, 2);
 });
 
@@ -958,7 +967,6 @@ test("上一关爆分不会抬高下一关公开目标", () => {
 test("十秒结束时仍有生命即可继续下一关", () => {
   const game = new EggFryGame({ durationMs: 1, eventChance: 0 });
   game.start();
-  game.runCoins = 5;
   game.update(1);
 
   assert.equal(game.continueStage(), true);
@@ -968,6 +976,22 @@ test("十秒结束时仍有生命即可继续下一关", () => {
   const ended = game.drainEvents().find((event) => event.type === "gameEnded");
   assert.equal(ended.silent, true);
   assert.equal(ended.coinsEarned, calculateRunCoinsByLevel(1));
+});
+
+test("最终金币只由到达关卡数决定", () => {
+  const game = new EggFryGame({ eventChance: 0 });
+  game.start();
+  game.level = 7;
+  game.combo = 99;
+  game.bestCombo = 99;
+  game.perfectStreak = 9;
+  game.bestPerfectStreak = 9;
+  game.totalScore = 999_999;
+
+  assert.equal(game.cashOut({ silent: true }), true);
+  const ended = game.drainEvents().find((event) => event.type === "gameEnded");
+  assert.equal(ended.coinsEarned, calculateRunCoinsByLevel(7));
+  assert.equal(game.coinsEarned, calculateRunCoinsByLevel(7));
 });
 
 test("自动出锅关卡数最多累积到五关", () => {

@@ -77,8 +77,6 @@ const BASE_EFFECT = Object.freeze({
   healOnSuccess: 0,
   doubleYolk: false,
   hiddenHeatAfter: null,
-  coinMultiplier: 1,
-  coinBonus: 0,
   progressBonus: 0,
   guardHeart: false,
 });
@@ -95,7 +93,6 @@ export const EVENT_DEFINITIONS = Object.freeze([
     weight: 12,
     scoreMultiplier: 3,
     doubleYolk: true,
-    coinBonus: 4,
   }),
   Object.freeze({
     ...BASE_EFFECT,
@@ -110,7 +107,6 @@ export const EVENT_DEFINITIONS = Object.freeze([
     perfectMin: 55,
     perfectMax: 95,
     perfectBonus: 400,
-    coinBonus: 4,
   }),
   Object.freeze({
     ...BASE_EFFECT,
@@ -124,7 +120,6 @@ export const EVENT_DEFINITIONS = Object.freeze([
     minLevel: 2,
     speedMultiplier: 2.1,
     scoreMultiplier: 4,
-    coinMultiplier: 2,
   }),
   Object.freeze({
     ...BASE_EFFECT,
@@ -148,7 +143,6 @@ export const EVENT_DEFINITIONS = Object.freeze([
     rarity: "rare",
     weight: 12,
     successBonus: 180,
-    coinBonus: 8,
   }),
   Object.freeze({
     ...BASE_EFFECT,
@@ -160,7 +154,6 @@ export const EVENT_DEFINITIONS = Object.freeze([
     rarity: "epic",
     weight: 8,
     perfectBonus: 500,
-    coinBonus: 12,
   }),
   Object.freeze({
     ...BASE_EFFECT,
@@ -173,7 +166,6 @@ export const EVENT_DEFINITIONS = Object.freeze([
     weight: 10,
     minLevel: 2,
     scoreMultiplier: 5,
-    coinMultiplier: 2.5,
     crisis: true,
   }),
   Object.freeze({
@@ -222,8 +214,6 @@ export const EVENT_DEFINITIONS = Object.freeze([
     rarity: "legendary",
     weight: 3,
     scoreMultiplier: 10,
-    coinMultiplier: 4,
-    coinBonus: 8,
   }),
   Object.freeze({
     ...BASE_EFFECT,
@@ -237,8 +227,6 @@ export const EVENT_DEFINITIONS = Object.freeze([
     minLevel: 3,
     speedMultiplier: 2.5,
     scoreMultiplier: 8,
-    coinMultiplier: 3,
-    coinBonus: 8,
     perfectMin: 78,
     perfectMax: 82,
   }),
@@ -253,8 +241,6 @@ export const EVENT_DEFINITIONS = Object.freeze([
     weight: 5,
     minLevel: 2,
     scoreMultiplier: 6,
-    coinMultiplier: 3,
-    coinBonus: 5,
     hiddenHeatAfter: 52,
   }),
 ]);
@@ -318,7 +304,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     id: "opening-jackpot",
     icon: "🍽️",
     name: "双份装盘",
-    rule: "旧金币强化，暂时不出现在奖励池",
+    rule: "旧经济强化，暂时不出现在奖励池",
     family: "basic",
     deprecatedEconomyOnly: true,
     rarity: "rare",
@@ -373,7 +359,7 @@ export const UPGRADE_DEFINITIONS = Object.freeze([
     id: "coin-sprout",
     icon: "🎊",
     name: "彩蛋礼炮",
-    rule: "旧金币强化，暂时不出现在奖励池",
+    rule: "旧经济强化，暂时不出现在奖励池",
     family: "basic",
     deprecatedEconomyOnly: true,
     rarity: "epic",
@@ -423,7 +409,7 @@ export function getUpgradePreview(id, currentStacks = 0) {
     },
     "opening-jackpot": {
       headline: "暂时移出奖励池",
-      before: "旧金币强化",
+      before: "旧经济强化",
       after: "等待后续构筑系统重做",
     },
     "last-call": {
@@ -453,7 +439,7 @@ export function getUpgradePreview(id, currentStacks = 0) {
     },
     "coin-sprout": {
       headline: "暂时移出奖励池",
-      before: "旧金币强化",
+      before: "旧经济强化",
       after: "等待后续构筑系统重做",
     },
   };
@@ -784,8 +770,6 @@ export class EggFryGame {
     this.stageCleared = false;
     this.successfulActions = 0;
     this.stageSuccessfulActions = 0;
-    this.runCoins = 0;
-    this.stageCoins = 0;
     this.coinRushRemainingMs = 0;
     this.coinRushGraceRemainingMs = 0;
     this.coinRushTaps = 0;
@@ -890,7 +874,7 @@ export class EggFryGame {
         this.coinRushGraceRemainingMs = COIN_RUSH_END_GRACE_MS;
         this.pushEvent("coinRushEnded", {
           taps: this.coinRushTaps,
-          coins: this.stageCoins,
+          combo: this.combo,
           graceMs: this.coinRushGraceRemainingMs,
         });
         this.spawnEgg();
@@ -1117,7 +1101,7 @@ export class EggFryGame {
           this.pushEvent("buildBurst", {
             icon: "🖨️",
             title: "完美复印！",
-            short: "连中触发金币复印",
+            short: "连中触发额外加分",
             rarity: perfectChainStacks >= 2 ? "legendary" : "epic",
             family: "basic",
           });
@@ -1138,7 +1122,6 @@ export class EggFryGame {
         multiplier: singedMultiplier,
         family: "basic",
       });
-      result.singedCoinBonus = 6;
     }
 
     const dangerStacks = this.upgrades["danger-chef"] || 0;
@@ -1156,7 +1139,6 @@ export class EggFryGame {
         multiplier: riskMultiplier,
         family: "basic",
       });
-      result.riskCoinBonus = this.riskStreak * (dangerStacks >= 2 ? 4 : 2);
     }
 
     const lastCallStacks = this.upgrades["last-call"] || 0;
@@ -1197,7 +1179,6 @@ export class EggFryGame {
           multiplier: 2,
           family: "basic",
         });
-        result.encoreCoinBonus = 8;
       } else if (!this.currentEgg.isEncore) {
         this.queuedEventId = this.effect.id;
         buildTriggers.push({
@@ -1245,7 +1226,6 @@ export class EggFryGame {
         multiplier: confettiMultiplier,
         family: "basic",
       });
-      result.confettiCoinBonus = confettiStacks >= 2 ? 10 : 5;
     }
 
     if (buildMultiplier > 1 && result.awardedScore > 0) {
@@ -1253,15 +1233,6 @@ export class EggFryGame {
       result.buildMultiplier = buildMultiplier;
     }
     result.buildTriggers = buildTriggers.map((trigger) => ({ ...trigger }));
-    result.buildLabel = buildTriggers
-      .map((trigger) => {
-        if (!trigger.multiplier) return trigger.label;
-        const multiplier = Number.isInteger(trigger.multiplier)
-          ? trigger.multiplier
-          : trigger.multiplier.toFixed(1);
-        return `${trigger.label} ×${multiplier}`;
-      })
-      .join(" · ");
 
     if (
       comboEngineStacks > 0 &&
@@ -1276,8 +1247,8 @@ export class EggFryGame {
           title: "连击超频启动！",
           short:
             comboEngineStacks >= 2
-              ? "6 秒内每颗额外爆出 8 金币"
-              : "4 秒内每颗额外爆出 4 金币",
+              ? "6 秒内每颗额外加分"
+              : "4 秒内每颗额外加分",
           rarity: "legendary",
           family: "basic",
         });
@@ -1297,69 +1268,7 @@ export class EggFryGame {
     result.progressGain = 1;
     result.unlockedLevel = this.level + 1;
 
-    if (activeEffect.progressBonus > 0) {
-      result.eventCoinBonus = activeEffect.progressBonus * 4;
-    }
-    const plateStacks = this.upgrades["opening-jackpot"] || 0;
-    const plateTarget = plateStacks >= 2 ? 2 : 3;
-    if (plateStacks > 0 && this.stageEggs % plateTarget === 0) {
-      result.doublePlate = true;
-      result.doublePlateCoinBonus = plateStacks >= 2 ? 8 : 4;
-      buildTriggers.push({
-        id: "opening-jackpot",
-        icon: "🍽️",
-        label: "双份装盘",
-        text: `金币 +${result.doublePlateCoinBonus}`,
-        family: "basic",
-      });
-    }
-    if (lastCallStacks > 0 && this.remainingMs <= 3_000) {
-      result.lastCallCoinBonus = lastCallStacks >= 2 ? 8 : 4;
-    }
-    if (buildTriggers.some((trigger) => trigger.id === "perfect-chain")) {
-      result.chainCoinBonus = perfectChainStacks >= 2 ? 10 : 6;
-    }
-    if (comboEngineStacks > 0 && this.overdriveRemainingMs > 0) {
-      result.overdriveCoinBonus = comboEngineStacks >= 2 ? 8 : 4;
-    }
-    const characterCoinEvery =
-      this.characterBuff.coinEvery || this.characterBuff.progressEvery || 0;
-    if (
-      characterCoinEvery > 0 &&
-      this.stageEggs % characterCoinEvery === 0
-    ) {
-      result.characterPeriodicCoinBonus =
-        this.characterBuff.periodicCoinBonus ||
-        (this.characterBuff.bonusProgress || 1) * 6;
-    }
     result.buildTriggers = buildTriggers.map((trigger) => ({ ...trigger }));
-    result.buildLabel = buildTriggers
-      .map((trigger) => {
-        if (trigger.text) return trigger.text;
-        if (!trigger.multiplier) return trigger.label;
-        const multiplier = Number.isInteger(trigger.multiplier)
-          ? trigger.multiplier
-          : trigger.multiplier.toFixed(1);
-        return `${trigger.label} ×${multiplier}`;
-      })
-      .join(" · ");
-    const rarityCoins = {
-      normal: 0,
-      common: 0,
-      rare: 1,
-      epic: 2,
-      danger: 3,
-      legendary: 5,
-    }[result.rarity] || 0;
-    const buildCoins = Math.max(
-      0,
-      Math.floor(Math.log2(Math.max(1, result.buildMultiplier || 1))),
-    );
-    let coinReward = 0;
-    if (singleTap && (this.upgrades["steady-hand"] || 0) >= 2) {
-      result.magneticCoinBonus = 0;
-    }
-    result.coinReward = coinReward;
 
     const timeSeasoningStacks = this.upgrades["time-seasoning"] || 0;
     const healingComboTarget = timeSeasoningStacks >= 2 ? 4 : 5;
@@ -1501,7 +1410,7 @@ export class EggFryGame {
   tapCoinRush() {
     if (this.state !== "playing" || this.coinRushRemainingMs <= 0) return false;
     this.coinRushTaps += 1;
-    const comboGain = 1 + (this.characterBuff.coinRushTapBonus || 0);
+    const comboGain = 1 + (this.characterBuff.comboRushTapBonus || 0);
     const milestone = this.coinRushTaps % 10 === 0;
     this.combo += comboGain;
     this.bestCombo = Math.max(this.bestCombo, this.combo);
@@ -1779,7 +1688,6 @@ export class EggFryGame {
       stageProgress: this.stageProgress,
       stageEggs: this.stageEggs,
       stagePerfects: this.stagePerfects,
-      stageCoins: this.stageCoins,
       health: this.health,
       maxHealth: this.maxHealth,
       target,
@@ -1811,7 +1719,6 @@ export class EggFryGame {
     this.stageScore = 0;
     this.stageProgress = 0;
     this.stageCleared = false;
-    this.stageCoins = 0;
     this.stageSuccessfulActions = 0;
     this.stageEggs = 0;
     this.stagePerfects = 0;
@@ -1907,8 +1814,6 @@ export class EggFryGame {
       stageCleared: this.stageCleared,
       successfulActions: this.successfulActions,
       stageSuccessfulActions: this.stageSuccessfulActions,
-      runCoins: this.runCoins,
-      stageCoins: this.stageCoins,
       coinRushRemainingMs: this.coinRushRemainingMs,
       coinRushGraceRemainingMs: this.coinRushGraceRemainingMs,
       coinRushTaps: this.coinRushTaps,

@@ -19,7 +19,7 @@ export const SKIN_CATALOG = Object.freeze([
     tagline: "暴击时自带节拍",
     buffTitle: "连击鼓点",
     buffDescription: "连击狂欢每次额外 +1 连击",
-    buff: { coinRushTapBonus: 1 },
+    buff: { comboRushTapBonus: 1 },
   },
   {
     id: "swordsman",

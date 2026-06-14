@@ -1405,7 +1405,7 @@ function showFinalResults(result) {
   elements.finalScoreLabel.textContent = "获得金币";
   elements.finalScore.textContent = `+${result.coinsEarned}`;
   elements.finalEggs.textContent = result.eggsCooked;
-  elements.finalCombo.textContent = `x${result.bestPerfectStreak ?? result.bestCombo ?? 0}`;
+  elements.finalCombo.textContent = `x${result.bestCombo ?? 0}`;
   elements.finalPerfect.textContent = result.perfectEggs;
   elements.finalCoins.textContent = result.coinsEarned;
   elements.resultKicker.textContent = `到达第 ${result.levelReached} 关`;

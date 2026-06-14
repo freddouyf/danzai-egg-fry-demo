@@ -55,7 +55,6 @@ export class GameRenderer {
       panUpgradeLevel: 1,
       panUpgradeId: "iron-steady",
     };
-    this.scorePopups = [];
     this.smokeParticles = [];
     this.sparkParticles = [];
     this.lastRenderAt = performance.now();
@@ -99,44 +98,10 @@ export class GameRenderer {
     this.addSparkBurst(46);
     void name;
     void impact;
-    return;
-    this.scorePopups.push({
-      label: `${name}: ${impact}`,
-      color: "#8f52c6",
-      startedAt: now,
-      duration: 1600,
-      large: true,
-    });
   }
 
   triggerEvent(effect, now = performance.now()) {
     this.animations.eventAt = now;
-    const payoff = {
-      "double-yolk": "Double yolk",
-      "golden-heat": "Wider perfect zone",
-      "angry-fire": "Fast fire",
-      "slow-egg": "Slow heat",
-      "lucky-scallion": "Scallion rain",
-      "spatula-critical": "Perfect bonus",
-      "pan-crisis": "Risk heat",
-      "danzai-cheer": "Combo guard",
-      "time-warp": "Heart restore",
-      jackpot: "Jackpot",
-      "devil-fire": "Danger fire",
-      "blind-heat": "Blind heat",
-    }[effect.id] || effect.title || "Event";
-    this.scorePopups.push({
-      label: payoff,
-      color:
-        effect.rarity === "legendary"
-          ? "#e23883"
-          : effect.rarity === "danger"
-            ? "#e8452e"
-            : "#7b4fbd",
-      startedAt: now,
-      duration: 1500,
-      large: true,
-    });
     if (effect.rarity === "legendary") {
       this.activateCostume(now, 1500);
       this.addSparkBurst(58);
@@ -151,14 +116,6 @@ export class GameRenderer {
     this.addSparkBurst(64);
     this.activateCostume(now, 1500);
     void target;
-    return;
-    this.scorePopups.push({
-      label: `Stage clear: ${target}`,
-      color: "#e54c6f",
-      startedAt: now,
-      duration: 1700,
-      large: true,
-    });
   }
 
   triggerStage(level, multiplier, panPerk = null, now = performance.now()) {
@@ -170,14 +127,6 @@ export class GameRenderer {
     this.animations.panUpgradeId = "basic-pan";
     this.activateCostume(now, 1800, level - 1);
     this.addSparkBurst(34, ["#fff3d0", "#ff9a43", "#ff6b92"]);
-    return;
-    this.scorePopups.push({
-      label: `Stage ${level}`,
-      color: "#e33c78",
-      startedAt: now,
-      duration: 900,
-      large: true,
-    });
   }
 
   triggerPanPerk(trigger, now = performance.now()) {
@@ -196,16 +145,7 @@ export class GameRenderer {
     if (["golden-feast", "legendary-resonance"].includes(trigger.kind)) {
       this.activateCostume(now, 1_250);
     }
-    return;
-    this.scorePopups.push({
-      label: trigger.label,
-      color,
-      startedAt: now,
-      duration: trigger.kind === "legendary-resonance" ? 1_450 : 1_050,
-      large: ["golden-feast", "crystal-charge", "legendary-resonance"].includes(
-        trigger.kind,
-      ),
-    });
+    void color;
   }
 
   activateCostume(now, duration, preferredIndex = null) {
@@ -217,44 +157,19 @@ export class GameRenderer {
   }
 
   triggerServe(result, now = performance.now()) {
-    let label = `+${result.awardedScore}`;
-    let color = "#ff7a35";
-    let showServePopup = false;
     if (result.awardedScore >= 1000) {
-      label = `MEGA!  +${result.awardedScore}`;
-      color = "#e63f82";
       this.activateCostume(now, 1400);
       this.addSparkBurst(44);
     } else if (result.awardedScore >= 500) {
-      label = `鏆村嚮!  +${result.awardedScore}`;
-      color = "#8f52c6";
       this.activateCostume(now, 1100);
       this.addSparkBurst(32);
     }
     if (result.isPerfect) {
-      label = result.awardedScore >= 1000
-        ? `PERFECT MEGA! +${result.awardedScore}`
-        : `Perfect!  +${result.awardedScore}`;
-      color = "#ef5d72";
       this.addSparkBurst();
     } else if (result.hitQuality === "good") {
-      label = `Good!  +${result.awardedScore}`;
-      color = "#35aa73";
       this.addSparkBurst(14, ["#d9ff91", "#6ed88b", "#fff06a"]);
     } else if (result.isBurnt) {
-      label = result.preservedCombo ? "Combo saved" : "Miss";
-      color = "#734439";
-      showServePopup = true;
       this.triggerBurn(now);
-    }
-
-    if (showServePopup) {
-      this.scorePopups.push({
-        label,
-        color,
-        startedAt: now,
-        duration: 900,
-      });
     }
 
     const buildTriggers = result.buildTriggers || [];
@@ -336,7 +251,6 @@ export class GameRenderer {
 
     this.updateAndDrawParticles(ctx, deltaMs);
     this.drawPanUpgradeAnimation(ctx, now);
-    this.drawScorePopups(ctx, now);
     ctx.restore();
   }
 
@@ -1116,30 +1030,6 @@ export class GameRenderer {
       ctx.globalAlpha = particle.life;
       ctx.fillStyle = particle.color;
       ctx.fillRect(-4, -2, 8, 4);
-      ctx.restore();
-      return true;
-    });
-  }
-
-  drawScorePopups(ctx, now) {
-    this.scorePopups = this.scorePopups.filter((popup) => {
-      const progress = (now - popup.startedAt) / popup.duration;
-      if (progress >= 1) return false;
-
-      const eased = easeOutCubic(clamp01(progress));
-      ctx.save();
-      ctx.translate(250, 205 + (popup.offsetY || 0) - eased * 55);
-      ctx.scale(0.75 + Math.min(1, progress * 5) * 0.25, 0.75 + Math.min(1, progress * 5) * 0.25);
-      ctx.globalAlpha = Math.min(1, (1 - progress) * 2.8);
-      const isLarge = popup.large || popup.label.startsWith("Perfect");
-      ctx.font = isLarge ? "900 24px Microsoft YaHei" : "900 20px Microsoft YaHei";
-      ctx.textAlign = "center";
-      ctx.lineJoin = "round";
-      ctx.strokeStyle = "white";
-      ctx.lineWidth = 7;
-      ctx.strokeText(popup.label, 0, 0);
-      ctx.fillStyle = popup.color;
-      ctx.fillText(popup.label, 0, 0);
       ctx.restore();
       return true;
     });
