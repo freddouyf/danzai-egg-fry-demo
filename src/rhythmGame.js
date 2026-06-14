@@ -18,6 +18,8 @@ export const RHYTHM_WINDOWS = Object.freeze({
 
 export const DEFAULT_ACTIONS_PER_DISH = 3;
 export const DEFAULT_STAR_EGGS = Object.freeze([2, 4, 6]);
+export const TAP_INPUT_PREP_MS = 200;
+export const POST_MASH_INPUT_GUARD_MS = 300;
 
 const BASE_COINS = 20;
 const STAR_COIN_BONUS = 10;
@@ -128,7 +130,10 @@ function normalizeCommand(command, index) {
     targetHoldMs,
     inputStartAtMs:
       type === RHYTHM_COMMAND_TYPES.TAP
-        ? Math.max(startAtMs, targetAtMs - RHYTHM_WINDOWS.TAP.goodMs)
+        ? Math.max(
+          startAtMs,
+          Math.min(targetAtMs - RHYTHM_WINDOWS.TAP.goodMs, startAtMs + TAP_INPUT_PREP_MS),
+        )
         : startAtMs,
     expireAtMs: Math.max(targetAtMs + 200, Math.floor(Number(command.expireAtMs) || targetAtMs + 650)),
   };
@@ -169,6 +174,7 @@ export class RhythmCookingGame {
     this.score = 0;
     this.mashTaps = 0;
     this.holdStartedAtMs = null;
+    this.stepInputGuardUntilMs = 0;
     this.lastHitQuality = null;
     this.lastActionResult = null;
     this.result = null;
@@ -197,23 +203,14 @@ export class RhythmCookingGame {
 
   resolveExpiredCommands() {
     let command = this.activeCommand;
-    while (command && this.elapsedMs > command.expireAtMs) {
-      if (command.type === RHYTHM_COMMAND_TYPES.MASH) {
-        this.resolveCommand(judgeMash(this.mashTaps, command.targetTaps), command, {
-          taps: this.mashTaps,
-          targetTaps: command.targetTaps,
-        });
-      } else {
-        const holdDurationMs =
-          command.type === RHYTHM_COMMAND_TYPES.HOLD
-            ? this.getHoldElapsedMs()
-            : 0;
-        this.holdStartedAtMs = null;
-        this.resolveCommand(RHYTHM_HIT_QUALITY.MISS, command, {
-          reason: "timeout",
-          holdDurationMs,
-        });
-      }
+    while (
+      command
+      && command.type === RHYTHM_COMMAND_TYPES.TAP
+      && this.elapsedMs > command.expireAtMs
+    ) {
+      this.resolveCommand(RHYTHM_HIT_QUALITY.MISS, command, {
+        reason: "timeout",
+      });
       command = this.activeCommand;
     }
   }
@@ -228,6 +225,16 @@ export class RhythmCookingGame {
     if (this.state !== "playing") return null;
     const command = this.activeCommand;
     if (!command || this.elapsedMs < command.startAtMs) return null;
+
+    if (this.elapsedMs < this.stepInputGuardUntilMs) {
+      const event = {
+        type: "inputGuarded",
+        command,
+        untilMs: this.stepInputGuardUntilMs,
+      };
+      this.events.push(event);
+      return event;
+    }
 
     if (command.type === RHYTHM_COMMAND_TYPES.MASH) {
       this.mashTaps += 1;
@@ -252,10 +259,13 @@ export class RhythmCookingGame {
 
     if (command.type !== RHYTHM_COMMAND_TYPES.TAP) return null;
     if (this.elapsedMs < command.inputStartAtMs) {
-      return this.resolveCommand(RHYTHM_HIT_QUALITY.MISS, command, {
-        reason: "tooEarly",
-        errorMs: this.elapsedMs - command.targetAtMs,
-      });
+      const event = {
+        type: "earlyTapIgnored",
+        command,
+        untilMs: command.inputStartAtMs,
+      };
+      this.events.push(event);
+      return event;
     }
     const errorMs = this.elapsedMs - command.targetAtMs;
     const quality = judgeTimingError(errorMs, RHYTHM_WINDOWS.TAP);
@@ -269,6 +279,15 @@ export class RhythmCookingGame {
       return null;
     }
     if (this.elapsedMs < command.startAtMs) return null;
+    if (this.elapsedMs < this.stepInputGuardUntilMs) {
+      const event = {
+        type: "inputGuarded",
+        command,
+        untilMs: this.stepInputGuardUntilMs,
+      };
+      this.events.push(event);
+      return event;
+    }
     if (this.holdStartedAtMs !== null) return null;
     this.holdStartedAtMs = this.elapsedMs;
     const event = { type: "holdStarted", command };
@@ -286,12 +305,20 @@ export class RhythmCookingGame {
     if (this.elapsedMs < command.startAtMs) return null;
     if (this.holdStartedAtMs === null) return null;
     const holdDurationMs = this.getHoldElapsedMs();
-    const errorMs = holdDurationMs - command.targetHoldMs;
-    const quality = judgeTimingError(errorMs, RHYTHM_WINDOWS.HOLD);
     const startedAtMs = this.holdStartedAtMs;
     this.holdStartedAtMs = null;
-    return this.resolveCommand(quality, command, {
-      errorMs,
+    if (holdDurationMs < command.targetHoldMs) {
+      const event = {
+        type: "holdReleasedEarly",
+        command,
+        holdDurationMs,
+        startedAtMs,
+      };
+      this.events.push(event);
+      return event;
+    }
+    return this.resolveCommand(RHYTHM_HIT_QUALITY.PERFECT, command, {
+      errorMs: holdDurationMs - command.targetHoldMs,
       holdDurationMs,
       startedAtMs,
     });
@@ -338,6 +365,11 @@ export class RhythmCookingGame {
       });
     }
     this.commandIndex += 1;
+    if (command.type === RHYTHM_COMMAND_TYPES.MASH) {
+      this.stepInputGuardUntilMs = this.elapsedMs + POST_MASH_INPUT_GUARD_MS;
+    } else {
+      this.stepInputGuardUntilMs = 0;
+    }
     this.mashTaps = 0;
     return event;
   }
@@ -386,6 +418,7 @@ export class RhythmCookingGame {
       holdActive: this.holdStartedAtMs !== null,
       holdElapsedMs,
       holdTargetMs: command?.type === RHYTHM_COMMAND_TYPES.HOLD ? command.targetHoldMs : 0,
+      inputGuardRemainingMs: Math.max(0, this.stepInputGuardUntilMs - this.elapsedMs),
       lastHitQuality: this.lastHitQuality,
       lastActionResult: this.lastActionResult,
       result: this.result,

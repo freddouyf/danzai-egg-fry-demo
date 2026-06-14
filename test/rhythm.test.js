@@ -5,9 +5,11 @@ import {
   calculateRhythmStarsFromEggs,
   judgeMash,
   judgeTimingError,
+  POST_MASH_INPUT_GUARD_MS,
   RHYTHM_ACTION_RESULT,
   RHYTHM_HIT_QUALITY,
   RHYTHM_WINDOWS,
+  TAP_INPUT_PREP_MS,
   RhythmCookingGame,
   unlockRhythmLevelIndex,
 } from "../src/rhythmGame.js";
@@ -141,10 +143,10 @@ test("MASH resolves immediately when target taps are reached", () => {
   assert.equal(game.getSnapshot().commandIndex, 1);
 });
 
-test("MASH times out as failure if the progress is not full", () => {
+test("MASH does not fail from step timeout if the progress is not full", () => {
   const game = new RhythmCookingGame({
     id: "mash-timeout",
-    durationMs: 3_000,
+    durationMs: 5_000,
     commands: [
       {
         id: "mash",
@@ -160,9 +162,33 @@ test("MASH times out as failure if the progress is not full", () => {
     game.tap(index * 120);
   }
   game.update(2_100);
-  const miss = game.drainEvents().findLast((event) => event.type === "hit");
-  assert.equal(miss.actionResult, RHYTHM_ACTION_RESULT.FAIL);
-  assert.equal(miss.taps, 5);
+  assert.equal(game.getSnapshot().state, "playing");
+  assert.equal(game.getSnapshot().commandIndex, 0);
+  assert.equal(game.getSnapshot().failedActions, 0);
+  assert.equal(game.getSnapshot().mashTaps, 5);
+});
+
+test("MASH with no clicks only consumes total time", () => {
+  const game = new RhythmCookingGame({
+    id: "mash-idle",
+    durationMs: 5_000,
+    commands: [
+      {
+        id: "mash",
+        type: RHYTHM_COMMAND_TYPES.MASH,
+        startAtMs: 0,
+        endAtMs: 1_000,
+        targetTaps: 6,
+      },
+    ],
+  });
+  game.start();
+  game.update(2_500);
+  assert.equal(game.getSnapshot().state, "playing");
+  assert.equal(game.getSnapshot().mashTaps, 0);
+  assert.equal(game.getSnapshot().failedActions, 0);
+  game.update(5_000);
+  assert.equal(game.getSnapshot().state, "ended");
 });
 
 test("rhythm level one is a 30 second fried egg completion challenge with TAP MASH HOLD", () => {
@@ -182,6 +208,35 @@ test("rhythm level one is a 30 second fried egg completion challenge with TAP MA
     RHYTHM_TEST_LEVEL.commands[1].endAtMs - RHYTHM_TEST_LEVEL.commands[1].startAtMs,
     2_200,
   );
+  assert.equal(RHYTHM_TEST_LEVEL.commands.length >= 30, true);
+});
+
+test("TAP input opens within the short prep window", () => {
+  const game = new RhythmCookingGame({
+    id: "tap-prep",
+    durationMs: 3_000,
+    commands: [
+      {
+        id: "tap",
+        type: RHYTHM_COMMAND_TYPES.TAP,
+        startAtMs: 0,
+        targetAtMs: 800,
+        expireAtMs: 1_200,
+      },
+    ],
+  });
+  game.start();
+  const command = game.getSnapshot().activeCommand;
+  assert.equal(command.inputStartAtMs <= TAP_INPUT_PREP_MS, true);
+});
+
+test("later rhythm levels avoid long fixed waits between steps", () => {
+  for (const level of RHYTHM_DISH_LEVELS.slice(1)) {
+    const starts = level.commands.map((command) => command.startAtMs);
+    for (let index = 1; index < starts.length; index += 1) {
+      assert.equal(starts[index] - starts[index - 1] <= 1_200, true);
+    }
+  }
 });
 
 test("rhythm prototype has simple dish names for later levels", () => {
@@ -257,6 +312,28 @@ test("HOLD progress only grows while the player is holding", () => {
   assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
 });
 
+test("HOLD idle does not trigger a step failure", () => {
+  const game = new RhythmCookingGame({
+    id: "hold-idle",
+    durationMs: 5_000,
+    commands: [
+      {
+        id: "hold-only",
+        type: RHYTHM_COMMAND_TYPES.HOLD,
+        startAtMs: 0,
+        targetAtMs: 1_000,
+        targetHoldMs: 1_000,
+        expireAtMs: 1_800,
+      },
+    ],
+  });
+  game.start();
+  game.update(2_500);
+  assert.equal(game.getSnapshot().state, "playing");
+  assert.equal(game.getSnapshot().holdElapsedMs, 0);
+  assert.equal(game.getSnapshot().failedActions, 0);
+});
+
 test("HOLD can start immediately after switching to the HOLD action", () => {
   const game = new RhythmCookingGame({
     id: "tap-then-hold",
@@ -286,10 +363,10 @@ test("HOLD can start immediately after switching to the HOLD action", () => {
   assert.equal(game.getSnapshot().holdActive, true);
 });
 
-test("HOLD times out as a failed action if the player never holds", () => {
+test("HOLD completes after holding to the target, even after the old expiry time", () => {
   const game = new RhythmCookingGame({
-    id: "hold-timeout",
-    durationMs: 4_000,
+    id: "hold-late-complete",
+    durationMs: 6_000,
     commands: [
       {
         id: "hold-only",
@@ -302,15 +379,16 @@ test("HOLD times out as a failed action if the player never holds", () => {
   });
   game.start();
   game.update(2_000);
-  const miss = game.drainEvents().findLast((event) => event.type === "hit");
-  assert.equal(miss.actionResult, RHYTHM_ACTION_RESULT.FAIL);
-  assert.equal(miss.reason, "timeout");
-  assert.equal(game.getSnapshot().failedActions, 1);
+  assert.equal(game.getSnapshot().failedActions, 0);
+  game.holdStart(2_000);
+  const hit = game.holdEnd(3_000);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+  assert.equal(game.getSnapshot().successfulActions, 1);
 });
 
-test("TAP and HOLD success or failure are recorded as action results", () => {
+test("early HOLD release does not count as a failed action", () => {
   const game = new RhythmCookingGame({
-    id: "tap-hold-record",
+    id: "tap-hold-early",
     durationMs: 4_000,
     commands: [
       {
@@ -333,20 +411,56 @@ test("TAP and HOLD success or failure are recorded as action results", () => {
 
   assert.equal(game.tap(1_000).actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
   game.holdStart(2_000);
-  assert.equal(game.holdEnd(2_200).actionResult, RHYTHM_ACTION_RESULT.FAIL);
+  assert.equal(game.holdEnd(2_200).type, "holdReleasedEarly");
 
   const snapshot = game.getSnapshot();
   assert.equal(snapshot.successfulActions, 1);
-  assert.equal(snapshot.failedActions, 1);
+  assert.equal(snapshot.failedActions, 0);
   assert.equal(snapshot.completedEggs, 0);
 });
 
-test("TAP outside the success window is recorded as a failed action", () => {
+test("post-MASH input guard ignores residual taps before the next TAP", () => {
+  const game = new RhythmCookingGame({
+    id: "mash-guard",
+    durationMs: 4_000,
+    commands: [
+      {
+        id: "mash",
+        type: RHYTHM_COMMAND_TYPES.MASH,
+        startAtMs: 0,
+        endAtMs: 2_000,
+        targetTaps: 2,
+      },
+      {
+        id: "tap",
+        type: RHYTHM_COMMAND_TYPES.TAP,
+        startAtMs: 0,
+        targetAtMs: 500,
+        expireAtMs: 900,
+      },
+    ],
+  });
+  game.start();
+  game.tap(0);
+  const hit = game.tap(100);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+  assert.equal(game.getSnapshot().inputGuardRemainingMs, POST_MASH_INPUT_GUARD_MS);
+
+  const guarded = game.tap(200);
+  assert.equal(guarded.type, "inputGuarded");
+  assert.equal(game.getSnapshot().failedActions, 0);
+  assert.equal(game.getSnapshot().commandIndex, 1);
+
+  const tapHit = game.tap(500);
+  assert.equal(tapHit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+});
+
+test("TAP outside the success window after prep is recorded as a failed action", () => {
   const game = new RhythmCookingGame(SMALL_LEVEL);
   game.start();
   const hit = game.tap(500);
   assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.FAIL);
-  assert.equal(hit.reason, "tooEarly");
+  assert.equal(hit.quality, RHYTHM_HIT_QUALITY.MISS);
   assert.equal(game.getSnapshot().failedActions, 1);
 });
 
