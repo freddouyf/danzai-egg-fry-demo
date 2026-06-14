@@ -11,6 +11,11 @@ const GOOD_SCORE = 60;
 const BASE_COINS = 20;
 const STAR_COIN_BONUS = 10;
 
+export const RHYTHM_WINDOWS = Object.freeze({
+  TAP: Object.freeze({ perfectMs: 180, goodMs: 360 }),
+  HOLD: Object.freeze({ perfectMs: 150, goodMs: 350 }),
+});
+
 export function judgeTimingError(errorMs, { perfectMs, goodMs }) {
   const error = Math.abs(Number(errorMs) || 0);
   if (error <= perfectMs) return RHYTHM_HIT_QUALITY.PERFECT;
@@ -54,11 +59,17 @@ function normalizeCommand(command, index) {
   }
 
   const targetAtMs = Math.max(startAtMs, Math.floor(Number(command.targetAtMs) || startAtMs + 600));
+  const targetHoldMs = Math.max(250, Math.floor(Number(command.targetHoldMs) || targetAtMs - startAtMs));
   return {
     ...command,
     id: command.id || `command-${index + 1}`,
     startAtMs,
     targetAtMs,
+    targetHoldMs,
+    inputStartAtMs:
+      type === RHYTHM_COMMAND_TYPES.TAP
+        ? Math.max(startAtMs, targetAtMs - RHYTHM_WINDOWS.TAP.goodMs)
+        : startAtMs,
     expireAtMs: Math.max(targetAtMs + 200, Math.floor(Number(command.expireAtMs) || targetAtMs + 650)),
   };
 }
@@ -125,10 +136,23 @@ export class RhythmCookingGame {
           targetTaps: command.targetTaps,
         });
       } else {
-        this.resolveCommand(RHYTHM_HIT_QUALITY.MISS, command, { reason: "timeout" });
+        const holdDurationMs =
+          command.type === RHYTHM_COMMAND_TYPES.HOLD
+            ? this.getHoldElapsedMs()
+            : 0;
+        this.holdStartedAtMs = null;
+        this.resolveCommand(RHYTHM_HIT_QUALITY.MISS, command, {
+          reason: "timeout",
+          holdDurationMs,
+        });
       }
       command = this.activeCommand;
     }
+  }
+
+  getHoldElapsedMs(nowMs = this.elapsedMs) {
+    if (this.holdStartedAtMs === null) return 0;
+    return Math.max(0, Math.floor(Number(nowMs) || 0) - this.holdStartedAtMs);
   }
 
   tap(nowMs) {
@@ -139,10 +163,15 @@ export class RhythmCookingGame {
 
     if (command.type === RHYTHM_COMMAND_TYPES.MASH) {
       this.mashTaps += 1;
+      const goodThreshold = Math.ceil(command.targetTaps * 0.65);
       const event = {
         type: "mashTap",
         taps: this.mashTaps,
         targetTaps: command.targetTaps,
+        goodReady: this.mashTaps >= goodThreshold,
+        perfectReady: this.mashTaps >= command.targetTaps,
+        milestone:
+          this.mashTaps === goodThreshold || this.mashTaps === command.targetTaps,
         combo: this.combo,
       };
       this.events.push(event);
@@ -150,8 +179,17 @@ export class RhythmCookingGame {
     }
 
     if (command.type !== RHYTHM_COMMAND_TYPES.TAP) return null;
+    if (this.elapsedMs < command.inputStartAtMs) {
+      const event = {
+        type: "earlyTapIgnored",
+        command,
+        waitMs: command.inputStartAtMs - this.elapsedMs,
+      };
+      this.events.push(event);
+      return event;
+    }
     const errorMs = this.elapsedMs - command.targetAtMs;
-    const quality = judgeTimingError(errorMs, { perfectMs: 120, goodMs: 260 });
+    const quality = judgeTimingError(errorMs, RHYTHM_WINDOWS.TAP);
     return this.resolveCommand(quality, command, { errorMs });
   }
 
@@ -162,6 +200,7 @@ export class RhythmCookingGame {
       return null;
     }
     if (this.elapsedMs < command.startAtMs) return null;
+    if (this.holdStartedAtMs !== null) return null;
     this.holdStartedAtMs = this.elapsedMs;
     const event = { type: "holdStarted", command };
     this.events.push(event);
@@ -176,11 +215,17 @@ export class RhythmCookingGame {
       return null;
     }
     if (this.elapsedMs < command.startAtMs) return null;
-    const errorMs = this.elapsedMs - command.targetAtMs;
-    const quality = judgeTimingError(errorMs, { perfectMs: 150, goodMs: 350 });
+    if (this.holdStartedAtMs === null) return null;
+    const holdDurationMs = this.getHoldElapsedMs();
+    const errorMs = holdDurationMs - command.targetHoldMs;
+    const quality = judgeTimingError(errorMs, RHYTHM_WINDOWS.HOLD);
     const startedAtMs = this.holdStartedAtMs;
     this.holdStartedAtMs = null;
-    return this.resolveCommand(quality, command, { errorMs, startedAtMs });
+    return this.resolveCommand(quality, command, {
+      errorMs,
+      holdDurationMs,
+      startedAtMs,
+    });
   }
 
   resolveCommand(quality, command, detail = {}) {
@@ -203,6 +248,7 @@ export class RhythmCookingGame {
 
     this.score += scoreDelta;
     this.lastHitQuality = quality;
+    this.holdStartedAtMs = null;
     const event = {
       type: "hit",
       quality,
@@ -245,6 +291,7 @@ export class RhythmCookingGame {
   getSnapshot() {
     const command = this.activeCommand;
     const remainingMs = Math.max(0, this.level.durationMs - this.elapsedMs);
+    const holdElapsedMs = this.getHoldElapsedMs();
     return {
       state: this.state,
       level: this.level,
@@ -259,6 +306,9 @@ export class RhythmCookingGame {
       missCount: this.missCount,
       score: this.score,
       mashTaps: this.mashTaps,
+      holdActive: this.holdStartedAtMs !== null,
+      holdElapsedMs,
+      holdTargetMs: command?.type === RHYTHM_COMMAND_TYPES.HOLD ? command.targetHoldMs : 0,
       lastHitQuality: this.lastHitQuality,
       fever: this.combo >= 5,
       result: this.result,

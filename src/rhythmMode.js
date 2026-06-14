@@ -14,9 +14,27 @@ const COMMAND_LABELS = {
 };
 
 const COMMAND_HINTS = {
-  [RHYTHM_COMMAND_TYPES.TAP]: "节拍点亮时点一下",
-  [RHYTHM_COMMAND_TYPES.HOLD]: "按住，接近目标时松开",
-  [RHYTHM_COMMAND_TYPES.MASH]: "限定时间内快速连点",
+  [RHYTHM_COMMAND_TYPES.TAP]: "等指针进入蓝色命中区",
+  [RHYTHM_COMMAND_TYPES.HOLD]: "按住，让进度接近橙色目标",
+  [RHYTHM_COMMAND_TYPES.MASH]: "冲到亮区，越快越爽",
+};
+
+const COMMAND_UI = {
+  [RHYTHM_COMMAND_TYPES.TAP]: {
+    icon: "👆",
+    code: "TAP",
+    label: "点击！",
+  },
+  [RHYTHM_COMMAND_TYPES.HOLD]: {
+    icon: "✊",
+    code: "HOLD",
+    label: "按住后松开！",
+  },
+  [RHYTHM_COMMAND_TYPES.MASH]: {
+    icon: "⚡",
+    code: "MASH",
+    label: "狂点！",
+  },
 };
 
 function createRhythmOverlay() {
@@ -42,16 +60,20 @@ function createRhythmOverlay() {
 
       <div class="rhythm-stage">
         <div class="rhythm-mascot" data-rhythm-mascot aria-hidden="true"></div>
-        <div class="rhythm-command">
+        <div class="rhythm-command" data-rhythm-command>
           <small data-rhythm-command-step>1 / 1</small>
+          <i data-rhythm-command-icon aria-hidden="true">🍳</i>
           <strong data-rhythm-command-type>READY</strong>
           <span data-rhythm-command-label>准备开火</span>
           <em data-rhythm-command-hint>看指令操作</em>
+          <b data-rhythm-next>下一步：--</b>
         </div>
         <div class="rhythm-feedback" data-rhythm-feedback aria-hidden="true"></div>
       </div>
 
       <div class="rhythm-track" data-rhythm-track>
+        <em data-rhythm-good-zone></em>
+        <strong data-rhythm-perfect-zone></strong>
         <i data-rhythm-fill></i>
         <b data-rhythm-target></b>
         <span data-rhythm-track-copy>等待第一道指令</span>
@@ -86,24 +108,84 @@ function formatStars(stars) {
   return "★".repeat(stars) + "☆".repeat(Math.max(0, 3 - stars));
 }
 
-function commandProgress(command, elapsedMs, mashTaps) {
+function zonePercent(value, max) {
+  return Math.min(100, Math.max(0, (value / Math.max(1, max)) * 100));
+}
+
+function timingZone(command, perfectMs, goodMs) {
+  const span = Math.max(1, command.expireAtMs - command.startAtMs);
+  const target = command.targetAtMs - command.startAtMs;
+  const goodStart = zonePercent(target - goodMs, span);
+  const goodEnd = zonePercent(target + goodMs, span);
+  const perfectStart = zonePercent(target - perfectMs, span);
+  const perfectEnd = zonePercent(target + perfectMs, span);
+  return {
+    goodLeft: goodStart,
+    goodWidth: Math.max(3, goodEnd - goodStart),
+    perfectLeft: perfectStart,
+    perfectWidth: Math.max(3, perfectEnd - perfectStart),
+  };
+}
+
+function holdZone(command) {
+  const max = Math.max(command.targetHoldMs + 450, command.targetHoldMs * 1.45);
+  const goodStart = zonePercent(command.targetHoldMs - 350, max);
+  const goodEnd = zonePercent(command.targetHoldMs + 350, max);
+  const perfectStart = zonePercent(command.targetHoldMs - 150, max);
+  const perfectEnd = zonePercent(command.targetHoldMs + 150, max);
+  return {
+    max,
+    goodLeft: goodStart,
+    goodWidth: Math.max(4, goodEnd - goodStart),
+    perfectLeft: perfectStart,
+    perfectWidth: Math.max(4, perfectEnd - perfectStart),
+  };
+}
+
+function commandProgress(snapshot) {
+  const command = snapshot.activeCommand;
   if (!command) return { fill: 0, target: 50, copy: "等待指令" };
   if (command.type === RHYTHM_COMMAND_TYPES.MASH) {
+    const goodAt = Math.ceil(command.targetTaps * 0.65);
     return {
-      fill: Math.min(100, (mashTaps / command.targetTaps) * 100),
+      fill: Math.min(100, (snapshot.mashTaps / command.targetTaps) * 100),
       target: 100,
-      copy: `${mashTaps} / ${command.targetTaps}`,
+      copy: `${snapshot.mashTaps} / ${command.targetTaps}`,
+      goodLeft: zonePercent(goodAt, command.targetTaps),
+      goodWidth: Math.max(4, 100 - zonePercent(goodAt, command.targetTaps)),
+      perfectLeft: 96,
+      perfectWidth: 4,
+    };
+  }
+
+  if (command.type === RHYTHM_COMMAND_TYPES.HOLD) {
+    const zone = holdZone(command);
+    const fill = Math.min(100, (snapshot.holdElapsedMs / zone.max) * 100);
+    const target = zonePercent(command.targetHoldMs, zone.max);
+    return {
+      fill,
+      target,
+      copy: snapshot.holdActive
+        ? `${(snapshot.holdElapsedMs / 1000).toFixed(1)}s`
+        : "按住开始",
+      ...zone,
     };
   }
 
   const span = Math.max(1, command.expireAtMs - command.startAtMs);
-  const fill = Math.min(100, Math.max(0, ((elapsedMs - command.startAtMs) / span) * 100));
+  const fill = Math.min(100, Math.max(0, ((snapshot.elapsedMs - command.startAtMs) / span) * 100));
   const target = Math.min(100, Math.max(0, ((command.targetAtMs - command.startAtMs) / span) * 100));
-  const untilTarget = Math.round((command.targetAtMs - elapsedMs) / 100) / 10;
+  const untilTarget = Math.round((command.targetAtMs - snapshot.elapsedMs) / 100) / 10;
   return {
     fill,
     target,
-    copy: untilTarget > 0 ? `${untilTarget.toFixed(1)}s` : "现在！",
+    copy:
+      snapshot.elapsedMs < command.inputStartAtMs
+        ? "准备点击"
+        : untilTarget > 0
+          ? `${untilTarget.toFixed(1)}s`
+          : "现在！",
+    ...timingZone(command, 180, 360),
   };
 }
 
@@ -128,12 +210,17 @@ export function createRhythmMode({
     score: overlay.querySelector("[data-rhythm-score]"),
     combo: overlay.querySelector("[data-rhythm-combo]"),
     mascot: overlay.querySelector("[data-rhythm-mascot]"),
+    commandBox: overlay.querySelector("[data-rhythm-command]"),
     commandStep: overlay.querySelector("[data-rhythm-command-step]"),
+    commandIcon: overlay.querySelector("[data-rhythm-command-icon]"),
     commandType: overlay.querySelector("[data-rhythm-command-type]"),
     commandLabel: overlay.querySelector("[data-rhythm-command-label]"),
     commandHint: overlay.querySelector("[data-rhythm-command-hint]"),
+    commandNext: overlay.querySelector("[data-rhythm-next]"),
     feedback: overlay.querySelector("[data-rhythm-feedback]"),
     track: overlay.querySelector("[data-rhythm-track]"),
+    goodZone: overlay.querySelector("[data-rhythm-good-zone]"),
+    perfectZone: overlay.querySelector("[data-rhythm-perfect-zone]"),
     fill: overlay.querySelector("[data-rhythm-fill]"),
     target: overlay.querySelector("[data-rhythm-target]"),
     trackCopy: overlay.querySelector("[data-rhythm-track-copy]"),
@@ -158,6 +245,7 @@ export function createRhythmMode({
   let settled = false;
   let feedbackTimer = 0;
   let spaceDown = false;
+  let lastCommandId = "";
 
   function nowElapsed() {
     return Math.max(0, performance.now() - startTime);
@@ -174,6 +262,7 @@ export function createRhythmMode({
     settled = false;
     active = true;
     startTime = performance.now();
+    lastCommandId = "";
     overlay.hidden = false;
     overlay.classList.add("is-visible");
     overlay.classList.remove("is-ended", "is-fever");
@@ -259,8 +348,30 @@ export function createRhythmMode({
         refs.actionButton.classList.remove("is-tapping");
         void refs.actionButton.offsetWidth;
         refs.actionButton.classList.add("is-tapping");
+        refs.track.classList.toggle("is-mash-good", event.goodReady);
+        refs.track.classList.toggle("is-mash-perfect", event.perfectReady);
+        if (event.milestone) showMashPop(event.perfectReady ? "Perfect!" : "Good!");
+      } else if (event.type === "earlyTapIgnored") {
+        showWaitingHint();
       }
     }
+  }
+
+  function showWaitingHint() {
+    window.clearTimeout(feedbackTimer);
+    refs.feedback.className = "rhythm-feedback is-visible is-wait";
+    refs.feedback.textContent = "等一下";
+    feedbackTimer = window.setTimeout(() => {
+      refs.feedback.classList.remove("is-visible");
+    }, 360);
+  }
+
+  function showMashPop(text) {
+    const pop = document.createElement("span");
+    pop.className = "rhythm-mash-pop";
+    pop.textContent = text;
+    refs.actionButton.append(pop);
+    window.setTimeout(() => pop.remove(), 680);
   }
 
   function showFeedback(event) {
@@ -288,9 +399,12 @@ export function createRhythmMode({
       `${Math.min(snapshot.commandIndex + 1, snapshot.level.commands.length)} / ${snapshot.level.commands.length}`;
 
     if (!command || snapshot.state === "ended") {
+      refs.commandBox.dataset.type = "done";
+      refs.commandIcon.textContent = "⭐";
       refs.commandType.textContent = "DONE";
       refs.commandLabel.textContent = "出菜完成";
       refs.commandHint.textContent = "查看本局结算";
+      refs.commandNext.textContent = "本轮完成";
       refs.actionLabel.textContent = "完成";
       refs.actionIcon.textContent = "⭐";
       refs.fill.style.width = "100%";
@@ -299,17 +413,28 @@ export function createRhythmMode({
       return;
     }
 
-    refs.commandType.textContent = COMMAND_LABELS[command.type] || "TAP";
-    refs.commandLabel.textContent = command.label || "厨房动作";
+    if (command.id !== lastCommandId) {
+      lastCommandId = command.id;
+      refs.commandBox.classList.remove("is-entering");
+      void refs.commandBox.offsetWidth;
+      refs.commandBox.classList.add("is-entering");
+      refs.track.classList.remove("is-mash-good", "is-mash-perfect");
+    }
+
+    const ui = COMMAND_UI[command.type] || COMMAND_UI[RHYTHM_COMMAND_TYPES.TAP];
+    const nextCommand = snapshot.level.commands[snapshot.commandIndex + 1];
+    refs.commandBox.dataset.type = command.type;
+    refs.commandIcon.textContent = ui.icon;
+    refs.commandType.textContent = ui.code;
+    refs.commandLabel.textContent = ui.label;
     refs.commandHint.textContent = COMMAND_HINTS[command.type] || "按提示操作";
+    refs.commandNext.textContent = nextCommand
+      ? `下一步：${COMMAND_LABELS[nextCommand.type]}`
+      : "最后一道";
     refs.track.dataset.type = command.type;
     refs.actionButton.dataset.type = command.type;
     refs.actionIcon.textContent =
-      command.type === RHYTHM_COMMAND_TYPES.MASH
-        ? "⚡"
-        : command.type === RHYTHM_COMMAND_TYPES.HOLD
-          ? "✊"
-          : "👆";
+      ui.icon;
     refs.actionLabel.textContent =
       command.type === RHYTHM_COMMAND_TYPES.MASH
         ? "狂点"
@@ -317,14 +442,18 @@ export function createRhythmMode({
           ? "按住"
           : "点击";
 
-    const progress = commandProgress(command, snapshot.elapsedMs, snapshot.mashTaps);
+    const progress = commandProgress(snapshot);
     refs.fill.style.width = `${progress.fill}%`;
     refs.target.style.left = `${progress.target}%`;
+    refs.goodZone.style.left = `${progress.goodLeft ?? 0}%`;
+    refs.goodZone.style.width = `${progress.goodWidth ?? 0}%`;
+    refs.perfectZone.style.left = `${progress.perfectLeft ?? progress.target}%`;
+    refs.perfectZone.style.width = `${progress.perfectWidth ?? 0}%`;
     refs.trackCopy.textContent = progress.copy;
   }
 
   function performPrimaryInput(event) {
-    event?.preventDefault();
+    if (event?.cancelable) event.preventDefault();
     if (!active || game.state !== "playing") return;
     const command = game.getSnapshot().activeCommand;
     if (command?.type === RHYTHM_COMMAND_TYPES.HOLD) {
@@ -338,7 +467,7 @@ export function createRhythmMode({
   }
 
   function releasePrimaryInput(event) {
-    event?.preventDefault();
+    if (event?.cancelable) event.preventDefault();
     if (!active || game.state !== "playing") return;
     const command = game.getSnapshot().activeCommand;
     refs.actionButton.classList.remove("is-holding");
@@ -355,6 +484,17 @@ export function createRhythmMode({
   });
   refs.actionButton.addEventListener("pointerup", releasePrimaryInput);
   refs.actionButton.addEventListener("pointercancel", releasePrimaryInput);
+  refs.actionButton.addEventListener(
+    "touchstart",
+    (event) => event.preventDefault(),
+    { passive: false },
+  );
+  refs.actionButton.addEventListener(
+    "touchend",
+    (event) => event.preventDefault(),
+    { passive: false },
+  );
+  overlay.addEventListener("contextmenu", (event) => event.preventDefault());
   refs.retry.addEventListener("click", startRun);
   refs.homeButtons.forEach((button) => {
     button.addEventListener("click", () => stopRun({ showHome: true }));
