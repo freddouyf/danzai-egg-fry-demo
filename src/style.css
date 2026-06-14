@@ -7080,9 +7080,60 @@ img,
   animation: rhythm-fever-bg 420ms ease-in-out infinite alternate;
 }
 
+.rhythm-overlay.is-holding .rhythm-stage {
+  box-shadow:
+    inset 0 -25px 50px rgba(255, 128, 44, 0.18),
+    0 0 28px rgba(255, 128, 44, 0.34);
+}
+
+.rhythm-overlay.is-holding .rhythm-stage::after {
+  position: absolute;
+  z-index: 1;
+  inset: 34% 8% 14%;
+  content: "";
+  opacity: 0.5;
+  background:
+    radial-gradient(circle at 35% 78%, rgba(255, 114, 40, 0.58), transparent 20%),
+    radial-gradient(circle at 62% 68%, rgba(255, 201, 77, 0.52), transparent 24%);
+  filter: blur(1px);
+  animation: rhythm-heat-wave 520ms ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.rhythm-dish-progress {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  left: 50%;
+  display: flex;
+  min-width: min(74%, 260px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  transform: translateX(-50%);
+  border: 2px solid rgba(255, 255, 255, 0.94);
+  border-radius: 999px;
+  color: #6a3d24;
+  background: rgba(255, 252, 232, 0.88);
+  box-shadow: 0 4px 12px rgba(116, 65, 35, 0.12);
+  font-size: 11px;
+  font-weight: 950;
+  pointer-events: none;
+}
+
+.rhythm-dish-progress strong {
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.rhythm-dish-progress span {
+  color: #ef5c2d;
+}
+
 .rhythm-mascot {
   position: absolute;
-  top: 18px;
+  top: 42px;
   left: 50%;
   display: grid;
   width: min(42%, 150px);
@@ -7101,7 +7152,7 @@ img,
 .rhythm-command {
   display: grid;
   width: min(82%, 280px);
-  margin-top: 80px;
+  margin-top: 92px;
   gap: 4px;
   place-items: center;
   padding: 16px 16px 13px;
@@ -7129,6 +7180,15 @@ img,
   font-size: 11px;
   font-style: normal;
   font-weight: 900;
+}
+
+.rhythm-command small {
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: white;
+  background: #1882dc;
+  box-shadow: 0 2px 0 rgba(77, 45, 24, 0.12);
+  letter-spacing: 0.04em;
 }
 
 .rhythm-command i {
@@ -7174,6 +7234,10 @@ img,
   color: #1882dc;
 }
 
+.rhythm-command[data-type="tap"] small {
+  background: #1882dc;
+}
+
 .rhythm-command[data-type="hold"] {
   border-color: #ffd19a;
   background: linear-gradient(180deg, rgba(255, 247, 226, 0.95), rgba(255, 225, 182, 0.88));
@@ -7184,6 +7248,10 @@ img,
   color: #e26924;
 }
 
+.rhythm-command[data-type="hold"] small {
+  background: #e26924;
+}
+
 .rhythm-command[data-type="mash"] {
   border-color: #ffc0e4;
   background: linear-gradient(180deg, rgba(255, 241, 251, 0.95), rgba(246, 218, 255, 0.88));
@@ -7192,6 +7260,35 @@ img,
 .rhythm-command[data-type="mash"] strong,
 .rhythm-command[data-type="mash"] span {
   color: #d63d8f;
+}
+
+.rhythm-command[data-type="mash"] small {
+  background: #d63d8f;
+}
+
+.rhythm-action-fx {
+  position: absolute;
+  z-index: 5;
+  top: 56%;
+  left: 50%;
+  opacity: 0;
+  transform: translate(calc(-50% + var(--fx-x, 0px)), -50%) scale(0.72);
+  font-size: 24px;
+  pointer-events: none;
+  animation: rhythm-action-fx 720ms ease-out var(--fx-delay, 0ms) forwards;
+}
+
+.rhythm-action-fx.fx-hold {
+  top: 62%;
+}
+
+.rhythm-action-fx.fx-mash {
+  font-size: 27px;
+}
+
+.rhythm-stage.is-mashing .rhythm-mascot,
+.rhythm-stage.is-mashing .rhythm-command {
+  animation: rhythm-mash-shake 170ms ease-out;
 }
 
 .rhythm-feedback {
@@ -7435,6 +7532,14 @@ img,
   text-align: center;
 }
 
+.rhythm-result-comment {
+  margin: -3px 0 0;
+  color: #8c5736;
+  font-size: 14px;
+  font-weight: 950;
+  text-align: center;
+}
+
 .rhythm-stars {
   color: #ff9e1f;
   font-size: 34px;
@@ -7541,5 +7646,38 @@ img,
 @keyframes rhythm-fever-bg {
   to {
     filter: saturate(1.12) brightness(1.04);
+  }
+}
+
+@keyframes rhythm-action-fx {
+  0% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--fx-x, 0px)), -20%) scale(0.58);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--fx-x, 0px)), -118%) scale(1.18) rotate(10deg);
+  }
+}
+
+@keyframes rhythm-mash-shake {
+  25% {
+    transform: translateX(-3px) rotate(-1deg);
+  }
+
+  65% {
+    transform: translateX(3px) rotate(1deg);
+  }
+}
+
+@keyframes rhythm-heat-wave {
+  to {
+    opacity: 0.72;
+    transform: translateY(-4px) scale(1.03);
   }
 }

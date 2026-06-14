@@ -10,6 +10,12 @@ const PERFECT_SCORE = 100;
 const GOOD_SCORE = 60;
 const BASE_COINS = 20;
 const STAR_COIN_BONUS = 10;
+const STAR_COMMENTS = Object.freeze([
+  "旦仔还要练练！",
+  "能吃就行！",
+  "香气不错！",
+  "完美出餐！",
+]);
 
 export const RHYTHM_WINDOWS = Object.freeze({
   TAP: Object.freeze({ perfectMs: 180, goodMs: 360 }),
@@ -43,14 +49,28 @@ export function calculateRhythmCoins(stars) {
   return BASE_COINS + Math.max(0, Math.floor(Number(stars) || 0)) * STAR_COIN_BONUS;
 }
 
+export function getRhythmStarComment(stars) {
+  const index = Math.min(3, Math.max(0, Math.floor(Number(stars) || 0)));
+  return STAR_COMMENTS[index];
+}
+
 function normalizeCommand(command, index) {
-  const type = command.type;
+  const type = command.input || command.type;
   const startAtMs = Math.max(0, Math.floor(Number(command.startAtMs) || 0));
+  const id = command.id || `command-${index + 1}`;
+  const actionName = command.actionName || command.label || id;
+  const prompt = command.prompt || `${actionName}！`;
+  const helperText = command.helperText || command.label || "";
   if (type === RHYTHM_COMMAND_TYPES.MASH) {
     const endAtMs = Math.max(startAtMs + 300, Math.floor(Number(command.endAtMs) || startAtMs + 1_500));
     return {
       ...command,
-      id: command.id || `command-${index + 1}`,
+      id,
+      type,
+      input: type,
+      actionName,
+      prompt,
+      helperText,
       startAtMs,
       endAtMs,
       expireAtMs: endAtMs,
@@ -62,7 +82,12 @@ function normalizeCommand(command, index) {
   const targetHoldMs = Math.max(250, Math.floor(Number(command.targetHoldMs) || targetAtMs - startAtMs));
   return {
     ...command,
-    id: command.id || `command-${index + 1}`,
+    id,
+    type,
+    input: type,
+    actionName,
+    prompt,
+    helperText,
     startAtMs,
     targetAtMs,
     targetHoldMs,
@@ -75,9 +100,13 @@ function normalizeCommand(command, index) {
 }
 
 function normalizeLevel(level) {
+  const title = level?.title || RHYTHM_TEST_LEVEL.title;
+  const dishName = level?.dishName || title;
   return {
     ...RHYTHM_TEST_LEVEL,
     ...level,
+    title,
+    dishName,
     durationMs: Math.max(5_000, Math.floor(Number(level?.durationMs) || RHYTHM_TEST_LEVEL.durationMs)),
     commands: (level?.commands || RHYTHM_TEST_LEVEL.commands).map(normalizeCommand),
   };
@@ -271,11 +300,14 @@ export class RhythmCookingGame {
     const maxScore = this.level.commands.length * PERFECT_SCORE;
     const stars = calculateRhythmStars(this.score, maxScore);
     const coinsEarned = calculateRhythmCoins(stars);
+    const starComment = getRhythmStarComment(stars);
     this.state = "ended";
     this.result = {
+      dishName: this.level.dishName,
       score: this.score,
       maxScore,
       stars,
+      starComment,
       bestCombo: this.bestCombo,
       perfectCount: this.perfectCount,
       goodCount: this.goodCount,
@@ -295,6 +327,7 @@ export class RhythmCookingGame {
     return {
       state: this.state,
       level: this.level,
+      dishName: this.level.dishName,
       elapsedMs: this.elapsedMs,
       remainingMs,
       activeCommand: command,

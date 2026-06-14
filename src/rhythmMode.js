@@ -23,17 +23,17 @@ const COMMAND_UI = {
   [RHYTHM_COMMAND_TYPES.TAP]: {
     icon: "👆",
     code: "TAP",
-    label: "点击！",
+    fallbackPrompt: "点击！",
   },
   [RHYTHM_COMMAND_TYPES.HOLD]: {
     icon: "✊",
     code: "HOLD",
-    label: "按住后松开！",
+    fallbackPrompt: "按住后松开！",
   },
   [RHYTHM_COMMAND_TYPES.MASH]: {
     icon: "⚡",
     code: "MASH",
-    label: "狂点！",
+    fallbackPrompt: "狂点！",
   },
 };
 
@@ -59,9 +59,13 @@ function createRhythmOverlay() {
       </div>
 
       <div class="rhythm-stage">
+        <div class="rhythm-dish-progress">
+          <strong data-rhythm-dish-name>元气煎蛋</strong>
+          <span data-rhythm-dish-step>1 / 8</span>
+        </div>
         <div class="rhythm-mascot" data-rhythm-mascot aria-hidden="true"></div>
         <div class="rhythm-command" data-rhythm-command>
-          <small data-rhythm-command-step>1 / 1</small>
+          <small data-rhythm-command-step>TAP</small>
           <i data-rhythm-command-icon aria-hidden="true">🍳</i>
           <strong data-rhythm-command-type>READY</strong>
           <span data-rhythm-command-label>准备开火</span>
@@ -85,7 +89,8 @@ function createRhythmOverlay() {
       </button>
 
       <div class="rhythm-result" data-rhythm-result hidden>
-        <h3>节奏厨房结算</h3>
+        <h3 data-rhythm-result-title>菜品完成：元气煎蛋</h3>
+        <p class="rhythm-result-comment" data-rhythm-result-comment>完美出餐！</p>
         <div class="rhythm-stars" data-rhythm-stars>☆☆☆</div>
         <dl>
           <div><dt>得分</dt><dd data-rhythm-final-score>0</dd></div>
@@ -209,6 +214,9 @@ export function createRhythmMode({
     time: overlay.querySelector("[data-rhythm-time]"),
     score: overlay.querySelector("[data-rhythm-score]"),
     combo: overlay.querySelector("[data-rhythm-combo]"),
+    dishName: overlay.querySelector("[data-rhythm-dish-name]"),
+    dishStep: overlay.querySelector("[data-rhythm-dish-step]"),
+    stage: overlay.querySelector(".rhythm-stage"),
     mascot: overlay.querySelector("[data-rhythm-mascot]"),
     commandBox: overlay.querySelector("[data-rhythm-command]"),
     commandStep: overlay.querySelector("[data-rhythm-command-step]"),
@@ -228,6 +236,8 @@ export function createRhythmMode({
     actionIcon: overlay.querySelector("[data-rhythm-action-icon]"),
     actionLabel: overlay.querySelector("[data-rhythm-action-label]"),
     result: overlay.querySelector("[data-rhythm-result]"),
+    resultTitle: overlay.querySelector("[data-rhythm-result-title]"),
+    resultComment: overlay.querySelector("[data-rhythm-result-comment]"),
     finalScore: overlay.querySelector("[data-rhythm-final-score]"),
     finalCombo: overlay.querySelector("[data-rhythm-final-combo]"),
     finalPerfect: overlay.querySelector("[data-rhythm-final-perfect]"),
@@ -316,6 +326,8 @@ export function createRhythmMode({
     refs.result.hidden = false;
     refs.actionButton.disabled = true;
     overlay.classList.add("is-ended");
+    refs.resultTitle.textContent = `菜品完成：${result.dishName}`;
+    refs.resultComment.textContent = result.starComment;
     refs.finalScore.textContent = result.score;
     refs.finalCombo.textContent = `x${result.bestCombo}`;
     refs.finalPerfect.textContent = result.perfectCount;
@@ -330,6 +342,7 @@ export function createRhythmMode({
     for (const event of game.drainEvents()) {
       if (event.type === "hit") {
         showFeedback(event);
+        spawnActionFx(event.command?.type, event.quality);
         if (event.quality === RHYTHM_HIT_QUALITY.PERFECT) {
           playCue?.(event.combo >= 5 ? "fever" : "perfect");
           vibrate?.(event.combo >= 5 ? [35, 15, 55] : 20);
@@ -348,6 +361,9 @@ export function createRhythmMode({
         refs.actionButton.classList.remove("is-tapping");
         void refs.actionButton.offsetWidth;
         refs.actionButton.classList.add("is-tapping");
+        refs.stage.classList.remove("is-mashing");
+        void refs.stage.offsetWidth;
+        refs.stage.classList.add("is-mashing");
         refs.track.classList.toggle("is-mash-good", event.goodReady);
         refs.track.classList.toggle("is-mash-perfect", event.perfectReady);
         if (event.milestone) showMashPop(event.perfectReady ? "Perfect!" : "Good!");
@@ -355,6 +371,25 @@ export function createRhythmMode({
         showWaitingHint();
       }
     }
+  }
+
+  function spawnActionFx(type, quality) {
+    if (quality === RHYTHM_HIT_QUALITY.MISS) return;
+    const particles =
+      type === RHYTHM_COMMAND_TYPES.HOLD
+        ? ["🔥", "♨️", "🔥"]
+        : type === RHYTHM_COMMAND_TYPES.MASH
+          ? ["✨", "🔥", "✨", "💥"]
+          : ["⭐", "🥚", "✨"];
+    particles.forEach((text, index) => {
+      const particle = document.createElement("span");
+      particle.className = `rhythm-action-fx fx-${type || "tap"}`;
+      particle.textContent = text;
+      particle.style.setProperty("--fx-x", `${(index - (particles.length - 1) / 2) * 24}px`);
+      particle.style.setProperty("--fx-delay", `${index * 35}ms`);
+      refs.stage.append(particle);
+      window.setTimeout(() => particle.remove(), 760);
+    });
   }
 
   function showWaitingHint() {
@@ -394,14 +429,17 @@ export function createRhythmMode({
     refs.time.textContent = remainingSeconds;
     refs.score.textContent = snapshot.score;
     refs.combo.textContent = snapshot.combo;
-    overlay.classList.toggle("is-fever", snapshot.fever);
-    refs.commandStep.textContent =
+    refs.dishName.textContent = snapshot.dishName;
+    refs.dishStep.textContent =
       `${Math.min(snapshot.commandIndex + 1, snapshot.level.commands.length)} / ${snapshot.level.commands.length}`;
+    overlay.classList.toggle("is-fever", snapshot.fever);
+    overlay.classList.toggle("is-holding", snapshot.holdActive);
 
     if (!command || snapshot.state === "ended") {
       refs.commandBox.dataset.type = "done";
       refs.commandIcon.textContent = "⭐";
-      refs.commandType.textContent = "DONE";
+      refs.commandStep.textContent = "DONE";
+      refs.commandType.textContent = "出菜完成";
       refs.commandLabel.textContent = "出菜完成";
       refs.commandHint.textContent = "查看本局结算";
       refs.commandNext.textContent = "本轮完成";
@@ -425,11 +463,13 @@ export function createRhythmMode({
     const nextCommand = snapshot.level.commands[snapshot.commandIndex + 1];
     refs.commandBox.dataset.type = command.type;
     refs.commandIcon.textContent = ui.icon;
-    refs.commandType.textContent = ui.code;
-    refs.commandLabel.textContent = ui.label;
-    refs.commandHint.textContent = COMMAND_HINTS[command.type] || "按提示操作";
+    refs.commandStep.textContent = ui.code;
+    refs.commandType.textContent = command.prompt || ui.fallbackPrompt;
+    refs.commandLabel.textContent = command.actionName || ui.fallbackPrompt;
+    refs.commandHint.textContent =
+      command.helperText || COMMAND_HINTS[command.type] || "按提示操作";
     refs.commandNext.textContent = nextCommand
-      ? `下一步：${COMMAND_LABELS[nextCommand.type]}`
+      ? `下一步：${nextCommand.actionName || COMMAND_LABELS[nextCommand.type]}`
       : "最后一道";
     refs.track.dataset.type = command.type;
     refs.actionButton.dataset.type = command.type;

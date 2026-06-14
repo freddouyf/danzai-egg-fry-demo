@@ -3,13 +3,18 @@ import assert from "node:assert/strict";
 import {
   calculateRhythmCoins,
   calculateRhythmStars,
+  getRhythmStarComment,
   judgeMash,
   judgeTimingError,
   RHYTHM_HIT_QUALITY,
   RHYTHM_WINDOWS,
   RhythmCookingGame,
 } from "../src/rhythmGame.js";
-import { RHYTHM_COMMAND_TYPES } from "../src/rhythmLevels.js";
+import {
+  RHYTHM_COMMAND_TYPES,
+  RHYTHM_DISH_LEVELS,
+  RHYTHM_TEST_LEVEL,
+} from "../src/rhythmLevels.js";
 
 const SMALL_LEVEL = {
   id: "test-rhythm",
@@ -59,6 +64,34 @@ test("rhythm mash uses target count and 65 percent Good threshold", () => {
   assert.equal(judgeMash(6, 6), RHYTHM_HIT_QUALITY.PERFECT);
   assert.equal(judgeMash(4, 6), RHYTHM_HIT_QUALITY.GOOD);
   assert.equal(judgeMash(3, 6), RHYTHM_HIT_QUALITY.MISS);
+});
+
+test("rhythm dish level exposes dish name and action prompts", () => {
+  assert.equal(RHYTHM_TEST_LEVEL.dishName, "元气煎蛋");
+  assert.equal(RHYTHM_TEST_LEVEL.commands.length, 8);
+  assert.deepEqual(
+    RHYTHM_TEST_LEVEL.commands.map((command) => command.actionName),
+    ["敲蛋", "打蛋", "下锅", "煎蛋", "撒盐", "翻炒", "控火", "出锅"],
+  );
+  assert.equal(RHYTHM_TEST_LEVEL.commands[0].prompt, "敲蛋！");
+  assert.equal(RHYTHM_TEST_LEVEL.commands[1].input, RHYTHM_COMMAND_TYPES.MASH);
+});
+
+test("rhythm prototype has simple dish names for later levels", () => {
+  assert.deepEqual(
+    RHYTHM_DISH_LEVELS.map((level) => level.dishName),
+    ["元气煎蛋", "黄金蛋液", "早餐拼盘"],
+  );
+});
+
+test("rhythm game snapshots expose current dish action fields", () => {
+  const game = new RhythmCookingGame(RHYTHM_TEST_LEVEL);
+  game.start();
+  const snapshot = game.getSnapshot();
+  assert.equal(snapshot.dishName, "元气煎蛋");
+  assert.equal(snapshot.activeCommand.actionName, "敲蛋");
+  assert.equal(snapshot.activeCommand.prompt, "敲蛋！");
+  assert.equal(snapshot.activeCommand.helperText, "看准节奏点击");
 });
 
 test("rhythm game handles TAP, HOLD, MASH and combo", () => {
@@ -189,4 +222,39 @@ test("rhythm stars and coins use base 20 plus 10 per star", () => {
   assert.equal(calculateRhythmStars(800, 1_000), 3);
   assert.equal(calculateRhythmCoins(0), 20);
   assert.equal(calculateRhythmCoins(3), 50);
+});
+
+test("rhythm final result includes dish name and star comment", () => {
+  const game = new RhythmCookingGame({
+    id: "single-dish",
+    title: "Single Dish",
+    dishName: "测试煎蛋",
+    durationMs: 3_000,
+    commands: [
+      {
+        id: "serve",
+        input: RHYTHM_COMMAND_TYPES.TAP,
+        actionName: "出锅",
+        prompt: "出锅！",
+        helperText: "点击完成",
+        startAtMs: 0,
+        targetAtMs: 1_000,
+        expireAtMs: 1_700,
+      },
+    ],
+  });
+  game.start();
+  game.tap(1_000);
+  game.update(1_100);
+  const result = game.getSnapshot().result;
+  assert.equal(result.dishName, "测试煎蛋");
+  assert.equal(result.stars, 3);
+  assert.equal(result.starComment, "完美出餐！");
+});
+
+test("rhythm star comments map to result copy", () => {
+  assert.equal(getRhythmStarComment(3), "完美出餐！");
+  assert.equal(getRhythmStarComment(2), "香气不错！");
+  assert.equal(getRhythmStarComment(1), "能吃就行！");
+  assert.equal(getRhythmStarComment(0), "旦仔还要练练！");
 });
