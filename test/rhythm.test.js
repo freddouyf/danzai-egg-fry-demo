@@ -16,6 +16,7 @@ import {
   RHYTHM_DISH_LEVELS,
   RHYTHM_TEST_LEVEL,
 } from "../src/rhythmLevels.js";
+import { shouldShowRhythmNextLevel } from "../src/rhythmMode.js";
 
 const SMALL_LEVEL = {
   id: "test-rhythm",
@@ -71,17 +72,32 @@ function makeTapLevel(count) {
   };
 }
 
-test("rhythm TAP uses the loose prototype timing window", () => {
+test("rhythm TAP uses the narrowed success timing window", () => {
   assert.equal(
-    judgeTimingError(180, RHYTHM_WINDOWS.TAP),
+    judgeTimingError(150, RHYTHM_WINDOWS.TAP),
     RHYTHM_HIT_QUALITY.PERFECT,
   );
   assert.equal(
-    judgeTimingError(360, RHYTHM_WINDOWS.TAP),
+    judgeTimingError(300, RHYTHM_WINDOWS.TAP),
     RHYTHM_HIT_QUALITY.GOOD,
   );
   assert.equal(
-    judgeTimingError(361, RHYTHM_WINDOWS.TAP),
+    judgeTimingError(301, RHYTHM_WINDOWS.TAP),
+    RHYTHM_HIT_QUALITY.MISS,
+  );
+});
+
+test("rhythm HOLD uses the narrowed success timing window", () => {
+  assert.equal(
+    judgeTimingError(125, RHYTHM_WINDOWS.HOLD),
+    RHYTHM_HIT_QUALITY.PERFECT,
+  );
+  assert.equal(
+    judgeTimingError(290, RHYTHM_WINDOWS.HOLD),
+    RHYTHM_HIT_QUALITY.GOOD,
+  );
+  assert.equal(
+    judgeTimingError(291, RHYTHM_WINDOWS.HOLD),
     RHYTHM_HIT_QUALITY.MISS,
   );
 });
@@ -90,6 +106,34 @@ test("rhythm MASH still uses target count and 65 percent success threshold", () 
   assert.equal(judgeMash(6, 6), RHYTHM_HIT_QUALITY.PERFECT);
   assert.equal(judgeMash(4, 6), RHYTHM_HIT_QUALITY.GOOD);
   assert.equal(judgeMash(3, 6), RHYTHM_HIT_QUALITY.MISS);
+});
+
+test("MASH tap events expose success threshold and complete readiness", () => {
+  const game = new RhythmCookingGame({
+    id: "mash-only",
+    durationMs: 3_000,
+    commands: [
+      {
+        id: "mash",
+        type: RHYTHM_COMMAND_TYPES.MASH,
+        startAtMs: 0,
+        endAtMs: 2_000,
+        targetTaps: 6,
+      },
+    ],
+  });
+  game.start();
+  let event;
+  for (let index = 0; index < 4; index += 1) {
+    event = game.tap(index * 120);
+  }
+  assert.equal(event.goodReady, true);
+  assert.equal(event.completeReady, false);
+
+  game.tap(520);
+  event = game.tap(640);
+  assert.equal(event.goodReady, true);
+  assert.equal(event.completeReady, true);
 });
 
 test("rhythm level one is a 30 second fried egg completion challenge", () => {
@@ -283,9 +327,15 @@ test("rhythm final result uses completed eggs, action counts and new coin formul
 });
 
 test("passing level one unlocks level two", () => {
-  assert.equal(unlockRhythmLevelIndex(0, 0, 0), 0);
-  assert.equal(unlockRhythmLevelIndex(0, 0, 1), 1);
-  assert.equal(unlockRhythmLevelIndex(1, 1, 2), 2);
+  assert.equal(unlockRhythmLevelIndex(0, 0, false), 0);
+  assert.equal(unlockRhythmLevelIndex(0, 0, true), 1);
+  assert.equal(unlockRhythmLevelIndex(1, 1, true), 2);
+});
+
+test("rhythm result next-level entrance shows until the last level", () => {
+  assert.equal(shouldShowRhythmNextLevel(0, RHYTHM_DISH_LEVELS.length), true);
+  assert.equal(shouldShowRhythmNextLevel(1, RHYTHM_DISH_LEVELS.length), true);
+  assert.equal(shouldShowRhythmNextLevel(2, RHYTHM_DISH_LEVELS.length), false);
 });
 
 test("rhythm star comments map to result copy", () => {

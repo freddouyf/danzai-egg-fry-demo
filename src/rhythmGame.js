@@ -12,8 +12,8 @@ export const RHYTHM_ACTION_RESULT = Object.freeze({
 });
 
 export const RHYTHM_WINDOWS = Object.freeze({
-  TAP: Object.freeze({ perfectMs: 180, goodMs: 360 }),
-  HOLD: Object.freeze({ perfectMs: 150, goodMs: 350 }),
+  TAP: Object.freeze({ perfectMs: 150, goodMs: 300 }),
+  HOLD: Object.freeze({ perfectMs: 125, goodMs: 290 }),
 });
 
 export const DEFAULT_ACTIONS_PER_DISH = 3;
@@ -83,10 +83,10 @@ export function getRhythmStarComment(stars) {
   return STAR_COMMENTS[index];
 }
 
-export function unlockRhythmLevelIndex(currentUnlockedIndex, completedLevelIndex, stars) {
+export function unlockRhythmLevelIndex(currentUnlockedIndex, completedLevelIndex, didComplete = true) {
   const current = Math.max(0, Math.floor(Number(currentUnlockedIndex) || 0));
   const completed = Math.max(0, Math.floor(Number(completedLevelIndex) || 0));
-  if (Math.floor(Number(stars) || 0) <= 0) return current;
+  if (!didComplete) return current;
   return Math.max(current, completed + 1);
 }
 

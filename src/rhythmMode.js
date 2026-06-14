@@ -1,4 +1,4 @@
-import { RhythmCookingGame } from "./rhythmGame.js";
+import { RHYTHM_WINDOWS, RhythmCookingGame, unlockRhythmLevelIndex } from "./rhythmGame.js";
 import { RHYTHM_COMMAND_TYPES, RHYTHM_DISH_LEVELS } from "./rhythmLevels.js";
 
 const RHYTHM_UNLOCK_KEY = "danzai-rhythm-unlocked-level";
@@ -136,8 +136,8 @@ function timingZone(command, goodMs) {
 
 function holdZone(command) {
   const max = Math.max(command.targetHoldMs + 450, command.targetHoldMs * 1.45);
-  const goodStart = zonePercent(command.targetHoldMs - 350, max);
-  const goodEnd = zonePercent(command.targetHoldMs + 350, max);
+  const goodStart = zonePercent(command.targetHoldMs - RHYTHM_WINDOWS.HOLD.goodMs, max);
+  const goodEnd = zonePercent(command.targetHoldMs + RHYTHM_WINDOWS.HOLD.goodMs, max);
   return {
     max,
     goodLeft: goodStart,
@@ -181,7 +181,7 @@ function commandProgress(snapshot) {
         : untilTarget > 0
           ? `${untilTarget.toFixed(1)}s`
           : "现在！",
-    ...timingZone(command, 360),
+    ...timingZone(command, RHYTHM_WINDOWS.TAP.goodMs),
   };
 }
 
@@ -207,6 +207,10 @@ function levelAt(index) {
     Math.max(0, Math.floor(Number(index) || 0)),
   );
   return { index: safeIndex, level: RHYTHM_DISH_LEVELS[safeIndex] };
+}
+
+export function shouldShowRhythmNextLevel(activeLevelIndex, totalLevels = RHYTHM_DISH_LEVELS.length) {
+  return Math.max(0, Math.floor(Number(activeLevelIndex) || 0)) < Math.max(0, totalLevels - 1);
 }
 
 export function createRhythmMode({
@@ -341,8 +345,11 @@ export function createRhythmMode({
       totalEggs: (Number(progress.totalEggs) || 0) + result.completedEggs,
       totalCoinsEarned: (Number(progress.totalCoinsEarned) || 0) + result.coinsEarned,
     });
-    if (result.stars > 0) {
-      const nextUnlocked = Math.min(RHYTHM_DISH_LEVELS.length - 1, activeLevelIndex + 1);
+    if (shouldShowRhythmNextLevel(activeLevelIndex)) {
+      const nextUnlocked = Math.min(
+        RHYTHM_DISH_LEVELS.length - 1,
+        unlockRhythmLevelIndex(unlockedLevelIndex, activeLevelIndex, true),
+      );
       if (nextUnlocked > unlockedLevelIndex) {
         unlockedLevelIndex = nextUnlocked;
         saveUnlockedLevelIndex(unlockedLevelIndex);
@@ -362,10 +369,7 @@ export function createRhythmMode({
     refs.finalFails.textContent = result.failedActions;
     refs.finalCoins.textContent = `+${result.coinsEarned}`;
     refs.stars.textContent = formatStars(result.stars);
-    refs.nextLevel.hidden =
-      result.stars <= 0
-      || activeLevelIndex >= RHYTHM_DISH_LEVELS.length - 1
-      || activeLevelIndex + 1 > unlockedLevelIndex;
+    refs.nextLevel.hidden = !shouldShowRhythmNextLevel(activeLevelIndex);
     playCue?.(result.stars >= 2 ? "perfect" : "good");
     vibrate?.(result.stars >= 2 ? [35, 20, 55] : 20);
   }
@@ -399,8 +403,12 @@ export function createRhythmMode({
         refs.stage.classList.remove("is-mashing");
         void refs.stage.offsetWidth;
         refs.stage.classList.add("is-mashing");
+        refs.scene.classList.remove("is-mashing");
+        void refs.scene.offsetWidth;
+        refs.scene.classList.add("is-mashing");
         refs.track.classList.toggle("is-mash-good", event.goodReady);
         refs.track.classList.toggle("is-mash-perfect", event.completeReady);
+        spawnMashTapFx(event);
         if (event.milestone) showMashPop(event.completeReady ? "完成！" : "达标！");
       } else if (event.type === "earlyTapIgnored") {
         showWaitingHint();
@@ -427,6 +435,15 @@ export function createRhythmMode({
       refs.stage.append(particle);
       window.setTimeout(() => particle.remove(), 760);
     });
+  }
+
+  function spawnMashTapFx(event) {
+    const particle = document.createElement("span");
+    particle.className = `rhythm-action-fx fx-mash-tap${event.completeReady ? " is-complete" : ""}`;
+    particle.textContent = event.completeReady ? "💥" : "⚡";
+    particle.style.setProperty("--fx-x", `${((event.taps % 5) - 2) * 18}px`);
+    refs.stage.append(particle);
+    window.setTimeout(() => particle.remove(), 520);
   }
 
   function showWaitingHint() {

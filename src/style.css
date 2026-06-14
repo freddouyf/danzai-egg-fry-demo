@@ -7384,9 +7384,25 @@ img,
   font-size: 27px;
 }
 
+.rhythm-action-fx.fx-mash-tap {
+  top: 50%;
+  font-size: 22px;
+  animation-duration: 520ms;
+}
+
+.rhythm-action-fx.fx-mash-tap.is-complete {
+  font-size: 34px;
+}
+
 .rhythm-stage.is-mashing .rhythm-mascot,
-.rhythm-stage.is-mashing .rhythm-command {
-  animation: rhythm-mash-shake 170ms ease-out;
+.rhythm-stage.is-mashing .rhythm-command,
+.rhythm-stage.is-mashing .rhythm-cook-scene {
+  animation: rhythm-mash-shake 190ms ease-out;
+}
+
+.rhythm-cook-scene.is-mashing .scene-egg,
+.rhythm-cook-scene.is-mashing .scene-pan {
+  animation: rhythm-mash-scene-pop 190ms ease-out;
 }
 
 .rhythm-feedback {
@@ -7575,6 +7591,10 @@ img,
   animation: rhythm-action-pop 220ms ease-out;
 }
 
+.rhythm-action-button[data-type="mash"].is-tapping {
+  animation: rhythm-action-mash-pop 150ms ease-out;
+}
+
 .rhythm-mash-pop {
   position: absolute;
   z-index: 3;
@@ -7702,6 +7722,16 @@ img,
   }
 }
 
+@keyframes rhythm-action-mash-pop {
+  35% {
+    transform: translateY(5px) scale(0.94) rotate(-1deg);
+  }
+
+  70% {
+    transform: translateY(-1px) scale(1.03) rotate(1deg);
+  }
+}
+
 @keyframes rhythm-command-enter {
   0% {
     opacity: 0.72;
@@ -7761,11 +7791,18 @@ img,
 
 @keyframes rhythm-mash-shake {
   25% {
-    transform: translateX(-3px) rotate(-1deg);
+    transform: translateX(-5px) rotate(-1.5deg);
   }
 
   65% {
-    transform: translateX(3px) rotate(1deg);
+    transform: translateX(5px) rotate(1.5deg);
+  }
+}
+
+@keyframes rhythm-mash-scene-pop {
+  45% {
+    filter: brightness(1.16) saturate(1.2);
+    transform: scale(1.08) rotate(-3deg);
   }
 }
 
