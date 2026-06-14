@@ -600,7 +600,7 @@ export function createRhythmMode({
     }
 
     const ui = COMMAND_UI[command.type] || COMMAND_UI[RHYTHM_COMMAND_TYPES.TAP];
-    const nextCommand = snapshot.level.commands[snapshot.commandIndex + 1];
+    const nextCommand = snapshot.nextCommand;
     const stepIndex = Math.min(
       snapshot.actionsPerDish - 1,
       Math.max(0, Number(command.dishStepIndex ?? (snapshot.commandIndex % snapshot.actionsPerDish)) || 0),
@@ -662,6 +662,15 @@ export function createRhythmMode({
     }
   }
 
+  function cancelActiveHold() {
+    if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
+    if (!game.getSnapshot().holdActive) return;
+    refs.actionButton.classList.remove("is-holding");
+    game.cancelHold(nowElapsed());
+    handleEvents();
+    render();
+  }
+
   refs.actionButton.addEventListener("pointerdown", (event) => {
     if (event?.cancelable) event.preventDefault();
     refs.actionButton.setPointerCapture?.(event.pointerId);
@@ -698,6 +707,11 @@ export function createRhythmMode({
     if (!active || event.code !== "Space") return;
     spaceDown = false;
     releasePrimaryInput(event);
+  });
+
+  window.addEventListener("blur", cancelActiveHold);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) cancelActiveHold();
   });
 
   return {

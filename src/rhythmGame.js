@@ -18,6 +18,11 @@ export const RHYTHM_WINDOWS = Object.freeze({
 
 export const DEFAULT_ACTIONS_PER_DISH = 3;
 export const DEFAULT_STAR_EGGS = Object.freeze([2, 4, 6]);
+export const RHYTHM_DISH_STEP_TYPES = Object.freeze([
+  RHYTHM_COMMAND_TYPES.TAP,
+  RHYTHM_COMMAND_TYPES.MASH,
+  RHYTHM_COMMAND_TYPES.HOLD,
+]);
 export const TAP_INPUT_PREP_MS = 200;
 export const POST_MASH_INPUT_GUARD_MS = 300;
 
@@ -157,9 +162,47 @@ function normalizeLevel(level) {
   };
 }
 
+function fallbackStepTemplate(stepIndex) {
+  const type = RHYTHM_DISH_STEP_TYPES[stepIndex] || RHYTHM_COMMAND_TYPES.TAP;
+  const names = ["敲蛋", "打蛋", "煎熟出锅"];
+  const prompts = ["敲蛋！", "快速打蛋！", "按住煎熟！"];
+  return normalizeCommand({
+    id: `fallback-step-${stepIndex}`,
+    input: type,
+    actionName: names[stepIndex] || "做菜",
+    prompt: prompts[stepIndex] || "开始！",
+    helperText: "",
+    scene:
+      type === RHYTHM_COMMAND_TYPES.MASH
+        ? "mash"
+        : type === RHYTHM_COMMAND_TYPES.HOLD
+          ? "fry"
+          : "crack",
+    dishStepIndex: stepIndex,
+    startAtMs: 0,
+    targetAtMs: type === RHYTHM_COMMAND_TYPES.TAP ? 330 : 800,
+    targetHoldMs: 800,
+    expireAtMs: 720,
+    endAtMs: 2_200,
+    targetTaps: 8,
+  }, stepIndex);
+}
+
+function buildStepTemplates(commands) {
+  const usedIds = new Set();
+  return RHYTHM_DISH_STEP_TYPES.map((type, stepIndex) => {
+    const byStep = commands.find((command) => command.dishStepIndex === stepIndex);
+    const byType = commands.find((command) => command.type === type && !usedIds.has(command.id));
+    const picked = byStep || byType || fallbackStepTemplate(stepIndex);
+    usedIds.add(picked.id);
+    return picked;
+  });
+}
+
 export class RhythmCookingGame {
   constructor(level = RHYTHM_TEST_LEVEL) {
     this.level = normalizeLevel(level);
+    this.stepTemplates = buildStepTemplates(this.level.commands);
     this.events = [];
     this.reset();
   }
@@ -168,12 +211,17 @@ export class RhythmCookingGame {
     this.state = "idle";
     this.elapsedMs = 0;
     this.commandIndex = 0;
+    this.currentDishStepIndex = 0;
+    this.currentEggActions = 0;
+    this.eggAttemptIndex = 1;
+    this.currentCommand = null;
     this.successfulActions = 0;
     this.failedActions = 0;
     this.completedEggs = 0;
     this.score = 0;
     this.mashTaps = 0;
     this.holdStartedAtMs = null;
+    this.stepResolved = false;
     this.stepInputGuardUntilMs = 0;
     this.lastHitQuality = null;
     this.lastActionResult = null;
@@ -185,20 +233,91 @@ export class RhythmCookingGame {
     this.reset();
     this.state = "playing";
     this.startAtMs = Math.floor(Number(startAtMs) || 0);
+    this.elapsedMs = this.startAtMs;
+    this.startStep(0, this.startAtMs);
     this.events.push({ type: "rhythmStarted", level: this.level });
   }
 
   get activeCommand() {
-    return this.level.commands[this.commandIndex] || null;
+    return this.currentCommand;
   }
 
   update(nowMs) {
     if (this.state !== "playing") return;
     this.elapsedMs = Math.max(0, Math.floor(Number(nowMs) || 0));
-    this.resolveExpiredCommands();
-    if (this.elapsedMs >= this.level.durationMs || this.commandIndex >= this.level.commands.length) {
+    if (this.elapsedMs >= this.level.durationMs) {
       this.finish();
+      return;
     }
+    this.resolveExpiredCommands();
+  }
+
+  createStepCommand(stepIndex, startAtMs = this.elapsedMs, { preview = false } = {}) {
+    const template = this.stepTemplates[stepIndex] || fallbackStepTemplate(stepIndex);
+    const type = RHYTHM_DISH_STEP_TYPES[stepIndex] || template.type || RHYTHM_COMMAND_TYPES.TAP;
+    const baseStart = Number(template.startAtMs) || 0;
+    const idSuffix = preview ? "preview" : `${this.eggAttemptIndex}-${this.commandIndex}`;
+
+    if (type === RHYTHM_COMMAND_TYPES.MASH) {
+      const durationMs = Math.max(900, (Number(template.endAtMs) || baseStart + 2_200) - baseStart);
+      return {
+        ...template,
+        id: `${template.id}-${idSuffix}`,
+        type,
+        input: type,
+        dishStepIndex: stepIndex,
+        eggIndex: this.eggAttemptIndex,
+        startAtMs,
+        endAtMs: startAtMs + durationMs,
+        expireAtMs: Number.POSITIVE_INFINITY,
+      };
+    }
+
+    const targetDelayMs =
+      type === RHYTHM_COMMAND_TYPES.HOLD
+        ? Math.max(250, Number(template.targetHoldMs) || 800)
+        : Math.max(250, (Number(template.targetAtMs) || baseStart + 330) - baseStart);
+    const expireDelayMs = Math.max(
+      targetDelayMs + 200,
+      (Number(template.expireAtMs) || baseStart + targetDelayMs + 390) - baseStart,
+    );
+    const targetAtMs = startAtMs + targetDelayMs;
+    return {
+      ...template,
+      id: `${template.id}-${idSuffix}`,
+      type,
+      input: type,
+      dishStepIndex: stepIndex,
+      eggIndex: this.eggAttemptIndex,
+      startAtMs,
+      targetAtMs,
+      targetHoldMs:
+        type === RHYTHM_COMMAND_TYPES.HOLD
+          ? targetDelayMs
+          : Math.max(250, Number(template.targetHoldMs) || targetDelayMs),
+      inputStartAtMs:
+        type === RHYTHM_COMMAND_TYPES.TAP
+          ? Math.max(
+            startAtMs,
+            Math.min(targetAtMs - RHYTHM_WINDOWS.TAP.goodMs, startAtMs + TAP_INPUT_PREP_MS),
+          )
+          : startAtMs,
+      expireAtMs:
+        type === RHYTHM_COMMAND_TYPES.TAP
+          ? startAtMs + expireDelayMs
+          : Number.POSITIVE_INFINITY,
+    };
+  }
+
+  startStep(stepIndex, startAtMs = this.elapsedMs) {
+    this.currentDishStepIndex = Math.min(
+      this.level.actionsPerDish - 1,
+      Math.max(0, Math.floor(Number(stepIndex) || 0)),
+    );
+    this.currentCommand = this.createStepCommand(this.currentDishStepIndex, startAtMs);
+    this.stepResolved = false;
+    this.mashTaps = 0;
+    this.holdStartedAtMs = null;
   }
 
   resolveExpiredCommands() {
@@ -208,7 +327,7 @@ export class RhythmCookingGame {
       && command.type === RHYTHM_COMMAND_TYPES.TAP
       && this.elapsedMs > command.expireAtMs
     ) {
-      this.resolveCommand(RHYTHM_HIT_QUALITY.MISS, command, {
+      this.resolveCurrentStep(RHYTHM_HIT_QUALITY.MISS, {
         reason: "timeout",
       });
       command = this.activeCommand;
@@ -249,7 +368,7 @@ export class RhythmCookingGame {
       };
       this.events.push(event);
       if (completeReady) {
-        return this.resolveCommand(RHYTHM_HIT_QUALITY.PERFECT, command, {
+        return this.resolveCurrentStep(RHYTHM_HIT_QUALITY.PERFECT, {
           taps: this.mashTaps,
           targetTaps: command.targetTaps,
         });
@@ -269,7 +388,7 @@ export class RhythmCookingGame {
     }
     const errorMs = this.elapsedMs - command.targetAtMs;
     const quality = judgeTimingError(errorMs, RHYTHM_WINDOWS.TAP);
-    return this.resolveCommand(quality, command, { errorMs });
+    return this.resolveCurrentStep(quality, { errorMs });
   }
 
   holdStart(nowMs) {
@@ -307,24 +426,25 @@ export class RhythmCookingGame {
     const holdDurationMs = this.getHoldElapsedMs();
     const startedAtMs = this.holdStartedAtMs;
     this.holdStartedAtMs = null;
-    if (holdDurationMs < command.targetHoldMs) {
-      const event = {
-        type: "holdReleasedEarly",
-        command,
-        holdDurationMs,
-        startedAtMs,
-      };
-      this.events.push(event);
-      return event;
-    }
-    return this.resolveCommand(RHYTHM_HIT_QUALITY.PERFECT, command, {
-      errorMs: holdDurationMs - command.targetHoldMs,
+    const errorMs = holdDurationMs - command.targetHoldMs;
+    const quality = judgeTimingError(errorMs, RHYTHM_WINDOWS.HOLD);
+    return this.resolveCurrentStep(quality, {
+      errorMs,
       holdDurationMs,
       startedAtMs,
     });
   }
 
-  resolveCommand(quality, command, detail = {}) {
+  cancelHold(nowMs = this.elapsedMs) {
+    if (this.holdStartedAtMs === null) return null;
+    return this.holdEnd(nowMs);
+  }
+
+  resolveCurrentStep(quality, detail = {}) {
+    if (this.stepResolved || this.state !== "playing" || !this.currentCommand) return null;
+    this.stepResolved = true;
+    const command = this.currentCommand;
+    const completedStepIndex = this.currentDishStepIndex;
     const actionResult =
       quality === RHYTHM_HIT_QUALITY.MISS
         ? RHYTHM_ACTION_RESULT.FAIL
@@ -333,12 +453,18 @@ export class RhythmCookingGame {
 
     if (actionResult === RHYTHM_ACTION_RESULT.SUCCESS) {
       this.successfulActions += 1;
+      this.currentEggActions += 1;
       this.score += 10;
     } else {
       this.failedActions += 1;
     }
 
-    this.completedEggs = Math.floor(this.successfulActions / this.level.actionsPerDish);
+    if (
+      actionResult === RHYTHM_ACTION_RESULT.SUCCESS
+      && completedStepIndex >= this.level.actionsPerDish - 1
+    ) {
+      this.completedEggs += 1;
+    }
     this.lastHitQuality = quality;
     this.lastActionResult = actionResult;
     this.holdStartedAtMs = null;
@@ -351,11 +477,16 @@ export class RhythmCookingGame {
       successfulActions: this.successfulActions,
       failedActions: this.failedActions,
       completedEggs: this.completedEggs,
-      currentDishActions: this.successfulActions % this.level.actionsPerDish,
+      currentDishActions:
+        actionResult === RHYTHM_ACTION_RESULT.SUCCESS
+          ? this.currentEggActions
+          : 0,
       score: this.score,
       ...detail,
     };
     this.events.push(event);
+    this.commandIndex += 1;
+
     if (this.completedEggs > previousEggs) {
       this.events.push({
         type: "eggCompleted",
@@ -364,7 +495,18 @@ export class RhythmCookingGame {
         successfulActions: this.successfulActions,
       });
     }
-    this.commandIndex += 1;
+
+    if (
+      actionResult === RHYTHM_ACTION_RESULT.SUCCESS
+      && completedStepIndex < this.level.actionsPerDish - 1
+    ) {
+      this.startStep(completedStepIndex + 1, this.elapsedMs);
+    } else {
+      this.currentEggActions = 0;
+      this.eggAttemptIndex += 1;
+      this.startStep(0, this.elapsedMs);
+    }
+
     if (command.type === RHYTHM_COMMAND_TYPES.MASH) {
       this.stepInputGuardUntilMs = this.elapsedMs + POST_MASH_INPUT_GUARD_MS;
     } else {
@@ -390,7 +532,7 @@ export class RhythmCookingGame {
       failedActions: this.failedActions,
       coinsEarned,
       commandsCompleted: this.successfulActions + this.failedActions,
-      totalCommands: this.level.commands.length,
+      totalCommands: this.commandIndex,
     };
     this.events.push({ type: "rhythmEnded", result: this.result });
     return this.result;
@@ -408,11 +550,22 @@ export class RhythmCookingGame {
       remainingMs,
       activeCommand: command,
       commandIndex: this.commandIndex,
+      currentDishStepIndex: this.currentDishStepIndex,
       successfulActions: this.successfulActions,
       failedActions: this.failedActions,
       completedEggs: this.completedEggs,
-      currentDishActions: this.successfulActions % this.level.actionsPerDish,
+      currentDishActions: this.currentDishStepIndex,
       actionsPerDish: this.level.actionsPerDish,
+      nextCommand:
+        this.state === "playing"
+          ? this.createStepCommand(
+            this.currentDishStepIndex >= this.level.actionsPerDish - 1
+              ? 0
+              : this.currentDishStepIndex + 1,
+            this.elapsedMs,
+            { preview: true },
+          )
+          : null,
       score: this.score,
       mashTaps: this.mashTaps,
       holdActive: this.holdStartedAtMs !== null,
