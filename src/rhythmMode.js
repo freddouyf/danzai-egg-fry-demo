@@ -1,11 +1,7 @@
-import { RhythmCookingGame, RHYTHM_HIT_QUALITY } from "./rhythmGame.js";
-import { RHYTHM_COMMAND_TYPES, RHYTHM_TEST_LEVEL } from "./rhythmLevels.js";
+import { RhythmCookingGame } from "./rhythmGame.js";
+import { RHYTHM_COMMAND_TYPES, RHYTHM_DISH_LEVELS } from "./rhythmLevels.js";
 
-const QUALITY_LABELS = {
-  [RHYTHM_HIT_QUALITY.PERFECT]: "Perfect",
-  [RHYTHM_HIT_QUALITY.GOOD]: "Good",
-  [RHYTHM_HIT_QUALITY.MISS]: "Miss",
-};
+const RHYTHM_UNLOCK_KEY = "danzai-rhythm-unlocked-level";
 
 const COMMAND_LABELS = {
   [RHYTHM_COMMAND_TYPES.TAP]: "TAP",
@@ -14,25 +10,28 @@ const COMMAND_LABELS = {
 };
 
 const COMMAND_HINTS = {
-  [RHYTHM_COMMAND_TYPES.TAP]: "等指针进入蓝色命中区",
-  [RHYTHM_COMMAND_TYPES.HOLD]: "按住，让进度接近橙色目标",
-  [RHYTHM_COMMAND_TYPES.MASH]: "冲到亮区，越快越爽",
+  [RHYTHM_COMMAND_TYPES.TAP]: "看准蓝色成功区点击",
+  [RHYTHM_COMMAND_TYPES.HOLD]: "按住，到亮区松开",
+  [RHYTHM_COMMAND_TYPES.MASH]: "时间内快速连点",
 };
 
 const COMMAND_UI = {
   [RHYTHM_COMMAND_TYPES.TAP]: {
     icon: "👆",
     code: "TAP",
+    actionLabel: "点击",
     fallbackPrompt: "点击！",
   },
   [RHYTHM_COMMAND_TYPES.HOLD]: {
-    icon: "✊",
+    icon: "✋",
     code: "HOLD",
+    actionLabel: "按住",
     fallbackPrompt: "按住后松开！",
   },
   [RHYTHM_COMMAND_TYPES.MASH]: {
     icon: "⚡",
     code: "MASH",
+    actionLabel: "狂点",
     fallbackPrompt: "狂点！",
   },
 };
@@ -54,20 +53,27 @@ function createRhythmOverlay() {
 
       <div class="rhythm-stats">
         <span>时间 <strong data-rhythm-time>30</strong>s</span>
-        <span>得分 <strong data-rhythm-score>0</strong></span>
-        <span>Combo <strong data-rhythm-combo>0</strong></span>
+        <span>煎蛋 <strong data-rhythm-eggs>0</strong>个</span>
+        <span>失败 <strong data-rhythm-fails>0</strong></span>
       </div>
 
       <div class="rhythm-stage">
         <div class="rhythm-dish-progress">
           <strong data-rhythm-dish-name>元气煎蛋</strong>
-          <span data-rhythm-dish-step>1 / 8</span>
+          <span data-rhythm-dish-step>动作 0 / 3</span>
         </div>
         <div class="rhythm-mascot" data-rhythm-mascot aria-hidden="true"></div>
+        <div class="rhythm-cook-scene" data-rhythm-scene data-scene="crack" aria-hidden="true">
+          <span class="scene-egg" data-scene-egg>🥚</span>
+          <span class="scene-pan" data-scene-pan>🍳</span>
+          <span class="scene-fire" data-scene-fire>🔥</span>
+          <span class="scene-plate" data-scene-plate>🍽️</span>
+          <span class="scene-sparkle" data-scene-sparkle>✨</span>
+        </div>
         <div class="rhythm-command" data-rhythm-command>
           <small data-rhythm-command-step>TAP</small>
-          <i data-rhythm-command-icon aria-hidden="true">🍳</i>
-          <strong data-rhythm-command-type>READY</strong>
+          <i data-rhythm-command-icon aria-hidden="true">👆</i>
+          <strong data-rhythm-command-type>准备</strong>
           <span data-rhythm-command-label>准备开火</span>
           <em data-rhythm-command-hint>看指令操作</em>
           <b data-rhythm-next>下一步：--</b>
@@ -80,12 +86,12 @@ function createRhythmOverlay() {
         <strong data-rhythm-perfect-zone></strong>
         <i data-rhythm-fill></i>
         <b data-rhythm-target></b>
-        <span data-rhythm-track-copy>等待第一道指令</span>
+        <span data-rhythm-track-copy>等待第一道动作</span>
       </div>
 
       <button class="rhythm-action-button" type="button" data-rhythm-action>
-        <span data-rhythm-action-icon>🍳</span>
-        <strong data-rhythm-action-label>准备</strong>
+        <span data-rhythm-action-icon>👆</span>
+        <strong data-rhythm-action-label>点击</strong>
       </button>
 
       <div class="rhythm-result" data-rhythm-result hidden>
@@ -93,15 +99,15 @@ function createRhythmOverlay() {
         <p class="rhythm-result-comment" data-rhythm-result-comment>完美出餐！</p>
         <div class="rhythm-stars" data-rhythm-stars>☆☆☆</div>
         <dl>
-          <div><dt>得分</dt><dd data-rhythm-final-score>0</dd></div>
-          <div><dt>最高 Combo</dt><dd data-rhythm-final-combo>0</dd></div>
-          <div><dt>Perfect</dt><dd data-rhythm-final-perfect>0</dd></div>
-          <div><dt>Miss</dt><dd data-rhythm-final-miss>0</dd></div>
-          <div><dt>获得金币</dt><dd data-rhythm-final-coins>0</dd></div>
+          <div><dt>完成煎蛋</dt><dd data-rhythm-final-eggs>0 个</dd></div>
+          <div><dt>成功动作</dt><dd data-rhythm-final-success>0</dd></div>
+          <div><dt>失败动作</dt><dd data-rhythm-final-fails>0</dd></div>
+          <div><dt>获得金币</dt><dd data-rhythm-final-coins>+0</dd></div>
         </dl>
         <div class="rhythm-result-actions">
           <button class="primary-button" type="button" data-rhythm-retry><span>再试一次</span></button>
-          <button class="secondary-button" type="button" data-rhythm-home>返回首页</button>
+          <button class="primary-button" type="button" data-rhythm-next-level hidden><span>下一关</span></button>
+          <button class="secondary-button" type="button" data-rhythm-home>返回地图</button>
         </div>
       </div>
     </div>
@@ -117,18 +123,14 @@ function zonePercent(value, max) {
   return Math.min(100, Math.max(0, (value / Math.max(1, max)) * 100));
 }
 
-function timingZone(command, perfectMs, goodMs) {
+function timingZone(command, goodMs) {
   const span = Math.max(1, command.expireAtMs - command.startAtMs);
   const target = command.targetAtMs - command.startAtMs;
   const goodStart = zonePercent(target - goodMs, span);
   const goodEnd = zonePercent(target + goodMs, span);
-  const perfectStart = zonePercent(target - perfectMs, span);
-  const perfectEnd = zonePercent(target + perfectMs, span);
   return {
     goodLeft: goodStart,
-    goodWidth: Math.max(3, goodEnd - goodStart),
-    perfectLeft: perfectStart,
-    perfectWidth: Math.max(3, perfectEnd - perfectStart),
+    goodWidth: Math.max(8, goodEnd - goodStart),
   };
 }
 
@@ -136,40 +138,31 @@ function holdZone(command) {
   const max = Math.max(command.targetHoldMs + 450, command.targetHoldMs * 1.45);
   const goodStart = zonePercent(command.targetHoldMs - 350, max);
   const goodEnd = zonePercent(command.targetHoldMs + 350, max);
-  const perfectStart = zonePercent(command.targetHoldMs - 150, max);
-  const perfectEnd = zonePercent(command.targetHoldMs + 150, max);
   return {
     max,
     goodLeft: goodStart,
-    goodWidth: Math.max(4, goodEnd - goodStart),
-    perfectLeft: perfectStart,
-    perfectWidth: Math.max(4, perfectEnd - perfectStart),
+    goodWidth: Math.max(8, goodEnd - goodStart),
   };
 }
 
 function commandProgress(snapshot) {
   const command = snapshot.activeCommand;
-  if (!command) return { fill: 0, target: 50, copy: "等待指令" };
+  if (!command) return { fill: 0, copy: "等待动作", goodLeft: 0, goodWidth: 0 };
   if (command.type === RHYTHM_COMMAND_TYPES.MASH) {
     const goodAt = Math.ceil(command.targetTaps * 0.65);
     return {
       fill: Math.min(100, (snapshot.mashTaps / command.targetTaps) * 100),
-      target: 100,
       copy: `${snapshot.mashTaps} / ${command.targetTaps}`,
       goodLeft: zonePercent(goodAt, command.targetTaps),
-      goodWidth: Math.max(4, 100 - zonePercent(goodAt, command.targetTaps)),
-      perfectLeft: 96,
-      perfectWidth: 4,
+      goodWidth: Math.max(8, 100 - zonePercent(goodAt, command.targetTaps)),
     };
   }
 
   if (command.type === RHYTHM_COMMAND_TYPES.HOLD) {
     const zone = holdZone(command);
     const fill = Math.min(100, (snapshot.holdElapsedMs / zone.max) * 100);
-    const target = zonePercent(command.targetHoldMs, zone.max);
     return {
       fill,
-      target,
       copy: snapshot.holdActive
         ? `${(snapshot.holdElapsedMs / 1000).toFixed(1)}s`
         : "按住开始",
@@ -179,19 +172,41 @@ function commandProgress(snapshot) {
 
   const span = Math.max(1, command.expireAtMs - command.startAtMs);
   const fill = Math.min(100, Math.max(0, ((snapshot.elapsedMs - command.startAtMs) / span) * 100));
-  const target = Math.min(100, Math.max(0, ((command.targetAtMs - command.startAtMs) / span) * 100));
   const untilTarget = Math.round((command.targetAtMs - snapshot.elapsedMs) / 100) / 10;
   return {
     fill,
-    target,
     copy:
       snapshot.elapsedMs < command.inputStartAtMs
         ? "准备点击"
         : untilTarget > 0
           ? `${untilTarget.toFixed(1)}s`
           : "现在！",
-    ...timingZone(command, 180, 360),
+    ...timingZone(command, 360),
   };
+}
+
+function readUnlockedLevelIndex() {
+  try {
+    return Math.max(0, Math.floor(Number(localStorage.getItem(RHYTHM_UNLOCK_KEY)) || 0));
+  } catch {
+    return 0;
+  }
+}
+
+function saveUnlockedLevelIndex(index) {
+  try {
+    localStorage.setItem(RHYTHM_UNLOCK_KEY, String(Math.max(0, Math.floor(Number(index) || 0))));
+  } catch {
+    // Local storage can be unavailable in private contexts.
+  }
+}
+
+function levelAt(index) {
+  const safeIndex = Math.min(
+    RHYTHM_DISH_LEVELS.length - 1,
+    Math.max(0, Math.floor(Number(index) || 0)),
+  );
+  return { index: safeIndex, level: RHYTHM_DISH_LEVELS[safeIndex] };
 }
 
 export function createRhythmMode({
@@ -212,12 +227,13 @@ export function createRhythmMode({
 
   const refs = {
     time: overlay.querySelector("[data-rhythm-time]"),
-    score: overlay.querySelector("[data-rhythm-score]"),
-    combo: overlay.querySelector("[data-rhythm-combo]"),
+    eggs: overlay.querySelector("[data-rhythm-eggs]"),
+    fails: overlay.querySelector("[data-rhythm-fails]"),
     dishName: overlay.querySelector("[data-rhythm-dish-name]"),
     dishStep: overlay.querySelector("[data-rhythm-dish-step]"),
     stage: overlay.querySelector(".rhythm-stage"),
     mascot: overlay.querySelector("[data-rhythm-mascot]"),
+    scene: overlay.querySelector("[data-rhythm-scene]"),
     commandBox: overlay.querySelector("[data-rhythm-command]"),
     commandStep: overlay.querySelector("[data-rhythm-command-step]"),
     commandIcon: overlay.querySelector("[data-rhythm-command-icon]"),
@@ -238,17 +254,20 @@ export function createRhythmMode({
     result: overlay.querySelector("[data-rhythm-result]"),
     resultTitle: overlay.querySelector("[data-rhythm-result-title]"),
     resultComment: overlay.querySelector("[data-rhythm-result-comment]"),
-    finalScore: overlay.querySelector("[data-rhythm-final-score]"),
-    finalCombo: overlay.querySelector("[data-rhythm-final-combo]"),
-    finalPerfect: overlay.querySelector("[data-rhythm-final-perfect]"),
-    finalMiss: overlay.querySelector("[data-rhythm-final-miss]"),
+    finalEggs: overlay.querySelector("[data-rhythm-final-eggs]"),
+    finalSuccess: overlay.querySelector("[data-rhythm-final-success]"),
+    finalFails: overlay.querySelector("[data-rhythm-final-fails]"),
     finalCoins: overlay.querySelector("[data-rhythm-final-coins]"),
     stars: overlay.querySelector("[data-rhythm-stars]"),
     retry: overlay.querySelector("[data-rhythm-retry]"),
+    nextLevel: overlay.querySelector("[data-rhythm-next-level]"),
     homeButtons: overlay.querySelectorAll("[data-rhythm-home]"),
   };
 
-  let game = new RhythmCookingGame(RHYTHM_TEST_LEVEL);
+  const first = levelAt(0);
+  let activeLevelIndex = first.index;
+  let unlockedLevelIndex = readUnlockedLevelIndex();
+  let game = new RhythmCookingGame(first.level);
   let animationFrame = 0;
   let startTime = 0;
   let active = false;
@@ -256,18 +275,21 @@ export function createRhythmMode({
   let feedbackTimer = 0;
   let spaceDown = false;
   let lastCommandId = "";
+  let sceneTimer = 0;
 
   function nowElapsed() {
     return Math.max(0, performance.now() - startTime);
   }
 
   function refreshMascot() {
-    mountMascot?.(refs.mascot, active && game.getSnapshot().fever ? "happy" : "idle");
+    mountMascot?.(refs.mascot, active ? "happy" : "idle");
   }
 
-  function startRun() {
+  function startRun(levelIndex = activeLevelIndex) {
     ensureAudio?.();
-    game = new RhythmCookingGame(RHYTHM_TEST_LEVEL);
+    const picked = levelAt(Math.min(levelIndex, unlockedLevelIndex));
+    activeLevelIndex = picked.index;
+    game = new RhythmCookingGame(picked.level);
     game.start(0);
     settled = false;
     active = true;
@@ -275,9 +297,10 @@ export function createRhythmMode({
     lastCommandId = "";
     overlay.hidden = false;
     overlay.classList.add("is-visible");
-    overlay.classList.remove("is-ended", "is-fever");
+    overlay.classList.remove("is-ended", "is-holding");
     refs.result.hidden = true;
     refs.actionButton.disabled = false;
+    refs.nextLevel.hidden = true;
     homeOverlay?.classList.remove("is-visible");
     refreshMascot();
     game.drainEvents();
@@ -289,7 +312,7 @@ export function createRhythmMode({
     active = false;
     spaceDown = false;
     window.cancelAnimationFrame(animationFrame);
-    overlay.classList.remove("is-visible", "is-fever");
+    overlay.classList.remove("is-visible", "is-holding");
     overlay.hidden = true;
     if (showHome) homeOverlay?.classList.add("is-visible");
   }
@@ -313,12 +336,18 @@ export function createRhythmMode({
     const progress = getProgress?.() || {};
     saveProgress?.({
       ...progress,
-      bestScore: Math.max(Number(progress.bestScore) || 0, result.score),
-      bestCombo: Math.max(Number(progress.bestCombo) || 0, result.bestCombo),
+      bestScore: Math.max(Number(progress.bestScore) || 0, result.completedEggs),
       totalRuns: (Number(progress.totalRuns) || 0) + 1,
-      totalPerfects: (Number(progress.totalPerfects) || 0) + result.perfectCount,
+      totalEggs: (Number(progress.totalEggs) || 0) + result.completedEggs,
       totalCoinsEarned: (Number(progress.totalCoinsEarned) || 0) + result.coinsEarned,
     });
+    if (result.stars > 0) {
+      const nextUnlocked = Math.min(RHYTHM_DISH_LEVELS.length - 1, activeLevelIndex + 1);
+      if (nextUnlocked > unlockedLevelIndex) {
+        unlockedLevelIndex = nextUnlocked;
+        saveUnlockedLevelIndex(unlockedLevelIndex);
+      }
+    }
   }
 
   function showResult(result) {
@@ -328,12 +357,15 @@ export function createRhythmMode({
     overlay.classList.add("is-ended");
     refs.resultTitle.textContent = `菜品完成：${result.dishName}`;
     refs.resultComment.textContent = result.starComment;
-    refs.finalScore.textContent = result.score;
-    refs.finalCombo.textContent = `x${result.bestCombo}`;
-    refs.finalPerfect.textContent = result.perfectCount;
-    refs.finalMiss.textContent = result.missCount;
+    refs.finalEggs.textContent = `${result.completedEggs} 个`;
+    refs.finalSuccess.textContent = result.successfulActions;
+    refs.finalFails.textContent = result.failedActions;
     refs.finalCoins.textContent = `+${result.coinsEarned}`;
     refs.stars.textContent = formatStars(result.stars);
+    refs.nextLevel.hidden =
+      result.stars <= 0
+      || activeLevelIndex >= RHYTHM_DISH_LEVELS.length - 1
+      || activeLevelIndex + 1 > unlockedLevelIndex;
     playCue?.(result.stars >= 2 ? "perfect" : "good");
     vibrate?.(result.stars >= 2 ? [35, 20, 55] : 20);
   }
@@ -341,22 +373,25 @@ export function createRhythmMode({
   function handleEvents() {
     for (const event of game.drainEvents()) {
       if (event.type === "hit") {
-        showFeedback(event);
-        spawnActionFx(event.command?.type, event.quality);
-        if (event.quality === RHYTHM_HIT_QUALITY.PERFECT) {
-          playCue?.(event.combo >= 5 ? "fever" : "perfect");
-          vibrate?.(event.combo >= 5 ? [35, 15, 55] : 20);
-        } else if (event.quality === RHYTHM_HIT_QUALITY.GOOD) {
+        showActionFeedback(event.actionResult === "success" ? "成功！" : "失败！", event.actionResult);
+        spawnActionFx(event.command?.type, event.actionResult, event.command?.scene);
+        if (event.actionResult === "success") {
           playCue?.("good");
           vibrate?.(12);
         } else {
           playCue?.("burn");
           vibrate?.([25, 20, 25]);
         }
-        if (event.combo >= 5) {
-          overlay.classList.add("is-fever");
-          refreshMascot();
-        }
+      } else if (event.type === "eggCompleted") {
+        refs.scene.classList.remove("is-egg-complete");
+        void refs.scene.offsetWidth;
+        refs.scene.classList.add("is-egg-complete");
+        window.clearTimeout(sceneTimer);
+        sceneTimer = window.setTimeout(() => refs.scene.classList.remove("is-egg-complete"), 680);
+        showActionFeedback("煎蛋完成！", "complete");
+        spawnActionFx(RHYTHM_COMMAND_TYPES.TAP, "success", "serve");
+        playCue?.("perfect");
+        vibrate?.([22, 18, 36]);
       } else if (event.type === "mashTap") {
         refs.actionButton.classList.remove("is-tapping");
         void refs.actionButton.offsetWidth;
@@ -365,22 +400,24 @@ export function createRhythmMode({
         void refs.stage.offsetWidth;
         refs.stage.classList.add("is-mashing");
         refs.track.classList.toggle("is-mash-good", event.goodReady);
-        refs.track.classList.toggle("is-mash-perfect", event.perfectReady);
-        if (event.milestone) showMashPop(event.perfectReady ? "Perfect!" : "Good!");
+        refs.track.classList.toggle("is-mash-perfect", event.completeReady);
+        if (event.milestone) showMashPop(event.completeReady ? "完成！" : "达标！");
       } else if (event.type === "earlyTapIgnored") {
         showWaitingHint();
       }
     }
   }
 
-  function spawnActionFx(type, quality) {
-    if (quality === RHYTHM_HIT_QUALITY.MISS) return;
+  function spawnActionFx(type, result, scene) {
+    if (result !== "success") return;
     const particles =
-      type === RHYTHM_COMMAND_TYPES.HOLD
+      scene === "fry" || type === RHYTHM_COMMAND_TYPES.HOLD
         ? ["🔥", "♨️", "🔥"]
-        : type === RHYTHM_COMMAND_TYPES.MASH
-          ? ["✨", "🔥", "✨", "💥"]
-          : ["⭐", "🥚", "✨"];
+        : scene === "serve"
+          ? ["✨", "🍳", "⭐"]
+          : type === RHYTHM_COMMAND_TYPES.MASH
+            ? ["⚡", "🥣", "⚡", "💥"]
+            : ["⭐", "🥚", "✨"];
     particles.forEach((text, index) => {
       const particle = document.createElement("span");
       particle.className = `rhythm-action-fx fx-${type || "tap"}`;
@@ -409,14 +446,10 @@ export function createRhythmMode({
     window.setTimeout(() => pop.remove(), 680);
   }
 
-  function showFeedback(event) {
+  function showActionFeedback(text, type) {
     window.clearTimeout(feedbackTimer);
-    refs.feedback.className = `rhythm-feedback is-visible is-${event.quality}`;
-    const label = QUALITY_LABELS[event.quality] || "Hit";
-    refs.feedback.textContent =
-      event.combo >= 3 && event.quality !== RHYTHM_HIT_QUALITY.MISS
-        ? `${label} x${event.combo}`
-        : `${label}!`;
+    refs.feedback.className = `rhythm-feedback is-visible is-${type}`;
+    refs.feedback.textContent = text;
     feedbackTimer = window.setTimeout(() => {
       refs.feedback.classList.remove("is-visible");
     }, 650);
@@ -427,26 +460,27 @@ export function createRhythmMode({
     const command = snapshot.activeCommand;
     const remainingSeconds = Math.ceil(snapshot.remainingMs / 1000);
     refs.time.textContent = remainingSeconds;
-    refs.score.textContent = snapshot.score;
-    refs.combo.textContent = snapshot.combo;
+    refs.eggs.textContent = snapshot.completedEggs;
+    refs.fails.textContent = snapshot.failedActions;
     refs.dishName.textContent = snapshot.dishName;
-    refs.dishStep.textContent =
-      `${Math.min(snapshot.commandIndex + 1, snapshot.level.commands.length)} / ${snapshot.level.commands.length}`;
-    overlay.classList.toggle("is-fever", snapshot.fever);
+    refs.dishStep.textContent = `动作 ${snapshot.currentDishActions} / ${snapshot.actionsPerDish}`;
     overlay.classList.toggle("is-holding", snapshot.holdActive);
 
     if (!command || snapshot.state === "ended") {
       refs.commandBox.dataset.type = "done";
+      refs.scene.dataset.scene = "serve";
+      refs.scene.dataset.holding = "false";
       refs.commandIcon.textContent = "⭐";
       refs.commandStep.textContent = "DONE";
-      refs.commandType.textContent = "出菜完成";
-      refs.commandLabel.textContent = "出菜完成";
-      refs.commandHint.textContent = "查看本局结算";
+      refs.commandType.textContent = "出餐完成";
+      refs.commandLabel.textContent = "查看本局结算";
+      refs.commandHint.textContent = "看看做出了多少煎蛋";
       refs.commandNext.textContent = "本轮完成";
       refs.actionLabel.textContent = "完成";
       refs.actionIcon.textContent = "⭐";
       refs.fill.style.width = "100%";
-      refs.target.style.left = "100%";
+      refs.goodZone.style.left = "0%";
+      refs.goodZone.style.width = "100%";
       refs.trackCopy.textContent = "完成";
       return;
     }
@@ -462,6 +496,8 @@ export function createRhythmMode({
     const ui = COMMAND_UI[command.type] || COMMAND_UI[RHYTHM_COMMAND_TYPES.TAP];
     const nextCommand = snapshot.level.commands[snapshot.commandIndex + 1];
     refs.commandBox.dataset.type = command.type;
+    refs.scene.dataset.scene = command.scene || command.type;
+    refs.scene.dataset.holding = String(snapshot.holdActive);
     refs.commandIcon.textContent = ui.icon;
     refs.commandStep.textContent = ui.code;
     refs.commandType.textContent = command.prompt || ui.fallbackPrompt;
@@ -473,22 +509,16 @@ export function createRhythmMode({
       : "最后一道";
     refs.track.dataset.type = command.type;
     refs.actionButton.dataset.type = command.type;
-    refs.actionIcon.textContent =
-      ui.icon;
-    refs.actionLabel.textContent =
-      command.type === RHYTHM_COMMAND_TYPES.MASH
-        ? "狂点"
-        : command.type === RHYTHM_COMMAND_TYPES.HOLD
-          ? "按住"
-          : "点击";
+    refs.actionIcon.textContent = ui.icon;
+    refs.actionLabel.textContent = ui.actionLabel;
 
     const progress = commandProgress(snapshot);
     refs.fill.style.width = `${progress.fill}%`;
-    refs.target.style.left = `${progress.target}%`;
     refs.goodZone.style.left = `${progress.goodLeft ?? 0}%`;
     refs.goodZone.style.width = `${progress.goodWidth ?? 0}%`;
-    refs.perfectZone.style.left = `${progress.perfectLeft ?? progress.target}%`;
-    refs.perfectZone.style.width = `${progress.perfectWidth ?? 0}%`;
+    refs.perfectZone.style.left = "0%";
+    refs.perfectZone.style.width = "0%";
+    refs.target.style.left = "0%";
     refs.trackCopy.textContent = progress.copy;
   }
 
@@ -519,6 +549,7 @@ export function createRhythmMode({
   }
 
   refs.actionButton.addEventListener("pointerdown", (event) => {
+    if (event?.cancelable) event.preventDefault();
     refs.actionButton.setPointerCapture?.(event.pointerId);
     performPrimaryInput(event);
   });
@@ -535,11 +566,12 @@ export function createRhythmMode({
     { passive: false },
   );
   overlay.addEventListener("contextmenu", (event) => event.preventDefault());
-  refs.retry.addEventListener("click", startRun);
+  refs.retry.addEventListener("click", () => startRun(activeLevelIndex));
+  refs.nextLevel.addEventListener("click", () => startRun(activeLevelIndex + 1));
   refs.homeButtons.forEach((button) => {
     button.addEventListener("click", () => stopRun({ showHome: true }));
   });
-  triggerButton?.addEventListener("click", startRun);
+  triggerButton?.addEventListener("click", () => startRun(0));
 
   window.addEventListener("keydown", (event) => {
     if (!active || event.code !== "Space" || spaceDown) return;

@@ -6,21 +6,28 @@ export const RHYTHM_HIT_QUALITY = Object.freeze({
   PERFECT: "perfect",
 });
 
-const PERFECT_SCORE = 100;
-const GOOD_SCORE = 60;
+export const RHYTHM_ACTION_RESULT = Object.freeze({
+  SUCCESS: "success",
+  FAIL: "fail",
+});
+
+export const RHYTHM_WINDOWS = Object.freeze({
+  TAP: Object.freeze({ perfectMs: 180, goodMs: 360 }),
+  HOLD: Object.freeze({ perfectMs: 150, goodMs: 350 }),
+});
+
+export const DEFAULT_ACTIONS_PER_DISH = 3;
+export const DEFAULT_STAR_EGGS = Object.freeze([2, 4, 6]);
+
 const BASE_COINS = 20;
 const STAR_COIN_BONUS = 10;
+const EGG_COIN_BONUS = 2;
 const STAR_COMMENTS = Object.freeze([
   "旦仔还要练练！",
   "能吃就行！",
   "香气不错！",
   "完美出餐！",
 ]);
-
-export const RHYTHM_WINDOWS = Object.freeze({
-  TAP: Object.freeze({ perfectMs: 180, goodMs: 360 }),
-  HOLD: Object.freeze({ perfectMs: 150, goodMs: 350 }),
-});
 
 export function judgeTimingError(errorMs, { perfectMs, goodMs }) {
   const error = Math.abs(Number(errorMs) || 0);
@@ -37,6 +44,7 @@ export function judgeMash(taps, targetTaps) {
   return RHYTHM_HIT_QUALITY.MISS;
 }
 
+// Kept for old unit coverage. Rhythm mode now uses completed egg count for stars.
 export function calculateRhythmStars(score, maxScore) {
   const ratio = maxScore > 0 ? score / maxScore : 0;
   if (ratio >= 0.78) return 3;
@@ -45,13 +53,41 @@ export function calculateRhythmStars(score, maxScore) {
   return 0;
 }
 
-export function calculateRhythmCoins(stars) {
-  return BASE_COINS + Math.max(0, Math.floor(Number(stars) || 0)) * STAR_COIN_BONUS;
+export function calculateRhythmStarsFromEggs(completedEggs, thresholds = DEFAULT_STAR_EGGS) {
+  const eggs = Math.max(0, Math.floor(Number(completedEggs) || 0));
+  const [oneStar = 2, twoStars = 4, threeStars = 6] = thresholds;
+  if (eggs >= threeStars) return 3;
+  if (eggs >= twoStars) return 2;
+  if (eggs >= oneStar) return 1;
+  return 0;
+}
+
+export function calculateRhythmCoins(starsOrResult, completedEggsArg = 0) {
+  const stars =
+    typeof starsOrResult === "object"
+      ? starsOrResult?.stars
+      : starsOrResult;
+  const completedEggs =
+    typeof starsOrResult === "object"
+      ? starsOrResult?.completedEggs
+      : completedEggsArg;
+  return (
+    BASE_COINS
+    + Math.max(0, Math.floor(Number(stars) || 0)) * STAR_COIN_BONUS
+    + Math.max(0, Math.floor(Number(completedEggs) || 0)) * EGG_COIN_BONUS
+  );
 }
 
 export function getRhythmStarComment(stars) {
   const index = Math.min(3, Math.max(0, Math.floor(Number(stars) || 0)));
   return STAR_COMMENTS[index];
+}
+
+export function unlockRhythmLevelIndex(currentUnlockedIndex, completedLevelIndex, stars) {
+  const current = Math.max(0, Math.floor(Number(currentUnlockedIndex) || 0));
+  const completed = Math.max(0, Math.floor(Number(completedLevelIndex) || 0));
+  if (Math.floor(Number(stars) || 0) <= 0) return current;
+  return Math.max(current, completed + 1);
 }
 
 function normalizeCommand(command, index) {
@@ -108,6 +144,11 @@ function normalizeLevel(level) {
     title,
     dishName,
     durationMs: Math.max(5_000, Math.floor(Number(level?.durationMs) || RHYTHM_TEST_LEVEL.durationMs)),
+    actionsPerDish: Math.max(
+      1,
+      Math.floor(Number(level?.actionsPerDish) || Number(RHYTHM_TEST_LEVEL.actionsPerDish) || DEFAULT_ACTIONS_PER_DISH),
+    ),
+    starEggs: level?.starEggs || RHYTHM_TEST_LEVEL.starEggs || DEFAULT_STAR_EGGS,
     commands: (level?.commands || RHYTHM_TEST_LEVEL.commands).map(normalizeCommand),
   };
 }
@@ -123,15 +164,14 @@ export class RhythmCookingGame {
     this.state = "idle";
     this.elapsedMs = 0;
     this.commandIndex = 0;
-    this.combo = 0;
-    this.bestCombo = 0;
-    this.perfectCount = 0;
-    this.goodCount = 0;
-    this.missCount = 0;
+    this.successfulActions = 0;
+    this.failedActions = 0;
+    this.completedEggs = 0;
     this.score = 0;
     this.mashTaps = 0;
     this.holdStartedAtMs = null;
     this.lastHitQuality = null;
+    this.lastActionResult = null;
     this.result = null;
     this.events = [];
   }
@@ -198,10 +238,9 @@ export class RhythmCookingGame {
         taps: this.mashTaps,
         targetTaps: command.targetTaps,
         goodReady: this.mashTaps >= goodThreshold,
-        perfectReady: this.mashTaps >= command.targetTaps,
+        completeReady: this.mashTaps >= command.targetTaps,
         milestone:
           this.mashTaps === goodThreshold || this.mashTaps === command.targetTaps,
-        combo: this.combo,
       };
       this.events.push(event);
       return event;
@@ -209,13 +248,10 @@ export class RhythmCookingGame {
 
     if (command.type !== RHYTHM_COMMAND_TYPES.TAP) return null;
     if (this.elapsedMs < command.inputStartAtMs) {
-      const event = {
-        type: "earlyTapIgnored",
-        command,
-        waitMs: command.inputStartAtMs - this.elapsedMs,
-      };
-      this.events.push(event);
-      return event;
+      return this.resolveCommand(RHYTHM_HIT_QUALITY.MISS, command, {
+        reason: "tooEarly",
+        errorMs: this.elapsedMs - command.targetAtMs,
+      });
     }
     const errorMs = this.elapsedMs - command.targetAtMs;
     const quality = judgeTimingError(errorMs, RHYTHM_WINDOWS.TAP);
@@ -258,38 +294,45 @@ export class RhythmCookingGame {
   }
 
   resolveCommand(quality, command, detail = {}) {
-    const scoreDelta =
-      quality === RHYTHM_HIT_QUALITY.PERFECT
-        ? PERFECT_SCORE
-        : quality === RHYTHM_HIT_QUALITY.GOOD
-          ? GOOD_SCORE
-          : 0;
+    const actionResult =
+      quality === RHYTHM_HIT_QUALITY.MISS
+        ? RHYTHM_ACTION_RESULT.FAIL
+        : RHYTHM_ACTION_RESULT.SUCCESS;
+    const previousEggs = this.completedEggs;
 
-    if (quality === RHYTHM_HIT_QUALITY.MISS) {
-      this.combo = 0;
-      this.missCount += 1;
+    if (actionResult === RHYTHM_ACTION_RESULT.SUCCESS) {
+      this.successfulActions += 1;
+      this.score += 10;
     } else {
-      this.combo += 1;
-      this.bestCombo = Math.max(this.bestCombo, this.combo);
-      if (quality === RHYTHM_HIT_QUALITY.PERFECT) this.perfectCount += 1;
-      if (quality === RHYTHM_HIT_QUALITY.GOOD) this.goodCount += 1;
+      this.failedActions += 1;
     }
 
-    this.score += scoreDelta;
+    this.completedEggs = Math.floor(this.successfulActions / this.level.actionsPerDish);
     this.lastHitQuality = quality;
+    this.lastActionResult = actionResult;
     this.holdStartedAtMs = null;
+
     const event = {
       type: "hit",
       quality,
+      actionResult,
       command,
-      combo: this.combo,
-      bestCombo: this.bestCombo,
-      scoreDelta,
+      successfulActions: this.successfulActions,
+      failedActions: this.failedActions,
+      completedEggs: this.completedEggs,
+      currentDishActions: this.successfulActions % this.level.actionsPerDish,
       score: this.score,
-      fever: this.combo >= 5,
       ...detail,
     };
     this.events.push(event);
+    if (this.completedEggs > previousEggs) {
+      this.events.push({
+        type: "eggCompleted",
+        command,
+        completedEggs: this.completedEggs,
+        successfulActions: this.successfulActions,
+      });
+    }
     this.commandIndex += 1;
     this.mashTaps = 0;
     return event;
@@ -297,23 +340,20 @@ export class RhythmCookingGame {
 
   finish() {
     if (this.state === "ended") return this.result;
-    const maxScore = this.level.commands.length * PERFECT_SCORE;
-    const stars = calculateRhythmStars(this.score, maxScore);
-    const coinsEarned = calculateRhythmCoins(stars);
+    const stars = calculateRhythmStarsFromEggs(this.completedEggs, this.level.starEggs);
+    const coinsEarned = calculateRhythmCoins({ stars, completedEggs: this.completedEggs });
     const starComment = getRhythmStarComment(stars);
     this.state = "ended";
     this.result = {
       dishName: this.level.dishName,
       score: this.score,
-      maxScore,
       stars,
       starComment,
-      bestCombo: this.bestCombo,
-      perfectCount: this.perfectCount,
-      goodCount: this.goodCount,
-      missCount: this.missCount,
+      completedEggs: this.completedEggs,
+      successfulActions: this.successfulActions,
+      failedActions: this.failedActions,
       coinsEarned,
-      commandsCompleted: this.perfectCount + this.goodCount + this.missCount,
+      commandsCompleted: this.successfulActions + this.failedActions,
       totalCommands: this.level.commands.length,
     };
     this.events.push({ type: "rhythmEnded", result: this.result });
@@ -332,18 +372,18 @@ export class RhythmCookingGame {
       remainingMs,
       activeCommand: command,
       commandIndex: this.commandIndex,
-      combo: this.combo,
-      bestCombo: this.bestCombo,
-      perfectCount: this.perfectCount,
-      goodCount: this.goodCount,
-      missCount: this.missCount,
+      successfulActions: this.successfulActions,
+      failedActions: this.failedActions,
+      completedEggs: this.completedEggs,
+      currentDishActions: this.successfulActions % this.level.actionsPerDish,
+      actionsPerDish: this.level.actionsPerDish,
       score: this.score,
       mashTaps: this.mashTaps,
       holdActive: this.holdStartedAtMs !== null,
       holdElapsedMs,
       holdTargetMs: command?.type === RHYTHM_COMMAND_TYPES.HOLD ? command.targetHoldMs : 0,
       lastHitQuality: this.lastHitQuality,
-      fever: this.combo >= 5,
+      lastActionResult: this.lastActionResult,
       result: this.result,
     };
   }

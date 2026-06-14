@@ -2,13 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   calculateRhythmCoins,
-  calculateRhythmStars,
-  getRhythmStarComment,
+  calculateRhythmStarsFromEggs,
   judgeMash,
   judgeTimingError,
+  RHYTHM_ACTION_RESULT,
   RHYTHM_HIT_QUALITY,
   RHYTHM_WINDOWS,
   RhythmCookingGame,
+  unlockRhythmLevelIndex,
 } from "../src/rhythmGame.js";
 import {
   RHYTHM_COMMAND_TYPES,
@@ -20,6 +21,8 @@ const SMALL_LEVEL = {
   id: "test-rhythm",
   title: "Test Rhythm",
   durationMs: 8_000,
+  actionsPerDish: 3,
+  starEggs: [1, 2, 3],
   commands: [
     {
       id: "tap",
@@ -45,6 +48,29 @@ const SMALL_LEVEL = {
   ],
 };
 
+function makeTapLevel(count) {
+  return {
+    id: `tap-${count}`,
+    title: "Tap Dish",
+    dishName: "测试煎蛋",
+    durationMs: count * 1_000 + 2_000,
+    actionsPerDish: 3,
+    starEggs: [2, 4, 6],
+    commands: Array.from({ length: count }, (_, index) => {
+      const startAtMs = index * 900;
+      return {
+        id: `tap-${index}`,
+        type: RHYTHM_COMMAND_TYPES.TAP,
+        actionName: index % 3 === 0 ? "敲蛋" : index % 3 === 1 ? "煎蛋" : "出锅",
+        prompt: "点击！",
+        startAtMs,
+        targetAtMs: startAtMs + 300,
+        expireAtMs: startAtMs + 700,
+      };
+    }),
+  };
+}
+
 test("rhythm TAP uses the loose prototype timing window", () => {
   assert.equal(
     judgeTimingError(180, RHYTHM_WINDOWS.TAP),
@@ -60,21 +86,24 @@ test("rhythm TAP uses the loose prototype timing window", () => {
   );
 });
 
-test("rhythm mash uses target count and 65 percent Good threshold", () => {
+test("rhythm MASH still uses target count and 65 percent success threshold", () => {
   assert.equal(judgeMash(6, 6), RHYTHM_HIT_QUALITY.PERFECT);
   assert.equal(judgeMash(4, 6), RHYTHM_HIT_QUALITY.GOOD);
   assert.equal(judgeMash(3, 6), RHYTHM_HIT_QUALITY.MISS);
 });
 
-test("rhythm dish level exposes dish name and action prompts", () => {
+test("rhythm level one is a 30 second fried egg completion challenge", () => {
   assert.equal(RHYTHM_TEST_LEVEL.dishName, "元气煎蛋");
-  assert.equal(RHYTHM_TEST_LEVEL.commands.length, 8);
+  assert.equal(RHYTHM_TEST_LEVEL.durationMs, 30_000);
+  assert.equal(RHYTHM_TEST_LEVEL.actionsPerDish, 3);
+  assert.deepEqual(RHYTHM_TEST_LEVEL.starEggs, [2, 4, 6]);
   assert.deepEqual(
-    RHYTHM_TEST_LEVEL.commands.map((command) => command.actionName),
-    ["敲蛋", "打蛋", "下锅", "煎蛋", "撒盐", "翻炒", "控火", "出锅"],
+    RHYTHM_TEST_LEVEL.commands.slice(0, 3).map((command) => command.actionName),
+    ["敲蛋", "煎蛋", "出锅"],
   );
-  assert.equal(RHYTHM_TEST_LEVEL.commands[0].prompt, "敲蛋！");
-  assert.equal(RHYTHM_TEST_LEVEL.commands[1].input, RHYTHM_COMMAND_TYPES.MASH);
+  assert.equal(RHYTHM_TEST_LEVEL.commands[0].input, RHYTHM_COMMAND_TYPES.TAP);
+  assert.equal(RHYTHM_TEST_LEVEL.commands[1].input, RHYTHM_COMMAND_TYPES.HOLD);
+  assert.equal(RHYTHM_TEST_LEVEL.commands[2].input, RHYTHM_COMMAND_TYPES.TAP);
 });
 
 test("rhythm prototype has simple dish names for later levels", () => {
@@ -84,56 +113,43 @@ test("rhythm prototype has simple dish names for later levels", () => {
   );
 });
 
-test("rhythm game snapshots expose current dish action fields", () => {
+test("rhythm game snapshots expose cooking action fields", () => {
   const game = new RhythmCookingGame(RHYTHM_TEST_LEVEL);
   game.start();
   const snapshot = game.getSnapshot();
   assert.equal(snapshot.dishName, "元气煎蛋");
   assert.equal(snapshot.activeCommand.actionName, "敲蛋");
   assert.equal(snapshot.activeCommand.prompt, "敲蛋！");
-  assert.equal(snapshot.activeCommand.helperText, "看准节奏点击");
+  assert.equal(snapshot.currentDishActions, 0);
+  assert.equal(snapshot.actionsPerDish, 3);
 });
 
-test("rhythm game handles TAP, HOLD, MASH and combo", () => {
+test("three successful actions complete one fried egg", () => {
   const game = new RhythmCookingGame(SMALL_LEVEL);
   game.start();
 
   let hit = game.tap(1_000);
-  assert.equal(hit.quality, RHYTHM_HIT_QUALITY.PERFECT);
-  assert.equal(game.getSnapshot().combo, 1);
-  assert.equal(game.getSnapshot().perfectCount, 1);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+  assert.equal(game.getSnapshot().completedEggs, 0);
+  assert.equal(game.getSnapshot().successfulActions, 1);
 
-  game.holdStart(2_150);
-  hit = game.holdEnd(3_150);
-  assert.equal(hit.quality, RHYTHM_HIT_QUALITY.PERFECT);
-  assert.equal(game.getSnapshot().combo, 2);
-  assert.equal(game.getSnapshot().perfectCount, 2);
+  game.holdStart(2_000);
+  hit = game.holdEnd(3_000);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+  assert.equal(game.getSnapshot().completedEggs, 0);
+  assert.equal(game.getSnapshot().successfulActions, 2);
 
   for (let index = 0; index < 6; index += 1) {
     game.tap(4_100 + index * 100);
   }
   game.update(5_700);
   hit = game.drainEvents().findLast((event) => event.type === "hit");
-  assert.equal(hit.quality, RHYTHM_HIT_QUALITY.PERFECT);
-  assert.equal(game.getSnapshot().bestCombo, 3);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+  assert.equal(game.getSnapshot().completedEggs, 1);
   assert.equal(game.getSnapshot().state, "ended");
 });
 
-test("rhythm TAP ignores preview taps before the Good window", () => {
-  const game = new RhythmCookingGame(SMALL_LEVEL);
-  game.start();
-
-  const early = game.tap(500);
-  assert.equal(early.type, "earlyTapIgnored");
-  assert.equal(game.getSnapshot().combo, 0);
-  assert.equal(game.getSnapshot().commandIndex, 0);
-
-  const hit = game.tap(820);
-  assert.equal(hit.quality, RHYTHM_HIT_QUALITY.PERFECT);
-  assert.equal(game.getSnapshot().combo, 1);
-});
-
-test("rhythm HOLD progress only grows while the player is holding", () => {
+test("HOLD progress only grows while the player is holding", () => {
   const game = new RhythmCookingGame({
     id: "hold-progress",
     durationMs: 4_000,
@@ -159,10 +175,39 @@ test("rhythm HOLD progress only grows while the player is holding", () => {
 
   const hit = game.holdEnd(1_800);
   assert.equal(hit.holdDurationMs, 1_000);
-  assert.equal(hit.quality, RHYTHM_HIT_QUALITY.PERFECT);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
 });
 
-test("rhythm HOLD times out as Miss if the player never holds", () => {
+test("HOLD can start immediately after switching to the HOLD action", () => {
+  const game = new RhythmCookingGame({
+    id: "tap-then-hold",
+    durationMs: 4_000,
+    commands: [
+      {
+        id: "tap",
+        type: RHYTHM_COMMAND_TYPES.TAP,
+        startAtMs: 0,
+        targetAtMs: 500,
+        expireAtMs: 900,
+      },
+      {
+        id: "hold",
+        type: RHYTHM_COMMAND_TYPES.HOLD,
+        startAtMs: 901,
+        targetAtMs: 1_701,
+        targetHoldMs: 800,
+        expireAtMs: 2_500,
+      },
+    ],
+  });
+  game.start();
+  assert.equal(game.tap(500).actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+  const started = game.holdStart(901);
+  assert.equal(started.type, "holdStarted");
+  assert.equal(game.getSnapshot().holdActive, true);
+});
+
+test("HOLD times out as a failed action if the player never holds", () => {
   const game = new RhythmCookingGame({
     id: "hold-timeout",
     durationMs: 4_000,
@@ -179,82 +224,77 @@ test("rhythm HOLD times out as Miss if the player never holds", () => {
   game.start();
   game.update(2_000);
   const miss = game.drainEvents().findLast((event) => event.type === "hit");
-  assert.equal(miss.quality, RHYTHM_HIT_QUALITY.MISS);
+  assert.equal(miss.actionResult, RHYTHM_ACTION_RESULT.FAIL);
   assert.equal(miss.reason, "timeout");
-  assert.equal(game.getSnapshot().combo, 0);
-  assert.equal(game.getSnapshot().missCount, 1);
+  assert.equal(game.getSnapshot().failedActions, 1);
 });
 
-test("rhythm Miss clears combo and increments miss count", () => {
-  const game = new RhythmCookingGame(SMALL_LEVEL);
-  game.start();
-  game.tap(1_000);
-
-  game.update(3_800);
-  const miss = game.drainEvents().findLast((event) => event.type === "hit");
-  assert.equal(miss.quality, RHYTHM_HIT_QUALITY.MISS);
-  const snapshot = game.getSnapshot();
-  assert.equal(snapshot.combo, 0);
-  assert.equal(snapshot.missCount, 1);
-});
-
-test("rhythm Good and Perfect increase combo while Miss clears it", () => {
+test("TAP and HOLD success or failure are recorded as action results", () => {
   const game = new RhythmCookingGame(SMALL_LEVEL);
   game.start();
 
-  assert.equal(game.tap(1_000).quality, RHYTHM_HIT_QUALITY.PERFECT);
-  assert.equal(game.getSnapshot().combo, 1);
-
+  assert.equal(game.tap(1_000).actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
   game.holdStart(2_000);
-  assert.equal(game.holdEnd(3_300).quality, RHYTHM_HIT_QUALITY.GOOD);
-  assert.equal(game.getSnapshot().combo, 2);
+  assert.equal(game.holdEnd(2_200).actionResult, RHYTHM_ACTION_RESULT.FAIL);
 
-  game.update(5_700);
-  const miss = game.drainEvents().findLast((event) => event.type === "hit");
-  assert.equal(miss.quality, RHYTHM_HIT_QUALITY.MISS);
-  assert.equal(game.getSnapshot().combo, 0);
+  const snapshot = game.getSnapshot();
+  assert.equal(snapshot.successfulActions, 1);
+  assert.equal(snapshot.failedActions, 1);
+  assert.equal(snapshot.completedEggs, 0);
 });
 
-test("rhythm stars and coins use base 20 plus 10 per star", () => {
-  assert.equal(calculateRhythmStars(0, 1_000), 0);
-  assert.equal(calculateRhythmStars(300, 1_000), 1);
-  assert.equal(calculateRhythmStars(540, 1_000), 2);
-  assert.equal(calculateRhythmStars(800, 1_000), 3);
-  assert.equal(calculateRhythmCoins(0), 20);
-  assert.equal(calculateRhythmCoins(3), 50);
-});
-
-test("rhythm final result includes dish name and star comment", () => {
-  const game = new RhythmCookingGame({
-    id: "single-dish",
-    title: "Single Dish",
-    dishName: "测试煎蛋",
-    durationMs: 3_000,
-    commands: [
-      {
-        id: "serve",
-        input: RHYTHM_COMMAND_TYPES.TAP,
-        actionName: "出锅",
-        prompt: "出锅！",
-        helperText: "点击完成",
-        startAtMs: 0,
-        targetAtMs: 1_000,
-        expireAtMs: 1_700,
-      },
-    ],
-  });
+test("TAP outside the success window is recorded as a failed action", () => {
+  const game = new RhythmCookingGame(SMALL_LEVEL);
   game.start();
-  game.tap(1_000);
-  game.update(1_100);
+  const hit = game.tap(500);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.FAIL);
+  assert.equal(hit.reason, "tooEarly");
+  assert.equal(game.getSnapshot().failedActions, 1);
+});
+
+test("2, 4 and 6 completed eggs map to 1, 2 and 3 stars", () => {
+  assert.equal(calculateRhythmStarsFromEggs(0), 0);
+  assert.equal(calculateRhythmStarsFromEggs(2), 1);
+  assert.equal(calculateRhythmStarsFromEggs(4), 2);
+  assert.equal(calculateRhythmStarsFromEggs(6), 3);
+});
+
+test("rhythm coins use base 20 plus stars and completed eggs", () => {
+  assert.equal(calculateRhythmCoins({ stars: 0, completedEggs: 0 }), 20);
+  assert.equal(calculateRhythmCoins({ stars: 1, completedEggs: 2 }), 34);
+  assert.equal(calculateRhythmCoins({ stars: 3, completedEggs: 6 }), 62);
+});
+
+test("rhythm final result uses completed eggs, action counts and new coin formula", () => {
+  const game = new RhythmCookingGame(makeTapLevel(6));
+  game.start();
+  for (let index = 0; index < 6; index += 1) {
+    const startAtMs = index * 900;
+    game.tap(startAtMs + 300);
+  }
+  game.update(6_000);
   const result = game.getSnapshot().result;
   assert.equal(result.dishName, "测试煎蛋");
-  assert.equal(result.stars, 3);
-  assert.equal(result.starComment, "完美出餐！");
+  assert.equal(result.completedEggs, 2);
+  assert.equal(result.successfulActions, 6);
+  assert.equal(result.failedActions, 0);
+  assert.equal(result.stars, 1);
+  assert.equal(result.coinsEarned, 34);
+});
+
+test("passing level one unlocks level two", () => {
+  assert.equal(unlockRhythmLevelIndex(0, 0, 0), 0);
+  assert.equal(unlockRhythmLevelIndex(0, 0, 1), 1);
+  assert.equal(unlockRhythmLevelIndex(1, 1, 2), 2);
 });
 
 test("rhythm star comments map to result copy", () => {
-  assert.equal(getRhythmStarComment(3), "完美出餐！");
-  assert.equal(getRhythmStarComment(2), "香气不错！");
-  assert.equal(getRhythmStarComment(1), "能吃就行！");
-  assert.equal(getRhythmStarComment(0), "旦仔还要练练！");
+  const game = new RhythmCookingGame(makeTapLevel(18));
+  game.start();
+  for (let index = 0; index < 18; index += 1) {
+    const startAtMs = index * 900;
+    game.tap(startAtMs + 300);
+  }
+  game.update(18_000);
+  assert.equal(game.getSnapshot().result.starComment, "完美出餐！");
 });
