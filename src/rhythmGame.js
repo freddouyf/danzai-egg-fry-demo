@@ -83,10 +83,10 @@ export function getRhythmStarComment(stars) {
   return STAR_COMMENTS[index];
 }
 
-export function unlockRhythmLevelIndex(currentUnlockedIndex, completedLevelIndex, didComplete = true) {
+export function unlockRhythmLevelIndex(currentUnlockedIndex, completedLevelIndex, stars = 0) {
   const current = Math.max(0, Math.floor(Number(currentUnlockedIndex) || 0));
   const completed = Math.max(0, Math.floor(Number(completedLevelIndex) || 0));
-  if (!didComplete) return current;
+  if (Math.floor(Number(stars) || 0) < 1) return current;
   return Math.max(current, completed + 1);
 }
 

@@ -209,8 +209,18 @@ function levelAt(index) {
   return { index: safeIndex, level: RHYTHM_DISH_LEVELS[safeIndex] };
 }
 
-export function shouldShowRhythmNextLevel(activeLevelIndex, totalLevels = RHYTHM_DISH_LEVELS.length) {
-  return Math.max(0, Math.floor(Number(activeLevelIndex) || 0)) < Math.max(0, totalLevels - 1);
+export function shouldShowRhythmNextLevel({
+  activeLevelIndex,
+  totalLevels = RHYTHM_DISH_LEVELS.length,
+  stars = 0,
+  unlockedLevelIndex = 0,
+} = {}) {
+  const current = Math.max(0, Math.floor(Number(activeLevelIndex) || 0));
+  const lastIndex = Math.max(0, Math.floor(Number(totalLevels) || 0) - 1);
+  const nextExists = current < lastIndex;
+  const passed = Math.floor(Number(stars) || 0) >= 1;
+  const nextAlreadyUnlocked = Math.max(0, Math.floor(Number(unlockedLevelIndex) || 0)) >= current + 1;
+  return nextExists && (passed || nextAlreadyUnlocked);
 }
 
 export function createRhythmMode({
@@ -345,10 +355,10 @@ export function createRhythmMode({
       totalEggs: (Number(progress.totalEggs) || 0) + result.completedEggs,
       totalCoinsEarned: (Number(progress.totalCoinsEarned) || 0) + result.coinsEarned,
     });
-    if (shouldShowRhythmNextLevel(activeLevelIndex)) {
+    if (result.stars >= 1 && activeLevelIndex < RHYTHM_DISH_LEVELS.length - 1) {
       const nextUnlocked = Math.min(
         RHYTHM_DISH_LEVELS.length - 1,
-        unlockRhythmLevelIndex(unlockedLevelIndex, activeLevelIndex, true),
+        unlockRhythmLevelIndex(unlockedLevelIndex, activeLevelIndex, result.stars),
       );
       if (nextUnlocked > unlockedLevelIndex) {
         unlockedLevelIndex = nextUnlocked;
@@ -369,7 +379,11 @@ export function createRhythmMode({
     refs.finalFails.textContent = result.failedActions;
     refs.finalCoins.textContent = `+${result.coinsEarned}`;
     refs.stars.textContent = formatStars(result.stars);
-    refs.nextLevel.hidden = !shouldShowRhythmNextLevel(activeLevelIndex);
+    refs.nextLevel.hidden = !shouldShowRhythmNextLevel({
+      activeLevelIndex,
+      stars: result.stars,
+      unlockedLevelIndex,
+    });
     playCue?.(result.stars >= 2 ? "perfect" : "good");
     vibrate?.(result.stars >= 2 ? [35, 20, 55] : 20);
   }

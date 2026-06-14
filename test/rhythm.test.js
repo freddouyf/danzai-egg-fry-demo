@@ -326,16 +326,60 @@ test("rhythm final result uses completed eggs, action counts and new coin formul
   assert.equal(result.coinsEarned, 34);
 });
 
-test("passing level one unlocks level two", () => {
-  assert.equal(unlockRhythmLevelIndex(0, 0, false), 0);
-  assert.equal(unlockRhythmLevelIndex(0, 0, true), 1);
-  assert.equal(unlockRhythmLevelIndex(1, 1, true), 2);
+test("0 star level one result does not unlock level two", () => {
+  assert.equal(unlockRhythmLevelIndex(0, 0, 0), 0);
 });
 
-test("rhythm result next-level entrance shows until the last level", () => {
-  assert.equal(shouldShowRhythmNextLevel(0, RHYTHM_DISH_LEVELS.length), true);
-  assert.equal(shouldShowRhythmNextLevel(1, RHYTHM_DISH_LEVELS.length), true);
-  assert.equal(shouldShowRhythmNextLevel(2, RHYTHM_DISH_LEVELS.length), false);
+test("0 star level one result hides the next-level entrance when locked", () => {
+  assert.equal(
+    shouldShowRhythmNextLevel({
+      activeLevelIndex: 0,
+      totalLevels: RHYTHM_DISH_LEVELS.length,
+      stars: 0,
+      unlockedLevelIndex: 0,
+    }),
+    false,
+  );
+});
+
+test("1 star level one result unlocks level two", () => {
+  assert.equal(unlockRhythmLevelIndex(0, 0, 1), 1);
+});
+
+test("1 star level one result shows the next-level entrance", () => {
+  assert.equal(
+    shouldShowRhythmNextLevel({
+      activeLevelIndex: 0,
+      totalLevels: RHYTHM_DISH_LEVELS.length,
+      stars: 1,
+      unlockedLevelIndex: 0,
+    }),
+    true,
+  );
+});
+
+test("last rhythm level never shows the next-level entrance", () => {
+  assert.equal(
+    shouldShowRhythmNextLevel({
+      activeLevelIndex: RHYTHM_DISH_LEVELS.length - 1,
+      totalLevels: RHYTHM_DISH_LEVELS.length,
+      stars: 3,
+      unlockedLevelIndex: RHYTHM_DISH_LEVELS.length - 1,
+    }),
+    false,
+  );
+});
+
+test("replaying level one with 0 stars still shows next level if it was already unlocked", () => {
+  assert.equal(
+    shouldShowRhythmNextLevel({
+      activeLevelIndex: 0,
+      totalLevels: RHYTHM_DISH_LEVELS.length,
+      stars: 0,
+      unlockedLevelIndex: 1,
+    }),
+    true,
+  );
 });
 
 test("rhythm star comments map to result copy", () => {
