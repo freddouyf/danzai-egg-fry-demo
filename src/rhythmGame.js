@@ -331,15 +331,27 @@ export class RhythmCookingGame {
       };
     }
 
+    const configuredTapDurationMs =
+      type === RHYTHM_COMMAND_TYPES.TAP
+        ? Math.floor(Number(template.tapDurationMs) || Number(this.level.tapDurationMs) || 0)
+        : 0;
     const targetDelayMs =
       type === RHYTHM_COMMAND_TYPES.HOLD
         ? Math.max(250, Number(template.targetHoldMs) || 800)
-        : Math.max(250, (Number(template.targetAtMs) || baseStart + 330) - baseStart);
-    const expireDelayMs = Math.max(
-      targetDelayMs + RHYTHM_WINDOWS.TAP.goodMs,
-      targetDelayMs + 200,
-      (Number(template.expireAtMs) || baseStart + targetDelayMs + 390) - baseStart,
-    );
+        : Math.max(
+          250,
+          Math.floor(Number(template.targetDelayMs) || 0)
+            || (configuredTapDurationMs ? Math.round(configuredTapDurationMs * 0.6) : 0)
+            || ((Number(template.targetAtMs) || baseStart + 330) - baseStart),
+        );
+    const expireDelayMs =
+      type === RHYTHM_COMMAND_TYPES.TAP && configuredTapDurationMs
+        ? Math.max(configuredTapDurationMs, targetDelayMs + RHYTHM_WINDOWS.TAP.goodMs)
+        : Math.max(
+          targetDelayMs + RHYTHM_WINDOWS.TAP.goodMs,
+          targetDelayMs + 200,
+          (Number(template.expireAtMs) || baseStart + targetDelayMs + 390) - baseStart,
+        );
     const targetAtMs = startAtMs + targetDelayMs;
     return {
       ...template,

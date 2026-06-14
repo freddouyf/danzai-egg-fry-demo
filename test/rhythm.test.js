@@ -22,6 +22,7 @@ import {
 } from "../src/rhythmLevels.js";
 import {
   canRunRhythmClock,
+  formatRhythmLevelInfo,
   getRhythmResultUiState,
   shouldShowRhythmNextLevel,
 } from "../src/rhythmMode.js";
@@ -254,6 +255,17 @@ test("HOLD at the visible success window left edge succeeds", () => {
   assert.equal(hit.successEndMs, window.endMs);
 });
 
+test("HOLD just before the visible success window left edge fails", () => {
+  const game = makeGameAtHoldStep();
+  const snapshot = game.getSnapshot();
+  const command = snapshot.activeCommand;
+  const window = getHoldSuccessWindow(command);
+  const startAtMs = snapshot.elapsedMs + snapshot.inputGuardRemainingMs;
+  game.holdStart(startAtMs);
+  const hit = game.holdEnd(startAtMs + window.startMs - 1);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.FAIL);
+});
+
 test("HOLD at the visible success window middle succeeds", () => {
   const game = makeGameAtHoldStep();
   const snapshot = game.getSnapshot();
@@ -459,6 +471,23 @@ test("TAP input opens within the short prep window", () => {
   assert.equal(command.inputStartAtMs - command.startAtMs <= TAP_INPUT_PREP_MS, true);
 });
 
+test("early rhythm levels use progressively faster TAP tracks", () => {
+  const levelOne = new RhythmCookingGame(RHYTHM_DISH_LEVELS[0]);
+  const levelTwo = new RhythmCookingGame(RHYTHM_DISH_LEVELS[1]);
+  const levelThree = new RhythmCookingGame(RHYTHM_DISH_LEVELS[2]);
+  levelOne.start();
+  levelTwo.start();
+  levelThree.start();
+  const tapDurationOne = activeCommand(levelOne).expireAtMs - activeCommand(levelOne).startAtMs;
+  const tapDurationTwo = activeCommand(levelTwo).expireAtMs - activeCommand(levelTwo).startAtMs;
+  const tapDurationThree = activeCommand(levelThree).expireAtMs - activeCommand(levelThree).startAtMs;
+  assert.equal(tapDurationOne, 1_500);
+  assert.equal(tapDurationTwo, 1_300);
+  assert.equal(tapDurationThree, 1_100);
+  assert.equal(tapDurationOne > tapDurationTwo, true);
+  assert.equal(tapDurationTwo > tapDurationThree, true);
+});
+
 test("reaching the 1 star threshold does not end the level early", () => {
   const game = new RhythmCookingGame(LOOP_LEVEL);
   game.start();
@@ -512,6 +541,17 @@ test("rhythm prototype has simple dish names for later levels", () => {
     RHYTHM_DISH_LEVELS.map((level) => level.dishName),
     ["元气煎蛋", "黄金蛋液", "早餐拼盘"],
   );
+});
+
+test("rhythm HUD level info exposes the current level number and dish name", () => {
+  assert.deepEqual(formatRhythmLevelInfo(0, RHYTHM_DISH_LEVELS[0]), {
+    levelText: "第 1 关",
+    dishText: "元气煎蛋",
+  });
+  assert.deepEqual(formatRhythmLevelInfo(2, RHYTHM_DISH_LEVELS[2]), {
+    levelText: "第 3 关",
+    dishText: "早餐拼盘",
+  });
 });
 
 test("rhythm game snapshots expose cooking action fields", () => {

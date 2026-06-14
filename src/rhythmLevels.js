@@ -58,6 +58,7 @@ export const RHYTHM_DISH_LEVELS = Object.freeze([
     title: "元气煎蛋",
     dishName: "元气煎蛋",
     durationMs: 30_000,
+    tapDurationMs: 1_500,
     actionsPerDish: 3,
     starEggs: Object.freeze([2, 4, 6]),
     commands: Object.freeze(
@@ -69,6 +70,7 @@ export const RHYTHM_DISH_LEVELS = Object.freeze([
     title: "黄金蛋液",
     dishName: "黄金蛋液",
     durationMs: 24_000,
+    tapDurationMs: 1_300,
     actionsPerDish: 3,
     starEggs: Object.freeze([2, 4, 5]),
     commands: Object.freeze([
@@ -85,6 +87,7 @@ export const RHYTHM_DISH_LEVELS = Object.freeze([
     title: "早餐拼盘",
     dishName: "早餐拼盘",
     durationMs: 22_000,
+    tapDurationMs: 1_100,
     actionsPerDish: 3,
     starEggs: Object.freeze([1, 2, 3]),
     commands: Object.freeze([

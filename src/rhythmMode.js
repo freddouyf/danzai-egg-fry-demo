@@ -49,6 +49,10 @@ function createRhythmOverlay() {
   overlay.innerHTML = `
     <div class="rhythm-card">
       <div class="rhythm-stats">
+        <span class="rhythm-level-stat">
+          <strong data-rhythm-level>第 1 关</strong>
+          <small data-rhythm-dish>元气煎蛋</small>
+        </span>
         <span>时间 <strong data-rhythm-time>30</strong>s</span>
         <span>煎蛋 <strong data-rhythm-eggs>0</strong>个</span>
         <span>失败 <strong data-rhythm-fails>0</strong></span>
@@ -127,6 +131,14 @@ function formatStars(stars) {
 function formatGoalText(level) {
   const [one = 2, two = 4, three = 6] = level?.starEggs || [];
   return `${one} 个 = ★ · ${two} 个 = ★★ · ${three} 个 = ★★★`;
+}
+
+export function formatRhythmLevelInfo(levelIndex = 0, level = {}) {
+  const safeIndex = Math.max(0, Math.floor(Number(levelIndex) || 0));
+  return {
+    levelText: `第 ${safeIndex + 1} 关`,
+    dishText: level?.dishName || level?.title || "",
+  };
 }
 
 export function canRunRhythmClock({
@@ -260,6 +272,8 @@ export function createRhythmMode({
   root.append(overlay);
 
   const refs = {
+    level: overlay.querySelector("[data-rhythm-level]"),
+    dish: overlay.querySelector("[data-rhythm-dish]"),
     time: overlay.querySelector("[data-rhythm-time]"),
     eggs: overlay.querySelector("[data-rhythm-eggs]"),
     fails: overlay.querySelector("[data-rhythm-fails]"),
@@ -344,6 +358,9 @@ export function createRhythmMode({
     refs.stepProgress.hidden = true;
     refs.goalTitle.textContent = picked.level.dishName;
     refs.goalStars.textContent = formatGoalText(picked.level);
+    const levelInfo = formatRhythmLevelInfo(picked.index, picked.level);
+    refs.level.textContent = levelInfo.levelText;
+    refs.dish.textContent = levelInfo.dishText;
     refs.goalCard.hidden = false;
     refs.time.textContent = Math.ceil(picked.level.durationMs / 1000);
     refs.eggs.textContent = "0";
