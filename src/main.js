@@ -1,4 +1,5 @@
 ﻿import "./style.css";
+import { createRhythmMode } from "./rhythmMode.js";
 import {
   chooseDanzaiAsset,
   chooseEventAsset,
@@ -81,6 +82,7 @@ const elements = {
   upgradeRerollButton: document.querySelector("#upgradeRerollButton"),
   upgradeRerollCount: document.querySelector("#upgradeRerollCount"),
   startButton: document.querySelector("#startButton"),
+  rhythmButton: document.querySelector("#rhythmButton"),
   shopButton: document.querySelector("#shopButton"),
   shopCloseButton: document.querySelector("#shopCloseButton"),
   recordsButton: document.querySelector("#recordsButton"),
@@ -197,6 +199,7 @@ let walletCoins = readWallet();
 let wardrobe = readWardrobe();
 let progress = readProgress();
 let audioContext = null;
+let rhythmMode = null;
 
 function readWallet() {
   try {
@@ -600,6 +603,7 @@ function resetTransientGameUi() {
 
 function startGame() {
   ensureAudio();
+  rhythmMode?.stop({ showHome: false });
   window.clearTimeout(stageResultTimer);
   pendingPanIntroEvent = null;
   resetTransientGameUi();
@@ -1522,7 +1526,22 @@ elements.upgradeOverlay.addEventListener("click", (event) => {
 });
 elements.actionButton.addEventListener("click", performAction);
 
+rhythmMode = createRhythmMode({
+  root: elements.app,
+  triggerButton: elements.rhythmButton,
+  homeOverlay: elements.startOverlay,
+  mountMascot,
+  ensureAudio,
+  playCue,
+  vibrate,
+  getWallet: () => walletCoins,
+  saveWallet,
+  getProgress: () => progress,
+  saveProgress,
+});
+
 window.addEventListener("keydown", (event) => {
+  if (rhythmMode?.isActive()) return;
   if (event.key === "Escape" && elements.mechanicsOverlay.classList.contains("is-visible")) {
     event.preventDefault();
     closeMechanics();
@@ -1564,5 +1583,6 @@ saveProgress(progress);
 loadAssets().then((assets) => {
   loadedAssets = assets;
   mountLoadedAssets();
+  rhythmMode?.refreshMascot();
 });
 window.requestAnimationFrame(frame);
