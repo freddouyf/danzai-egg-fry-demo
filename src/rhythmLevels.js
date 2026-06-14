@@ -4,7 +4,7 @@ export const RHYTHM_COMMAND_TYPES = Object.freeze({
   MASH: "mash",
 });
 
-const EGG_CYCLE_OFFSETS = [600, 5_000, 9_400, 13_800, 18_200, 22_600];
+const EGG_CYCLE_OFFSETS = [600, 5_400, 10_200, 15_000, 19_800, 24_600];
 
 function createFriedEggCycle(eggIndex, startAtMs) {
   const label = `egg-${eggIndex}`;
@@ -16,35 +16,38 @@ function createFriedEggCycle(eggIndex, startAtMs) {
       prompt: "敲蛋！",
       helperText: "等蛋靠近蓝色区再点",
       scene: "crack",
+      dishStepIndex: 0,
       eggIndex,
       startAtMs,
       targetAtMs: startAtMs + 560,
       expireAtMs: startAtMs + 1_060,
     },
     {
-      id: `${label}-fry`,
-      input: RHYTHM_COMMAND_TYPES.HOLD,
-      actionName: "煎蛋",
-      prompt: "按住煎！",
-      helperText: "按住到亮区松开",
-      scene: "fry",
+      id: `${label}-whisk`,
+      input: RHYTHM_COMMAND_TYPES.MASH,
+      actionName: "打蛋",
+      prompt: "快速打蛋！",
+      helperText: "时间内狂点",
+      scene: "mash",
+      dishStepIndex: 1,
       eggIndex,
-      startAtMs: startAtMs + 1_220,
-      targetAtMs: startAtMs + 2_000,
-      targetHoldMs: 780,
-      expireAtMs: startAtMs + 2_580,
+      startAtMs: startAtMs + 1_000,
+      endAtMs: startAtMs + 2_400,
+      targetTaps: 8,
     },
     {
-      id: `${label}-serve`,
-      input: RHYTHM_COMMAND_TYPES.TAP,
-      actionName: "出锅",
-      prompt: "出锅！",
-      helperText: "看准装盘",
-      scene: "serve",
+      id: `${label}-fry-serve`,
+      input: RHYTHM_COMMAND_TYPES.HOLD,
+      actionName: "煎熟出锅",
+      prompt: "按住煎熟！",
+      helperText: "按住到亮区松开",
+      scene: "fry",
+      dishStepIndex: 2,
       eggIndex,
-      startAtMs: startAtMs + 2_760,
-      targetAtMs: startAtMs + 3_320,
-      expireAtMs: startAtMs + 3_820,
+      startAtMs: startAtMs + 2_600,
+      targetAtMs: startAtMs + 3_400,
+      targetHoldMs: 800,
+      expireAtMs: startAtMs + 4_350,
     },
   ];
 }

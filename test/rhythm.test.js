@@ -33,18 +33,18 @@ const SMALL_LEVEL = {
       expireAtMs: 1_700,
     },
     {
-      id: "hold",
-      type: RHYTHM_COMMAND_TYPES.HOLD,
-      startAtMs: 2_000,
-      targetAtMs: 3_000,
-      expireAtMs: 3_700,
-    },
-    {
       id: "mash",
       type: RHYTHM_COMMAND_TYPES.MASH,
-      startAtMs: 4_000,
-      endAtMs: 5_600,
+      startAtMs: 2_000,
+      endAtMs: 3_600,
       targetTaps: 6,
+    },
+    {
+      id: "hold",
+      type: RHYTHM_COMMAND_TYPES.HOLD,
+      startAtMs: 4_000,
+      targetAtMs: 5_000,
+      expireAtMs: 5_700,
     },
   ],
 };
@@ -136,18 +136,19 @@ test("MASH tap events expose success threshold and complete readiness", () => {
   assert.equal(event.completeReady, true);
 });
 
-test("rhythm level one is a 30 second fried egg completion challenge", () => {
+test("rhythm level one is a 30 second fried egg completion challenge with TAP MASH HOLD", () => {
   assert.equal(RHYTHM_TEST_LEVEL.dishName, "元气煎蛋");
   assert.equal(RHYTHM_TEST_LEVEL.durationMs, 30_000);
   assert.equal(RHYTHM_TEST_LEVEL.actionsPerDish, 3);
   assert.deepEqual(RHYTHM_TEST_LEVEL.starEggs, [2, 4, 6]);
   assert.deepEqual(
     RHYTHM_TEST_LEVEL.commands.slice(0, 3).map((command) => command.actionName),
-    ["敲蛋", "煎蛋", "出锅"],
+    ["敲蛋", "打蛋", "煎熟出锅"],
   );
   assert.equal(RHYTHM_TEST_LEVEL.commands[0].input, RHYTHM_COMMAND_TYPES.TAP);
-  assert.equal(RHYTHM_TEST_LEVEL.commands[1].input, RHYTHM_COMMAND_TYPES.HOLD);
-  assert.equal(RHYTHM_TEST_LEVEL.commands[2].input, RHYTHM_COMMAND_TYPES.TAP);
+  assert.equal(RHYTHM_TEST_LEVEL.commands[1].input, RHYTHM_COMMAND_TYPES.MASH);
+  assert.equal(RHYTHM_TEST_LEVEL.commands[2].input, RHYTHM_COMMAND_TYPES.HOLD);
+  assert.equal(RHYTHM_TEST_LEVEL.commands[1].targetTaps, 8);
 });
 
 test("rhythm prototype has simple dish names for later levels", () => {
@@ -177,19 +178,20 @@ test("three successful actions complete one fried egg", () => {
   assert.equal(game.getSnapshot().completedEggs, 0);
   assert.equal(game.getSnapshot().successfulActions, 1);
 
-  game.holdStart(2_000);
-  hit = game.holdEnd(3_000);
+  for (let index = 0; index < 6; index += 1) {
+    game.tap(2_100 + index * 100);
+  }
+  game.update(3_700);
+  hit = game.drainEvents().findLast((event) => event.type === "hit");
   assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
   assert.equal(game.getSnapshot().completedEggs, 0);
   assert.equal(game.getSnapshot().successfulActions, 2);
 
-  for (let index = 0; index < 6; index += 1) {
-    game.tap(4_100 + index * 100);
-  }
-  game.update(5_700);
-  hit = game.drainEvents().findLast((event) => event.type === "hit");
+  game.holdStart(4_000);
+  hit = game.holdEnd(5_000);
   assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
   assert.equal(game.getSnapshot().completedEggs, 1);
+  game.update(5_800);
   assert.equal(game.getSnapshot().state, "ended");
 });
 
@@ -274,7 +276,26 @@ test("HOLD times out as a failed action if the player never holds", () => {
 });
 
 test("TAP and HOLD success or failure are recorded as action results", () => {
-  const game = new RhythmCookingGame(SMALL_LEVEL);
+  const game = new RhythmCookingGame({
+    id: "tap-hold-record",
+    durationMs: 4_000,
+    commands: [
+      {
+        id: "tap",
+        type: RHYTHM_COMMAND_TYPES.TAP,
+        startAtMs: 0,
+        targetAtMs: 1_000,
+        expireAtMs: 1_700,
+      },
+      {
+        id: "hold",
+        type: RHYTHM_COMMAND_TYPES.HOLD,
+        startAtMs: 2_000,
+        targetAtMs: 3_000,
+        expireAtMs: 3_700,
+      },
+    ],
+  });
   game.start();
 
   assert.equal(game.tap(1_000).actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
@@ -300,6 +321,7 @@ test("2, 4 and 6 completed eggs map to 1, 2 and 3 stars", () => {
   assert.equal(calculateRhythmStarsFromEggs(0), 0);
   assert.equal(calculateRhythmStarsFromEggs(2), 1);
   assert.equal(calculateRhythmStarsFromEggs(4), 2);
+  assert.equal(calculateRhythmStarsFromEggs(5), 2);
   assert.equal(calculateRhythmStarsFromEggs(6), 3);
 });
 

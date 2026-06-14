@@ -2,6 +2,7 @@ import { RHYTHM_WINDOWS, RhythmCookingGame, unlockRhythmLevelIndex } from "./rhy
 import { RHYTHM_COMMAND_TYPES, RHYTHM_DISH_LEVELS } from "./rhythmLevels.js";
 
 const RHYTHM_UNLOCK_KEY = "danzai-rhythm-unlocked-level";
+const GOAL_CARD_MS = 1_350;
 
 const COMMAND_LABELS = {
   [RHYTHM_COMMAND_TYPES.TAP]: "TAP",
@@ -43,14 +44,6 @@ function createRhythmOverlay() {
   overlay.hidden = true;
   overlay.innerHTML = `
     <div class="rhythm-card">
-      <header class="rhythm-header">
-        <div>
-          <p>实验模式</p>
-          <h2 id="rhythmTitle">节奏厨房</h2>
-        </div>
-        <button class="rhythm-home-button" type="button" data-rhythm-home>返回首页</button>
-      </header>
-
       <div class="rhythm-stats">
         <span>时间 <strong data-rhythm-time>30</strong>s</span>
         <span>煎蛋 <strong data-rhythm-eggs>0</strong>个</span>
@@ -58,9 +51,14 @@ function createRhythmOverlay() {
       </div>
 
       <div class="rhythm-stage">
-        <div class="rhythm-dish-progress">
-          <strong data-rhythm-dish-name>元气煎蛋</strong>
-          <span data-rhythm-dish-step>动作 0 / 3</span>
+        <div class="rhythm-goal-card" data-rhythm-goal-card>
+          <strong data-rhythm-goal-title>元气煎蛋</strong>
+          <span data-rhythm-goal-stars>2 个 = ★ · 4 个 = ★★ · 6 个 = ★★★</span>
+        </div>
+        <div class="rhythm-step-progress" data-rhythm-step-progress aria-label="当前煎蛋步骤">
+          <span data-step-index="0">🥚</span>
+          <span data-step-index="1">🥣</span>
+          <span data-step-index="2">🍳</span>
         </div>
         <div class="rhythm-mascot" data-rhythm-mascot aria-hidden="true"></div>
         <div class="rhythm-cook-scene" data-rhythm-scene data-scene="crack" aria-hidden="true">
@@ -96,12 +94,10 @@ function createRhythmOverlay() {
 
       <div class="rhythm-result" data-rhythm-result hidden>
         <h3 data-rhythm-result-title>菜品完成：元气煎蛋</h3>
-        <p class="rhythm-result-comment" data-rhythm-result-comment>完美出餐！</p>
-        <div class="rhythm-stars" data-rhythm-stars>☆☆☆</div>
         <dl>
           <div><dt>完成煎蛋</dt><dd data-rhythm-final-eggs>0 个</dd></div>
-          <div><dt>成功动作</dt><dd data-rhythm-final-success>0</dd></div>
           <div><dt>失败动作</dt><dd data-rhythm-final-fails>0</dd></div>
+          <div><dt>星级</dt><dd data-rhythm-stars>☆☆☆</dd></div>
           <div><dt>获得金币</dt><dd data-rhythm-final-coins>+0</dd></div>
         </dl>
         <div class="rhythm-result-actions">
@@ -117,6 +113,11 @@ function createRhythmOverlay() {
 
 function formatStars(stars) {
   return "★".repeat(stars) + "☆".repeat(Math.max(0, 3 - stars));
+}
+
+function formatGoalText(level) {
+  const [one = 2, two = 4, three = 6] = level?.starEggs || [];
+  return `${one} 个 = ★ · ${two} 个 = ★★ · ${three} 个 = ★★★`;
 }
 
 function zonePercent(value, max) {
@@ -243,8 +244,11 @@ export function createRhythmMode({
     time: overlay.querySelector("[data-rhythm-time]"),
     eggs: overlay.querySelector("[data-rhythm-eggs]"),
     fails: overlay.querySelector("[data-rhythm-fails]"),
-    dishName: overlay.querySelector("[data-rhythm-dish-name]"),
-    dishStep: overlay.querySelector("[data-rhythm-dish-step]"),
+    goalCard: overlay.querySelector("[data-rhythm-goal-card]"),
+    goalTitle: overlay.querySelector("[data-rhythm-goal-title]"),
+    goalStars: overlay.querySelector("[data-rhythm-goal-stars]"),
+    stepProgress: overlay.querySelector("[data-rhythm-step-progress]"),
+    stepIcons: overlay.querySelectorAll("[data-step-index]"),
     stage: overlay.querySelector(".rhythm-stage"),
     mascot: overlay.querySelector("[data-rhythm-mascot]"),
     scene: overlay.querySelector("[data-rhythm-scene]"),
@@ -267,9 +271,7 @@ export function createRhythmMode({
     actionLabel: overlay.querySelector("[data-rhythm-action-label]"),
     result: overlay.querySelector("[data-rhythm-result]"),
     resultTitle: overlay.querySelector("[data-rhythm-result-title]"),
-    resultComment: overlay.querySelector("[data-rhythm-result-comment]"),
     finalEggs: overlay.querySelector("[data-rhythm-final-eggs]"),
-    finalSuccess: overlay.querySelector("[data-rhythm-final-success]"),
     finalFails: overlay.querySelector("[data-rhythm-final-fails]"),
     finalCoins: overlay.querySelector("[data-rhythm-final-coins]"),
     stars: overlay.querySelector("[data-rhythm-stars]"),
@@ -290,6 +292,7 @@ export function createRhythmMode({
   let spaceDown = false;
   let lastCommandId = "";
   let sceneTimer = 0;
+  let goalTimer = 0;
 
   function nowElapsed() {
     return Math.max(0, performance.now() - startTime);
@@ -307,14 +310,25 @@ export function createRhythmMode({
     game.start(0);
     settled = false;
     active = true;
-    startTime = performance.now();
+    startTime = performance.now() + GOAL_CARD_MS;
     lastCommandId = "";
     overlay.hidden = false;
     overlay.classList.add("is-visible");
     overlay.classList.remove("is-ended", "is-holding");
     refs.result.hidden = true;
+    refs.track.hidden = false;
+    refs.actionButton.hidden = false;
     refs.actionButton.disabled = false;
     refs.nextLevel.hidden = true;
+    refs.commandBox.hidden = false;
+    refs.stepProgress.hidden = false;
+    refs.goalTitle.textContent = picked.level.dishName;
+    refs.goalStars.textContent = formatGoalText(picked.level);
+    refs.goalCard.hidden = false;
+    window.clearTimeout(goalTimer);
+    goalTimer = window.setTimeout(() => {
+      refs.goalCard.hidden = true;
+    }, GOAL_CARD_MS);
     homeOverlay?.classList.remove("is-visible");
     refreshMascot();
     game.drainEvents();
@@ -325,6 +339,7 @@ export function createRhythmMode({
   function stopRun({ showHome = true } = {}) {
     active = false;
     spaceDown = false;
+    window.clearTimeout(goalTimer);
     window.cancelAnimationFrame(animationFrame);
     overlay.classList.remove("is-visible", "is-holding");
     overlay.hidden = true;
@@ -371,11 +386,14 @@ export function createRhythmMode({
     applyResult(result);
     refs.result.hidden = false;
     refs.actionButton.disabled = true;
+    refs.actionButton.hidden = true;
+    refs.track.hidden = true;
+    refs.commandBox.hidden = true;
+    refs.stepProgress.hidden = true;
+    refs.goalCard.hidden = true;
     overlay.classList.add("is-ended");
     refs.resultTitle.textContent = `菜品完成：${result.dishName}`;
-    refs.resultComment.textContent = result.starComment;
     refs.finalEggs.textContent = `${result.completedEggs} 个`;
-    refs.finalSuccess.textContent = result.successfulActions;
     refs.finalFails.textContent = result.failedActions;
     refs.finalCoins.textContent = `+${result.coinsEarned}`;
     refs.stars.textContent = formatStars(result.stars);
@@ -493,26 +511,15 @@ export function createRhythmMode({
     refs.time.textContent = remainingSeconds;
     refs.eggs.textContent = snapshot.completedEggs;
     refs.fails.textContent = snapshot.failedActions;
-    refs.dishName.textContent = snapshot.dishName;
-    refs.dishStep.textContent = `动作 ${snapshot.currentDishActions} / ${snapshot.actionsPerDish}`;
     overlay.classList.toggle("is-holding", snapshot.holdActive);
 
     if (!command || snapshot.state === "ended") {
       refs.commandBox.dataset.type = "done";
       refs.scene.dataset.scene = "serve";
       refs.scene.dataset.holding = "false";
-      refs.commandIcon.textContent = "⭐";
-      refs.commandStep.textContent = "DONE";
-      refs.commandType.textContent = "出餐完成";
-      refs.commandLabel.textContent = "查看本局结算";
-      refs.commandHint.textContent = "看看做出了多少煎蛋";
-      refs.commandNext.textContent = "本轮完成";
-      refs.actionLabel.textContent = "完成";
-      refs.actionIcon.textContent = "⭐";
       refs.fill.style.width = "100%";
       refs.goodZone.style.left = "0%";
       refs.goodZone.style.width = "100%";
-      refs.trackCopy.textContent = "完成";
       return;
     }
 
@@ -526,6 +533,14 @@ export function createRhythmMode({
 
     const ui = COMMAND_UI[command.type] || COMMAND_UI[RHYTHM_COMMAND_TYPES.TAP];
     const nextCommand = snapshot.level.commands[snapshot.commandIndex + 1];
+    const stepIndex = Math.min(
+      snapshot.actionsPerDish - 1,
+      Math.max(0, Number(command.dishStepIndex ?? (snapshot.commandIndex % snapshot.actionsPerDish)) || 0),
+    );
+    refs.stepIcons.forEach((icon, index) => {
+      icon.classList.toggle("is-active", index === stepIndex);
+      icon.classList.toggle("is-done", index < stepIndex);
+    });
     refs.commandBox.dataset.type = command.type;
     refs.scene.dataset.scene = command.scene || command.type;
     refs.scene.dataset.holding = String(snapshot.holdActive);

@@ -6985,50 +6985,6 @@ img,
   overflow: hidden;
 }
 
-.rhythm-header {
-  display: flex;
-  min-height: 54px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 9px 11px;
-  border: 3px solid rgba(255, 255, 255, 0.92);
-  border-radius: 22px;
-  background: rgba(255, 250, 224, 0.88);
-  box-shadow: 0 5px 0 rgba(143, 72, 29, 0.12);
-}
-
-.rhythm-header p,
-.rhythm-header h2 {
-  margin: 0;
-}
-
-.rhythm-header p {
-  color: #9a6745;
-  font-size: 10px;
-  font-weight: 950;
-}
-
-.rhythm-header h2 {
-  color: #61351d;
-  font-size: 22px;
-  font-weight: 1000;
-}
-
-.rhythm-home-button {
-  min-height: 38px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 999px;
-  color: #7b4b2d;
-  background: white;
-  box-shadow: 0 3px 0 rgba(143, 72, 29, 0.12);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 950;
-  touch-action: manipulation;
-}
-
 .rhythm-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -7075,6 +7031,89 @@ img,
   touch-action: manipulation;
 }
 
+.rhythm-overlay.is-ended .rhythm-stage {
+  min-height: min(28svh, 230px);
+}
+
+.rhythm-goal-card {
+  position: absolute;
+  z-index: 6;
+  top: 18px;
+  left: 50%;
+  display: grid;
+  min-width: min(82%, 300px);
+  gap: 5px;
+  padding: 12px 15px;
+  transform: translateX(-50%);
+  border: 3px solid rgba(255, 255, 255, 0.95);
+  border-radius: 24px;
+  color: #60371f;
+  background: rgba(255, 249, 221, 0.96);
+  box-shadow: 0 10px 22px rgba(129, 72, 34, 0.18);
+  text-align: center;
+  pointer-events: none;
+  animation: rhythm-goal-card-in 360ms cubic-bezier(0.18, 1.2, 0.34, 1) both;
+}
+
+.rhythm-goal-card[hidden] {
+  display: none !important;
+}
+
+.rhythm-goal-card strong {
+  font-size: 20px;
+  font-weight: 1000;
+}
+
+.rhythm-goal-card span {
+  color: #ef5c2d;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.rhythm-step-progress {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  left: 50%;
+  display: flex;
+  gap: 8px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.rhythm-step-progress[hidden] {
+  display: none !important;
+}
+
+.rhythm-step-progress span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  background: rgba(255, 252, 232, 0.78);
+  box-shadow: 0 4px 10px rgba(102, 57, 30, 0.1);
+  font-size: 18px;
+  opacity: 0.62;
+  transform: scale(0.92);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.rhythm-step-progress span.is-active {
+  opacity: 1;
+  transform: scale(1.18);
+  background: #fff166;
+}
+
+.rhythm-step-progress span.is-done {
+  opacity: 0.9;
+  background: #d9ffb5;
+}
+
 .rhythm-overlay.is-fever .rhythm-stage {
   border-color: #fff15f;
   background:
@@ -7102,37 +7141,6 @@ img,
   filter: blur(1px);
   animation: rhythm-heat-wave 520ms ease-in-out infinite alternate;
   pointer-events: none;
-}
-
-.rhythm-dish-progress {
-  position: absolute;
-  z-index: 3;
-  top: 10px;
-  left: 50%;
-  display: flex;
-  min-width: min(74%, 260px);
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  transform: translateX(-50%);
-  border: 2px solid rgba(255, 255, 255, 0.94);
-  border-radius: 999px;
-  color: #6a3d24;
-  background: rgba(255, 252, 232, 0.88);
-  box-shadow: 0 4px 12px rgba(116, 65, 35, 0.12);
-  font-size: 11px;
-  font-weight: 950;
-  pointer-events: none;
-}
-
-.rhythm-dish-progress strong {
-  font-size: 13px;
-  font-weight: 1000;
-}
-
-.rhythm-dish-progress span {
-  color: #ef5c2d;
 }
 
 .rhythm-mascot {
@@ -7622,8 +7630,10 @@ img,
 
 .rhythm-result {
   display: grid;
-  gap: 8px;
-  padding: 12px;
+  max-height: min(38svh, 310px);
+  gap: 7px;
+  padding: 10px;
+  overflow: auto;
   border: 3px solid white;
   border-radius: 24px;
   background: rgba(255, 250, 224, 0.94);
@@ -7637,7 +7647,7 @@ img,
 .rhythm-result h3 {
   margin: 0;
   color: #5b3421;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 1000;
   text-align: center;
 }
@@ -7668,7 +7678,7 @@ img,
 .rhythm-result dl div {
   display: grid;
   gap: 2px;
-  padding: 8px;
+  padding: 7px;
   border-radius: 15px;
   background: white;
 }
@@ -7686,18 +7696,36 @@ img,
 
 .rhythm-result dd {
   color: #ef5c2d;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 1000;
 }
 
 .rhythm-result-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.rhythm-result-actions button {
+  min-height: 42px;
+  padding-inline: 8px;
+  font-size: 12px;
 }
 
 .rhythm-result-actions [hidden] {
   display: none !important;
+}
+
+@keyframes rhythm-goal-card-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.92);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
 }
 
 @keyframes rhythm-feedback-pop {
