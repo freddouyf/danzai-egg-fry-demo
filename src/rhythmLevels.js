@@ -31,8 +31,8 @@ function createFriedEggCycle(eggIndex, startAtMs) {
       scene: "mash",
       dishStepIndex: 1,
       eggIndex,
-      startAtMs: startAtMs + 1_000,
-      endAtMs: startAtMs + 2_400,
+      startAtMs: startAtMs + 1_100,
+      endAtMs: startAtMs + 3_300,
       targetTaps: 8,
     },
     {
@@ -44,10 +44,10 @@ function createFriedEggCycle(eggIndex, startAtMs) {
       scene: "fry",
       dishStepIndex: 2,
       eggIndex,
-      startAtMs: startAtMs + 2_600,
-      targetAtMs: startAtMs + 3_400,
+      startAtMs: startAtMs + 3_300,
+      targetAtMs: startAtMs + 4_100,
       targetHoldMs: 800,
-      expireAtMs: startAtMs + 4_350,
+      expireAtMs: startAtMs + 4_750,
     },
   ];
 }

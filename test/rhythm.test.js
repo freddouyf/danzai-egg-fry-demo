@@ -16,7 +16,11 @@ import {
   RHYTHM_DISH_LEVELS,
   RHYTHM_TEST_LEVEL,
 } from "../src/rhythmLevels.js";
-import { shouldShowRhythmNextLevel } from "../src/rhythmMode.js";
+import {
+  canRunRhythmClock,
+  getRhythmResultUiState,
+  shouldShowRhythmNextLevel,
+} from "../src/rhythmMode.js";
 
 const SMALL_LEVEL = {
   id: "test-rhythm",
@@ -102,13 +106,13 @@ test("rhythm HOLD uses the narrowed success timing window", () => {
   );
 });
 
-test("rhythm MASH still uses target count and 65 percent success threshold", () => {
+test("rhythm MASH succeeds only when the progress is full", () => {
   assert.equal(judgeMash(6, 6), RHYTHM_HIT_QUALITY.PERFECT);
-  assert.equal(judgeMash(4, 6), RHYTHM_HIT_QUALITY.GOOD);
-  assert.equal(judgeMash(3, 6), RHYTHM_HIT_QUALITY.MISS);
+  assert.equal(judgeMash(5, 6), RHYTHM_HIT_QUALITY.MISS);
+  assert.equal(judgeMash(4, 6), RHYTHM_HIT_QUALITY.MISS);
 });
 
-test("MASH tap events expose success threshold and complete readiness", () => {
+test("MASH resolves immediately when target taps are reached", () => {
   const game = new RhythmCookingGame({
     id: "mash-only",
     durationMs: 3_000,
@@ -123,17 +127,42 @@ test("MASH tap events expose success threshold and complete readiness", () => {
     ],
   });
   game.start();
-  let event;
-  for (let index = 0; index < 4; index += 1) {
-    event = game.tap(index * 120);
+  let hit = null;
+  for (let index = 0; index < 5; index += 1) {
+    const event = game.tap(index * 120);
+    assert.equal(event.type, "mashTap");
+    assert.equal(event.completeReady, false);
   }
-  assert.equal(event.goodReady, true);
-  assert.equal(event.completeReady, false);
 
-  game.tap(520);
-  event = game.tap(640);
-  assert.equal(event.goodReady, true);
-  assert.equal(event.completeReady, true);
+  hit = game.tap(640);
+  assert.equal(hit.type, "hit");
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+  assert.equal(game.getSnapshot().successfulActions, 1);
+  assert.equal(game.getSnapshot().commandIndex, 1);
+});
+
+test("MASH times out as failure if the progress is not full", () => {
+  const game = new RhythmCookingGame({
+    id: "mash-timeout",
+    durationMs: 3_000,
+    commands: [
+      {
+        id: "mash",
+        type: RHYTHM_COMMAND_TYPES.MASH,
+        startAtMs: 0,
+        endAtMs: 2_000,
+        targetTaps: 6,
+      },
+    ],
+  });
+  game.start();
+  for (let index = 0; index < 5; index += 1) {
+    game.tap(index * 120);
+  }
+  game.update(2_100);
+  const miss = game.drainEvents().findLast((event) => event.type === "hit");
+  assert.equal(miss.actionResult, RHYTHM_ACTION_RESULT.FAIL);
+  assert.equal(miss.taps, 5);
 });
 
 test("rhythm level one is a 30 second fried egg completion challenge with TAP MASH HOLD", () => {
@@ -149,6 +178,10 @@ test("rhythm level one is a 30 second fried egg completion challenge with TAP MA
   assert.equal(RHYTHM_TEST_LEVEL.commands[1].input, RHYTHM_COMMAND_TYPES.MASH);
   assert.equal(RHYTHM_TEST_LEVEL.commands[2].input, RHYTHM_COMMAND_TYPES.HOLD);
   assert.equal(RHYTHM_TEST_LEVEL.commands[1].targetTaps, 8);
+  assert.equal(
+    RHYTHM_TEST_LEVEL.commands[1].endAtMs - RHYTHM_TEST_LEVEL.commands[1].startAtMs,
+    2_200,
+  );
 });
 
 test("rhythm prototype has simple dish names for later levels", () => {
@@ -319,7 +352,9 @@ test("TAP outside the success window is recorded as a failed action", () => {
 
 test("2, 4 and 6 completed eggs map to 1, 2 and 3 stars", () => {
   assert.equal(calculateRhythmStarsFromEggs(0), 0);
+  assert.equal(calculateRhythmStarsFromEggs(1), 0);
   assert.equal(calculateRhythmStarsFromEggs(2), 1);
+  assert.equal(calculateRhythmStarsFromEggs(3), 1);
   assert.equal(calculateRhythmStarsFromEggs(4), 2);
   assert.equal(calculateRhythmStarsFromEggs(5), 2);
   assert.equal(calculateRhythmStarsFromEggs(6), 3);
@@ -380,6 +415,18 @@ test("1 star level one result shows the next-level entrance", () => {
   );
 });
 
+test("2 star level one result shows the next-level entrance", () => {
+  assert.equal(
+    shouldShowRhythmNextLevel({
+      activeLevelIndex: 0,
+      totalLevels: RHYTHM_DISH_LEVELS.length,
+      stars: 2,
+      unlockedLevelIndex: 0,
+    }),
+    true,
+  );
+});
+
 test("last rhythm level never shows the next-level entrance", () => {
   assert.equal(
     shouldShowRhythmNextLevel({
@@ -402,6 +449,40 @@ test("replaying level one with 0 stars still shows next level if it was already 
     }),
     true,
   );
+});
+
+test("rhythm clock starts only after goal card confirmation", () => {
+  assert.equal(
+    canRunRhythmClock({
+      isActive: true,
+      isGoalConfirmed: false,
+      gameState: "playing",
+    }),
+    false,
+  );
+  assert.equal(
+    canRunRhythmClock({
+      isActive: true,
+      isGoalConfirmed: true,
+      gameState: "playing",
+    }),
+    true,
+  );
+});
+
+test("result UI hides the live action controls and keeps next level eligibility", () => {
+  const state = getRhythmResultUiState({
+    activeLevelIndex: 0,
+    unlockedLevelIndex: 0,
+    result: {
+      stars: 2,
+    },
+  });
+  assert.equal(state.showActionButton, false);
+  assert.equal(state.actionLabel, "");
+  assert.equal(state.showTrack, false);
+  assert.equal(state.showCommand, false);
+  assert.equal(state.showNextLevel, true);
 });
 
 test("rhythm star comments map to result copy", () => {

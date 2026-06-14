@@ -6980,8 +6980,8 @@ img,
   display: grid;
   width: min(100%, 410px);
   max-height: 100%;
-  gap: 9px;
-  padding: 12px;
+  gap: 8px;
+  padding: 10px 12px max(8px, env(safe-area-inset-bottom));
   overflow: hidden;
 }
 
@@ -7014,7 +7014,7 @@ img,
 .rhythm-stage {
   position: relative;
   display: grid;
-  min-height: min(47svh, 390px);
+  min-height: min(46svh, 382px);
   place-items: center;
   overflow: hidden;
   border: 3px solid rgba(255, 255, 255, 0.92);
@@ -7032,26 +7032,30 @@ img,
 }
 
 .rhythm-overlay.is-ended .rhythm-stage {
-  min-height: min(28svh, 230px);
+  min-height: min(24svh, 200px);
+}
+
+.rhythm-overlay.is-ended .rhythm-stats {
+  display: none;
 }
 
 .rhythm-goal-card {
   position: absolute;
   z-index: 6;
-  top: 18px;
+  top: 50%;
   left: 50%;
   display: grid;
   min-width: min(82%, 300px);
-  gap: 5px;
-  padding: 12px 15px;
-  transform: translateX(-50%);
+  gap: 8px;
+  padding: 15px;
+  transform: translate(-50%, -50%);
   border: 3px solid rgba(255, 255, 255, 0.95);
   border-radius: 24px;
   color: #60371f;
   background: rgba(255, 249, 221, 0.96);
   box-shadow: 0 10px 22px rgba(129, 72, 34, 0.18);
   text-align: center;
-  pointer-events: none;
+  pointer-events: auto;
   animation: rhythm-goal-card-in 360ms cubic-bezier(0.18, 1.2, 0.34, 1) both;
 }
 
@@ -7064,10 +7068,31 @@ img,
   font-weight: 1000;
 }
 
+.rhythm-goal-card p,
+.rhythm-goal-card small {
+  margin: 0;
+  color: #7c4b2d;
+  font-weight: 900;
+}
+
+.rhythm-goal-card p {
+  font-size: 13px;
+}
+
 .rhythm-goal-card span {
   color: #ef5c2d;
   font-size: 14px;
   font-weight: 950;
+}
+
+.rhythm-goal-card small {
+  font-size: 11px;
+}
+
+.rhythm-goal-card button {
+  min-height: 42px;
+  margin-top: 2px;
+  font-size: 14px;
 }
 
 .rhythm-step-progress {
@@ -7254,16 +7279,20 @@ img,
 }
 
 .rhythm-command {
-  position: relative;
+  position: absolute;
   z-index: 3;
-  display: grid;
-  width: min(82%, 280px);
-  margin-top: 92px;
-  gap: 4px;
-  place-items: center;
-  padding: 16px 16px 13px;
-  border: 4px solid white;
-  border-radius: 28px;
+  bottom: 16px;
+  left: 50%;
+  display: inline-flex;
+  width: auto;
+  max-width: min(78%, 270px);
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  transform: translateX(-50%);
+  border: 3px solid white;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.82);
   box-shadow:
     0 8px 0 rgba(145, 77, 35, 0.12),
@@ -7279,9 +7308,7 @@ img,
   animation: rhythm-command-enter 360ms cubic-bezier(0.18, 1.4, 0.35, 1);
 }
 
-.rhythm-command small,
-.rhythm-command em,
-.rhythm-command b {
+.rhythm-command small {
   color: #9b6848;
   font-size: 11px;
   font-style: normal;
@@ -7297,37 +7324,19 @@ img,
   letter-spacing: 0.04em;
 }
 
-.rhythm-command i {
-  display: grid;
-  width: 52px;
-  height: 52px;
-  place-items: center;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 4px 0 rgba(113, 73, 20, 0.12);
-  font-size: 30px;
-  font-style: normal;
-}
-
 .rhythm-command strong {
   color: #ef5c2d;
-  font-size: clamp(56px, 17vw, 78px);
+  font-size: clamp(22px, 6vw, 28px);
   font-weight: 1000;
-  line-height: 0.95;
-  letter-spacing: -0.04em;
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
-.rhythm-command span {
-  color: #5b3421;
-  font-size: clamp(24px, 7vw, 31px);
-  font-weight: 1000;
-}
-
+.rhythm-command i,
+.rhythm-command span,
+.rhythm-command em,
 .rhythm-command b {
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(255, 247, 215, 0.88);
-  font-size: 10px;
+  display: none;
 }
 
 .rhythm-command[data-type="tap"] {
@@ -7498,11 +7507,15 @@ img,
 }
 
 .rhythm-track[data-type="mash"] em {
-  background: rgba(209, 72, 180, 0.28);
+  display: none;
 }
 
 .rhythm-track[data-type="mash"] strong {
   display: none;
+}
+
+.rhythm-track[data-type="mash"] i {
+  background: linear-gradient(90deg, #ff8aef, #ef3f83);
 }
 
 .rhythm-track i {
@@ -7716,15 +7729,23 @@ img,
   display: none !important;
 }
 
+.rhythm-action-button[hidden],
+.rhythm-track[hidden],
+.rhythm-command[hidden],
+.rhythm-step-progress[hidden],
+.rhythm-goal-card[hidden] {
+  display: none !important;
+}
+
 @keyframes rhythm-goal-card-in {
   0% {
     opacity: 0;
-    transform: translateX(-50%) translateY(-8px) scale(0.92);
+    transform: translate(-50%, calc(-50% - 8px)) scale(0.92);
   }
 
   100% {
     opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
+    transform: translate(-50%, -50%) scale(1);
   }
 }
 

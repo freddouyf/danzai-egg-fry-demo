@@ -2,7 +2,6 @@ import { RHYTHM_WINDOWS, RhythmCookingGame, unlockRhythmLevelIndex } from "./rhy
 import { RHYTHM_COMMAND_TYPES, RHYTHM_DISH_LEVELS } from "./rhythmLevels.js";
 
 const RHYTHM_UNLOCK_KEY = "danzai-rhythm-unlocked-level";
-const GOAL_CARD_MS = 1_350;
 
 const COMMAND_LABELS = {
   [RHYTHM_COMMAND_TYPES.TAP]: "TAP",
@@ -53,7 +52,12 @@ function createRhythmOverlay() {
       <div class="rhythm-stage">
         <div class="rhythm-goal-card" data-rhythm-goal-card>
           <strong data-rhythm-goal-title>元气煎蛋</strong>
+          <p>目标：30 秒内尽可能多做煎蛋</p>
           <span data-rhythm-goal-stars>2 个 = ★ · 4 个 = ★★ · 6 个 = ★★★</span>
+          <small>每个煎蛋：敲蛋 → 快速打蛋 → 按住煎熟</small>
+          <button class="primary-button" type="button" data-rhythm-goal-start>
+            <span>开始做菜</span>
+          </button>
         </div>
         <div class="rhythm-step-progress" data-rhythm-step-progress aria-label="当前煎蛋步骤">
           <span data-step-index="0">🥚</span>
@@ -120,6 +124,14 @@ function formatGoalText(level) {
   return `${one} 个 = ★ · ${two} 个 = ★★ · ${three} 个 = ★★★`;
 }
 
+export function canRunRhythmClock({
+  isActive = false,
+  isGoalConfirmed = false,
+  gameState = "idle",
+} = {}) {
+  return Boolean(isActive && isGoalConfirmed && gameState === "playing");
+}
+
 function zonePercent(value, max) {
   return Math.min(100, Math.max(0, (value / Math.max(1, max)) * 100));
 }
@@ -150,12 +162,11 @@ function commandProgress(snapshot) {
   const command = snapshot.activeCommand;
   if (!command) return { fill: 0, copy: "等待动作", goodLeft: 0, goodWidth: 0 };
   if (command.type === RHYTHM_COMMAND_TYPES.MASH) {
-    const goodAt = Math.ceil(command.targetTaps * 0.65);
     return {
       fill: Math.min(100, (snapshot.mashTaps / command.targetTaps) * 100),
       copy: `${snapshot.mashTaps} / ${command.targetTaps}`,
-      goodLeft: zonePercent(goodAt, command.targetTaps),
-      goodWidth: Math.max(8, 100 - zonePercent(goodAt, command.targetTaps)),
+      goodLeft: 0,
+      goodWidth: 0,
     };
   }
 
@@ -224,6 +235,28 @@ export function shouldShowRhythmNextLevel({
   return nextExists && (passed || nextAlreadyUnlocked);
 }
 
+export function getRhythmResultUiState({
+  activeLevelIndex = 0,
+  result = null,
+  unlockedLevelIndex = 0,
+  totalLevels = RHYTHM_DISH_LEVELS.length,
+} = {}) {
+  return {
+    showActionButton: false,
+    actionLabel: "",
+    showTrack: false,
+    showCommand: false,
+    showStepProgress: false,
+    showGoalCard: false,
+    showNextLevel: shouldShowRhythmNextLevel({
+      activeLevelIndex,
+      totalLevels,
+      stars: result?.stars || 0,
+      unlockedLevelIndex,
+    }),
+  };
+}
+
 export function createRhythmMode({
   root,
   triggerButton,
@@ -247,6 +280,7 @@ export function createRhythmMode({
     goalCard: overlay.querySelector("[data-rhythm-goal-card]"),
     goalTitle: overlay.querySelector("[data-rhythm-goal-title]"),
     goalStars: overlay.querySelector("[data-rhythm-goal-stars]"),
+    goalStart: overlay.querySelector("[data-rhythm-goal-start]"),
     stepProgress: overlay.querySelector("[data-rhythm-step-progress]"),
     stepIcons: overlay.querySelectorAll("[data-step-index]"),
     stage: overlay.querySelector(".rhythm-stage"),
@@ -292,7 +326,7 @@ export function createRhythmMode({
   let spaceDown = false;
   let lastCommandId = "";
   let sceneTimer = 0;
-  let goalTimer = 0;
+  let awaitingGoal = false;
 
   function nowElapsed() {
     return Math.max(0, performance.now() - startTime);
@@ -303,35 +337,60 @@ export function createRhythmMode({
   }
 
   function startRun(levelIndex = activeLevelIndex) {
-    ensureAudio?.();
     const picked = levelAt(Math.min(levelIndex, unlockedLevelIndex));
     activeLevelIndex = picked.index;
     game = new RhythmCookingGame(picked.level);
-    game.start(0);
     settled = false;
     active = true;
-    startTime = performance.now() + GOAL_CARD_MS;
+    awaitingGoal = true;
+    startTime = 0;
     lastCommandId = "";
     overlay.hidden = false;
     overlay.classList.add("is-visible");
+    overlay.classList.add("is-goal");
     overlay.classList.remove("is-ended", "is-holding");
     refs.result.hidden = true;
-    refs.track.hidden = false;
-    refs.actionButton.hidden = false;
+    refs.track.hidden = true;
+    refs.actionButton.hidden = true;
     refs.actionButton.disabled = false;
     refs.nextLevel.hidden = true;
-    refs.commandBox.hidden = false;
-    refs.stepProgress.hidden = false;
+    refs.commandBox.hidden = true;
+    refs.stepProgress.hidden = true;
     refs.goalTitle.textContent = picked.level.dishName;
     refs.goalStars.textContent = formatGoalText(picked.level);
     refs.goalCard.hidden = false;
-    window.clearTimeout(goalTimer);
-    goalTimer = window.setTimeout(() => {
-      refs.goalCard.hidden = true;
-    }, GOAL_CARD_MS);
+    refs.time.textContent = Math.ceil(picked.level.durationMs / 1000);
+    refs.eggs.textContent = "0";
+    refs.fails.textContent = "0";
+    refs.actionButton.classList.remove("is-holding", "is-tapping");
+    refs.stage.classList.remove("is-mashing");
+    refs.scene.classList.remove("is-mashing", "is-egg-complete");
+    refs.track.classList.remove("is-mash-good", "is-mash-perfect");
     homeOverlay?.classList.remove("is-visible");
     refreshMascot();
+    window.cancelAnimationFrame(animationFrame);
+  }
+
+  function beginCooking() {
+    if (!active || !awaitingGoal) return;
+    ensureAudio?.();
+    awaitingGoal = false;
+    overlay.classList.remove("is-goal");
+    game.start(0);
+    startTime = performance.now();
+    lastCommandId = "";
+    refs.goalCard.hidden = true;
+    refs.track.hidden = false;
+    refs.actionButton.hidden = false;
+    refs.actionButton.disabled = false;
+    refs.commandBox.hidden = false;
+    refs.stepProgress.hidden = false;
+    refs.actionButton.classList.remove("is-holding", "is-tapping");
+    refs.stage.classList.remove("is-mashing");
+    refs.scene.classList.remove("is-mashing", "is-egg-complete");
+    refs.track.classList.remove("is-mash-good", "is-mash-perfect");
     game.drainEvents();
+    render();
     window.cancelAnimationFrame(animationFrame);
     animationFrame = window.requestAnimationFrame(tick);
   }
@@ -339,15 +398,15 @@ export function createRhythmMode({
   function stopRun({ showHome = true } = {}) {
     active = false;
     spaceDown = false;
-    window.clearTimeout(goalTimer);
+    awaitingGoal = false;
     window.cancelAnimationFrame(animationFrame);
-    overlay.classList.remove("is-visible", "is-holding");
+    overlay.classList.remove("is-visible", "is-holding", "is-goal");
     overlay.hidden = true;
     if (showHome) homeOverlay?.classList.add("is-visible");
   }
 
   function tick() {
-    if (!active) return;
+    if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
     game.update(nowElapsed());
     handleEvents();
     render();
@@ -384,24 +443,33 @@ export function createRhythmMode({
 
   function showResult(result) {
     applyResult(result);
+    const resultUi = getRhythmResultUiState({
+      activeLevelIndex,
+      result,
+      unlockedLevelIndex,
+    });
+    awaitingGoal = false;
     refs.result.hidden = false;
     refs.actionButton.disabled = true;
-    refs.actionButton.hidden = true;
-    refs.track.hidden = true;
-    refs.commandBox.hidden = true;
-    refs.stepProgress.hidden = true;
-    refs.goalCard.hidden = true;
+    refs.actionButton.hidden = !resultUi.showActionButton;
+    refs.track.hidden = !resultUi.showTrack;
+    refs.commandBox.hidden = !resultUi.showCommand;
+    refs.stepProgress.hidden = !resultUi.showStepProgress;
+    refs.goalCard.hidden = !resultUi.showGoalCard;
+    refs.actionButton.classList.remove("is-holding", "is-tapping");
+    refs.stage.classList.remove("is-mashing");
+    refs.scene.classList.remove("is-mashing", "is-egg-complete");
+    refs.track.classList.remove("is-mash-good", "is-mash-perfect");
     overlay.classList.add("is-ended");
+    overlay.classList.remove("is-holding", "is-goal");
+    refs.actionIcon.textContent = "";
+    refs.actionLabel.textContent = resultUi.actionLabel;
     refs.resultTitle.textContent = `菜品完成：${result.dishName}`;
     refs.finalEggs.textContent = `${result.completedEggs} 个`;
     refs.finalFails.textContent = result.failedActions;
     refs.finalCoins.textContent = `+${result.coinsEarned}`;
     refs.stars.textContent = formatStars(result.stars);
-    refs.nextLevel.hidden = !shouldShowRhythmNextLevel({
-      activeLevelIndex,
-      stars: result.stars,
-      unlockedLevelIndex,
-    });
+    refs.nextLevel.hidden = !resultUi.showNextLevel;
     playCue?.(result.stars >= 2 ? "perfect" : "good");
     vibrate?.(result.stars >= 2 ? [35, 20, 55] : 20);
   }
@@ -441,7 +509,7 @@ export function createRhythmMode({
         refs.track.classList.toggle("is-mash-good", event.goodReady);
         refs.track.classList.toggle("is-mash-perfect", event.completeReady);
         spawnMashTapFx(event);
-        if (event.milestone) showMashPop(event.completeReady ? "完成！" : "达标！");
+        if (event.milestone) showMashPop("打蛋完成！");
       } else if (event.type === "earlyTapIgnored") {
         showWaitingHint();
       }
@@ -570,7 +638,7 @@ export function createRhythmMode({
 
   function performPrimaryInput(event) {
     if (event?.cancelable) event.preventDefault();
-    if (!active || game.state !== "playing") return;
+    if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
     const command = game.getSnapshot().activeCommand;
     if (command?.type === RHYTHM_COMMAND_TYPES.HOLD) {
       refs.actionButton.classList.add("is-holding");
@@ -584,7 +652,7 @@ export function createRhythmMode({
 
   function releasePrimaryInput(event) {
     if (event?.cancelable) event.preventDefault();
-    if (!active || game.state !== "playing") return;
+    if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
     const command = game.getSnapshot().activeCommand;
     refs.actionButton.classList.remove("is-holding");
     if (command?.type === RHYTHM_COMMAND_TYPES.HOLD) {
@@ -612,6 +680,7 @@ export function createRhythmMode({
     { passive: false },
   );
   overlay.addEventListener("contextmenu", (event) => event.preventDefault());
+  refs.goalStart.addEventListener("click", beginCooking);
   refs.retry.addEventListener("click", () => startRun(activeLevelIndex));
   refs.nextLevel.addEventListener("click", () => startRun(activeLevelIndex + 1));
   refs.homeButtons.forEach((button) => {

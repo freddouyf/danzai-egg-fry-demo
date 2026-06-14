@@ -40,7 +40,6 @@ export function judgeMash(taps, targetTaps) {
   const count = Math.max(0, Math.floor(Number(taps) || 0));
   const target = Math.max(1, Math.floor(Number(targetTaps) || 1));
   if (count >= target) return RHYTHM_HIT_QUALITY.PERFECT;
-  if (count >= Math.ceil(target * 0.65)) return RHYTHM_HIT_QUALITY.GOOD;
   return RHYTHM_HIT_QUALITY.MISS;
 }
 
@@ -232,17 +231,22 @@ export class RhythmCookingGame {
 
     if (command.type === RHYTHM_COMMAND_TYPES.MASH) {
       this.mashTaps += 1;
-      const goodThreshold = Math.ceil(command.targetTaps * 0.65);
+      const completeReady = this.mashTaps >= command.targetTaps;
       const event = {
         type: "mashTap",
         taps: this.mashTaps,
         targetTaps: command.targetTaps,
-        goodReady: this.mashTaps >= goodThreshold,
-        completeReady: this.mashTaps >= command.targetTaps,
-        milestone:
-          this.mashTaps === goodThreshold || this.mashTaps === command.targetTaps,
+        goodReady: false,
+        completeReady,
+        milestone: completeReady,
       };
       this.events.push(event);
+      if (completeReady) {
+        return this.resolveCommand(RHYTHM_HIT_QUALITY.PERFECT, command, {
+          taps: this.mashTaps,
+          targetTaps: command.targetTaps,
+        });
+      }
       return event;
     }
 
