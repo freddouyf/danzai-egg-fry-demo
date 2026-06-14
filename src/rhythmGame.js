@@ -43,6 +43,64 @@ export function judgeTimingError(errorMs, { perfectMs, goodMs }) {
   return RHYTHM_HIT_QUALITY.MISS;
 }
 
+function clampRatio(value) {
+  return Math.min(1, Math.max(0, value));
+}
+
+function buildSuccessWindow({ startMs, endMs, minMs = 0, maxMs }) {
+  const safeMin = Math.floor(Number(minMs) || 0);
+  const safeMax = Math.max(safeMin + 1, Math.floor(Number(maxMs) || safeMin + 1));
+  const safeStart = Math.max(safeMin, Math.floor(Number(startMs) || safeMin));
+  const safeEnd = Math.min(safeMax, Math.max(safeStart, Math.floor(Number(endMs) || safeStart)));
+  const span = safeMax - safeMin;
+  return {
+    startMs: safeStart,
+    endMs: safeEnd,
+    minMs: safeMin,
+    maxMs: safeMax,
+    startRatio: clampRatio((safeStart - safeMin) / span),
+    endRatio: clampRatio((safeEnd - safeMin) / span),
+  };
+}
+
+export function getTapSuccessWindow(command) {
+  const startAtMs = Math.floor(Number(command?.startAtMs) || 0);
+  const targetAtMs = Math.max(startAtMs, Math.floor(Number(command?.targetAtMs) || startAtMs));
+  const successStartMs = targetAtMs - RHYTHM_WINDOWS.TAP.goodMs;
+  const successEndMs = targetAtMs + RHYTHM_WINDOWS.TAP.goodMs;
+  const maxMs = Math.max(
+    successEndMs,
+    Math.floor(Number(command?.expireAtMs) || successEndMs),
+  );
+  return buildSuccessWindow({
+    startMs: successStartMs,
+    endMs: successEndMs,
+    minMs: startAtMs,
+    maxMs,
+  });
+}
+
+export function getHoldSuccessWindow(command) {
+  const targetHoldMs = Math.max(250, Math.floor(Number(command?.targetHoldMs) || 250));
+  const successStartMs = targetHoldMs - RHYTHM_WINDOWS.HOLD.goodMs;
+  const successEndMs = targetHoldMs + RHYTHM_WINDOWS.HOLD.goodMs;
+  const maxMs = Math.max(targetHoldMs + 450, targetHoldMs * 1.45, successEndMs);
+  return buildSuccessWindow({
+    startMs: successStartMs,
+    endMs: successEndMs,
+    minMs: 0,
+    maxMs,
+  });
+}
+
+function judgeWithinSuccessWindow(valueMs, window, targetMs, timingWindow) {
+  const value = Math.floor(Number(valueMs) || 0);
+  if (value < window.startMs || value > window.endMs) return RHYTHM_HIT_QUALITY.MISS;
+  const error = Math.abs(value - targetMs);
+  if (error <= timingWindow.perfectMs) return RHYTHM_HIT_QUALITY.PERFECT;
+  return RHYTHM_HIT_QUALITY.GOOD;
+}
+
 export function judgeMash(taps, targetTaps) {
   const count = Math.max(0, Math.floor(Number(taps) || 0));
   const target = Math.max(1, Math.floor(Number(targetTaps) || 1));
@@ -278,6 +336,7 @@ export class RhythmCookingGame {
         ? Math.max(250, Number(template.targetHoldMs) || 800)
         : Math.max(250, (Number(template.targetAtMs) || baseStart + 330) - baseStart);
     const expireDelayMs = Math.max(
+      targetDelayMs + RHYTHM_WINDOWS.TAP.goodMs,
       targetDelayMs + 200,
       (Number(template.expireAtMs) || baseStart + targetDelayMs + 390) - baseStart,
     );
@@ -386,9 +445,20 @@ export class RhythmCookingGame {
       this.events.push(event);
       return event;
     }
-    const errorMs = this.elapsedMs - command.targetAtMs;
-    const quality = judgeTimingError(errorMs, RHYTHM_WINDOWS.TAP);
-    return this.resolveCurrentStep(quality, { errorMs });
+    const hitAtMs = this.elapsedMs;
+    const window = getTapSuccessWindow(command);
+    const quality = judgeWithinSuccessWindow(
+      hitAtMs,
+      window,
+      command.targetAtMs,
+      RHYTHM_WINDOWS.TAP,
+    );
+    return this.resolveCurrentStep(quality, {
+      errorMs: hitAtMs - command.targetAtMs,
+      hitAtMs,
+      successStartMs: window.startMs,
+      successEndMs: window.endMs,
+    });
   }
 
   holdStart(nowMs) {
@@ -423,15 +493,22 @@ export class RhythmCookingGame {
     }
     if (this.elapsedMs < command.startAtMs) return null;
     if (this.holdStartedAtMs === null) return null;
-    const holdDurationMs = this.getHoldElapsedMs();
+    const holdDurationMs = this.getHoldElapsedMs(this.elapsedMs);
     const startedAtMs = this.holdStartedAtMs;
     this.holdStartedAtMs = null;
-    const errorMs = holdDurationMs - command.targetHoldMs;
-    const quality = judgeTimingError(errorMs, RHYTHM_WINDOWS.HOLD);
+    const window = getHoldSuccessWindow(command);
+    const quality = judgeWithinSuccessWindow(
+      holdDurationMs,
+      window,
+      command.targetHoldMs,
+      RHYTHM_WINDOWS.HOLD,
+    );
     return this.resolveCurrentStep(quality, {
-      errorMs,
+      errorMs: holdDurationMs - command.targetHoldMs,
       holdDurationMs,
       startedAtMs,
+      successStartMs: window.startMs,
+      successEndMs: window.endMs,
     });
   }
 

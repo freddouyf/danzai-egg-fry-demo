@@ -1,4 +1,9 @@
-import { RHYTHM_WINDOWS, RhythmCookingGame, unlockRhythmLevelIndex } from "./rhythmGame.js";
+import {
+  getHoldSuccessWindow,
+  getTapSuccessWindow,
+  RhythmCookingGame,
+  unlockRhythmLevelIndex,
+} from "./rhythmGame.js";
 import { RHYTHM_COMMAND_TYPES, RHYTHM_DISH_LEVELS } from "./rhythmLevels.js";
 
 const RHYTHM_UNLOCK_KEY = "danzai-rhythm-unlocked-level";
@@ -132,29 +137,10 @@ export function canRunRhythmClock({
   return Boolean(isActive && isGoalConfirmed && gameState === "playing");
 }
 
-function zonePercent(value, max) {
-  return Math.min(100, Math.max(0, (value / Math.max(1, max)) * 100));
-}
-
-function timingZone(command, goodMs) {
-  const span = Math.max(1, command.expireAtMs - command.startAtMs);
-  const target = command.targetAtMs - command.startAtMs;
-  const goodStart = zonePercent(target - goodMs, span);
-  const goodEnd = zonePercent(target + goodMs, span);
+function windowToPercent(window) {
   return {
-    goodLeft: goodStart,
-    goodWidth: Math.max(8, goodEnd - goodStart),
-  };
-}
-
-function holdZone(command) {
-  const max = Math.max(command.targetHoldMs + 450, command.targetHoldMs * 1.45);
-  const goodStart = zonePercent(command.targetHoldMs - RHYTHM_WINDOWS.HOLD.goodMs, max);
-  const goodEnd = zonePercent(command.targetHoldMs + RHYTHM_WINDOWS.HOLD.goodMs, max);
-  return {
-    max,
-    goodLeft: goodStart,
-    goodWidth: Math.max(8, goodEnd - goodStart),
+    goodLeft: window.startRatio * 100,
+    goodWidth: Math.max(0, (window.endRatio - window.startRatio) * 100),
   };
 }
 
@@ -171,14 +157,14 @@ function commandProgress(snapshot) {
   }
 
   if (command.type === RHYTHM_COMMAND_TYPES.HOLD) {
-    const zone = holdZone(command);
-    const fill = Math.min(100, (snapshot.holdElapsedMs / zone.max) * 100);
+    const window = getHoldSuccessWindow(command);
+    const fill = Math.min(100, (snapshot.holdElapsedMs / window.maxMs) * 100);
     return {
       fill,
       copy: snapshot.holdActive
         ? `${(snapshot.holdElapsedMs / 1000).toFixed(1)}s`
         : "按住开始",
-      ...zone,
+      ...windowToPercent(window),
     };
   }
 
@@ -191,9 +177,9 @@ function commandProgress(snapshot) {
       snapshot.elapsedMs < command.inputStartAtMs
         ? "准备点击"
         : untilTarget > 0
-          ? `${untilTarget.toFixed(1)}s`
-          : "现在！",
-    ...timingZone(command, RHYTHM_WINDOWS.TAP.goodMs),
+        ? `${untilTarget.toFixed(1)}s`
+        : "现在！",
+    ...windowToPercent(getTapSuccessWindow(command)),
   };
 }
 

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   calculateRhythmCoins,
   calculateRhythmStarsFromEggs,
+  getHoldSuccessWindow,
+  getTapSuccessWindow,
   judgeMash,
   judgeTimingError,
   POST_MASH_INPUT_GUARD_MS,
@@ -138,6 +140,15 @@ function completeEggs(game, count) {
   }
 }
 
+function makeGameAtHoldStep() {
+  const game = new RhythmCookingGame(LOOP_LEVEL);
+  game.start();
+  completeTap(game);
+  completeMash(game);
+  assertActiveType(game, RHYTHM_COMMAND_TYPES.HOLD);
+  return game;
+}
+
 test("rhythm TAP uses the narrowed success timing window", () => {
   assert.equal(judgeTimingError(150, RHYTHM_WINDOWS.TAP), RHYTHM_HIT_QUALITY.PERFECT);
   assert.equal(judgeTimingError(300, RHYTHM_WINDOWS.TAP), RHYTHM_HIT_QUALITY.GOOD);
@@ -186,6 +197,40 @@ test("TAP success advances to MASH", () => {
   assert.equal(game.getSnapshot().currentDishStepIndex, 1);
 });
 
+test("TAP at the visible success window left edge succeeds", () => {
+  const game = new RhythmCookingGame(LOOP_LEVEL);
+  game.start();
+  const window = getTapSuccessWindow(activeCommand(game));
+  const hit = game.tap(window.startMs);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+  assert.equal(hit.successStartMs, window.startMs);
+  assert.equal(hit.successEndMs, window.endMs);
+});
+
+test("TAP at the visible success window middle succeeds", () => {
+  const game = new RhythmCookingGame(LOOP_LEVEL);
+  game.start();
+  const window = getTapSuccessWindow(activeCommand(game));
+  const hit = game.tap(Math.floor((window.startMs + window.endMs) / 2));
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+});
+
+test("TAP at the visible success window right edge succeeds", () => {
+  const game = new RhythmCookingGame(LOOP_LEVEL);
+  game.start();
+  const window = getTapSuccessWindow(activeCommand(game));
+  const hit = game.tap(window.endMs);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+});
+
+test("TAP just beyond the visible success window right edge fails", () => {
+  const game = new RhythmCookingGame(LOOP_LEVEL);
+  game.start();
+  const window = getTapSuccessWindow(activeCommand(game));
+  const hit = game.tap(window.endMs + 1);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.FAIL);
+});
+
 test("MASH success advances to HOLD", () => {
   const game = new RhythmCookingGame(LOOP_LEVEL);
   game.start();
@@ -194,6 +239,52 @@ test("MASH success advances to HOLD", () => {
   assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
   assertActiveType(game, RHYTHM_COMMAND_TYPES.HOLD);
   assert.equal(game.getSnapshot().currentDishStepIndex, 2);
+});
+
+test("HOLD at the visible success window left edge succeeds", () => {
+  const game = makeGameAtHoldStep();
+  const snapshot = game.getSnapshot();
+  const command = snapshot.activeCommand;
+  const window = getHoldSuccessWindow(command);
+  const startAtMs = snapshot.elapsedMs + snapshot.inputGuardRemainingMs;
+  game.holdStart(startAtMs);
+  const hit = game.holdEnd(startAtMs + window.startMs);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+  assert.equal(hit.successStartMs, window.startMs);
+  assert.equal(hit.successEndMs, window.endMs);
+});
+
+test("HOLD at the visible success window middle succeeds", () => {
+  const game = makeGameAtHoldStep();
+  const snapshot = game.getSnapshot();
+  const command = snapshot.activeCommand;
+  const window = getHoldSuccessWindow(command);
+  const startAtMs = snapshot.elapsedMs + snapshot.inputGuardRemainingMs;
+  game.holdStart(startAtMs);
+  const hit = game.holdEnd(startAtMs + Math.floor((window.startMs + window.endMs) / 2));
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+});
+
+test("HOLD at the visible success window right edge succeeds", () => {
+  const game = makeGameAtHoldStep();
+  const snapshot = game.getSnapshot();
+  const command = snapshot.activeCommand;
+  const window = getHoldSuccessWindow(command);
+  const startAtMs = snapshot.elapsedMs + snapshot.inputGuardRemainingMs;
+  game.holdStart(startAtMs);
+  const hit = game.holdEnd(startAtMs + window.endMs);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+});
+
+test("HOLD just beyond the visible success window right edge fails", () => {
+  const game = makeGameAtHoldStep();
+  const snapshot = game.getSnapshot();
+  const command = snapshot.activeCommand;
+  const window = getHoldSuccessWindow(command);
+  const startAtMs = snapshot.elapsedMs + snapshot.inputGuardRemainingMs;
+  game.holdStart(startAtMs);
+  const hit = game.holdEnd(startAtMs + window.endMs + 1);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.FAIL);
 });
 
 test("HOLD success completes one egg and returns to next TAP", () => {
@@ -276,6 +367,24 @@ test("HOLD release resolves only once", () => {
   assert.equal(afterSecond.successfulActions, afterFirst.successfulActions);
   assert.equal(afterSecond.failedActions, afterFirst.failedActions);
   assert.equal(afterSecond.completedEggs, afterFirst.completedEggs);
+});
+
+test("HOLD release freezes the elapsed value and later updates do not change the result", () => {
+  const game = makeGameAtHoldStep();
+  const snapshot = game.getSnapshot();
+  const command = snapshot.activeCommand;
+  const window = getHoldSuccessWindow(command);
+  const startAtMs = snapshot.elapsedMs + snapshot.inputGuardRemainingMs;
+  game.holdStart(startAtMs);
+  const hit = game.holdEnd(startAtMs + window.endMs);
+  const afterRelease = game.getSnapshot();
+  game.update(startAtMs + window.endMs + 100);
+  const afterUpdate = game.getSnapshot();
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+  assert.equal(afterRelease.completedEggs, 1);
+  assert.equal(afterUpdate.completedEggs, 1);
+  assert.equal(afterUpdate.failedActions, afterRelease.failedActions);
+  assert.equal(afterUpdate.holdElapsedMs, 0);
 });
 
 test("HOLD progress only grows while the player is holding", () => {
