@@ -565,7 +565,14 @@ export class RhythmCookingGame {
       this.events.push(event);
       return event;
     }
-    const quality = judgeSwipe(points, command);
+    const effectiveMinDistancePx = Math.max(
+      1,
+      Math.floor(Number(points.minDistancePx) || Number(command.minDistancePx) || 70),
+    );
+    const quality = judgeSwipe(points, {
+      ...command,
+      minDistancePx: effectiveMinDistancePx,
+    });
     return this.resolveCurrentStep(quality, {
       swipe: {
         startX: Number(points.startX) || 0,
@@ -573,7 +580,7 @@ export class RhythmCookingGame {
         endX: Number(points.endX) || 0,
         endY: Number(points.endY) || 0,
       },
-      minDistancePx: command.minDistancePx,
+      minDistancePx: effectiveMinDistancePx,
       direction: command.direction,
     });
   }

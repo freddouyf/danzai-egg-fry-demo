@@ -316,11 +316,12 @@ export function calculateSwipeSliderProgress({
   currentY = 0,
 } = {}, {
   minDistancePx = 70,
+  requiredDistancePx = minDistancePx,
   direction = "any",
 } = {}) {
   const dx = Number(currentX) - Number(startX);
   const dy = Number(currentY) - Number(startY);
-  const required = Math.max(1, Math.floor(Number(minDistancePx) || 70));
+  const required = Math.max(1, Math.floor(Number(requiredDistancePx) || Number(minDistancePx) || 70));
   const normalizedDirection = direction || "any";
   const directedDistance =
     normalizedDirection === "left"
@@ -517,7 +518,10 @@ export function createRhythmMode({
       startY: swipeStart.y,
       currentX,
       currentY,
-    }, command);
+    }, {
+      ...command,
+      requiredDistancePx: swipeStart.requiredDistancePx,
+    });
     refs.actionButton.style.setProperty("--swipe-progress", `${slider.percent}%`);
     refs.actionButton.classList.toggle("is-swipe-ready", slider.ready);
     refs.swipeKnob.textContent = slider.ready ? "✨" : "➡️";
@@ -964,9 +968,13 @@ export function createRhythmMode({
       refs.actionButton.classList.add("is-holding");
       game.holdStart(nowElapsed());
     } else if (command?.type === RHYTHM_COMMAND_TYPES.SWIPE) {
+      const sliderWidth = refs.swipeSlider.getBoundingClientRect?.().width || 0;
+      const knobWidth = refs.swipeKnob.getBoundingClientRect?.().width || 36;
+      const trackDistancePx = Math.max(1, Math.round(sliderWidth - knobWidth));
       swipeStart = {
         x: numberOr(event?.clientX, 0),
         y: numberOr(event?.clientY, 0),
+        requiredDistancePx: Math.max(Math.floor(Number(command.minDistancePx) || 70), trackDistancePx),
       };
       refs.actionButton.classList.add("is-swiping");
       refs.stage.classList.add("is-swiping");
@@ -1009,10 +1017,11 @@ export function createRhythmMode({
           event?.clientX,
           numberOr(
             swipeStart.currentX,
-            event?.code === "Space" ? swipeStart.x + command.minDistancePx : swipeStart.x,
+            event?.code === "Space" ? swipeStart.x + swipeStart.requiredDistancePx : swipeStart.x,
           ),
         ),
         endY: numberOr(event?.clientY, numberOr(swipeStart.currentY, swipeStart.y)),
+        minDistancePx: swipeStart.requiredDistancePx,
       }, nowElapsed());
       swipeStart = null;
       resetSwipeSlider();

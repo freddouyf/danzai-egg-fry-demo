@@ -333,6 +333,46 @@ test("SWIPE slider progress keeps fractional percent for smoother dragging", () 
   );
 });
 
+test("SWIPE slider progress can use the visual track distance instead of the small base threshold", () => {
+  assert.equal(
+    calculateSwipeSliderProgress(
+      { startX: 0, startY: 0, currentX: 70, currentY: 0 },
+      { minDistancePx: 70, requiredDistancePx: 140, direction: "right" },
+    ).percent,
+    50,
+  );
+});
+
+test("SWIPE game judgment can use the runtime slider distance", () => {
+  const swipeOnlyLevel = {
+    id: "swipe-only",
+    title: "Swipe Only",
+    dishName: "测试装盘",
+    durationMs: 10_000,
+    actionsPerDish: 1,
+    starEggs: [1, 2, 3],
+    commands: [{
+      id: "swipe",
+      type: RHYTHM_COMMAND_TYPES.SWIPE,
+      input: RHYTHM_COMMAND_TYPES.SWIPE,
+      actionName: "装盘",
+      prompt: "装盘！",
+      dishStepIndex: 0,
+      minDistancePx: 70,
+      direction: "right",
+    }],
+  };
+  const shortSwipe = new RhythmCookingGame(swipeOnlyLevel);
+  shortSwipe.start();
+  const miss = shortSwipe.swipe({ startX: 0, startY: 0, endX: 70, endY: 0, minDistancePx: 140 }, 0);
+  assert.equal(miss.actionResult, RHYTHM_ACTION_RESULT.FAIL);
+
+  const fullSwipe = new RhythmCookingGame(swipeOnlyLevel);
+  fullSwipe.start();
+  const hit = fullSwipe.swipe({ startX: 0, startY: 0, endX: 140, endY: 0, minDistancePx: 140 }, 0);
+  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+});
+
 test("all rhythm visual keys have UI mappings", () => {
   for (const level of RHYTHM_DISH_LEVELS) {
     for (const command of level.commands) {
