@@ -5,9 +5,9 @@ import {
 } from "./rhythmGame.js";
 import { RHYTHM_COMMAND_TYPES, RHYTHM_DISH_LEVELS } from "./rhythmLevels.js";
 import {
+  getRhythmResultProgressUpdate,
   isRhythmLevelUnlocked,
   readRhythmProgress,
-  recordRhythmLevelResult,
   saveRhythmProgress,
 } from "./rhythmProgress.js";
 
@@ -44,6 +44,26 @@ const COMMAND_UI = {
   },
 };
 
+export const actionVisuals = Object.freeze({
+  crack: Object.freeze({ icon: "🥚", scene: "crack", primary: "🥚", secondary: "💢", plate: "🍽️", effect: "crack" }),
+  whisk: Object.freeze({ icon: "🥣", scene: "mash", primary: "🥣", secondary: "🌀", plate: "🥚", effect: "spin" }),
+  "fry-egg": Object.freeze({ icon: "🍳", scene: "fry", primary: "🍳", secondary: "🍳", plate: "🍽️", effect: "heat" }),
+  "omelette-fry": Object.freeze({ icon: "🟡", scene: "fry", primary: "🍳", secondary: "🟡", plate: "🍽️", effect: "golden" }),
+  roll: Object.freeze({ icon: "🌯", scene: "serve", primary: "🌯", secondary: "✨", plate: "🍽️", effect: "slide" }),
+  toast: Object.freeze({ icon: "🍞", scene: "serve", primary: "🍞", secondary: "⬇️", plate: "🍽️", effect: "drop" }),
+  bake: Object.freeze({ icon: "🔥", scene: "fry", primary: "🍞", secondary: "♨️", plate: "🍽️", effect: "toast" }),
+  "egg-on-plate": Object.freeze({ icon: "🍳", scene: "serve", primary: "🍳", secondary: "⬇️", plate: "🍽️", effect: "drop" }),
+  stir: Object.freeze({ icon: "🥄", scene: "mash", primary: "🥘", secondary: "🥄", plate: "🍽️", effect: "shake" }),
+  plate: Object.freeze({ icon: "🍽️", scene: "serve", primary: "🍽️", secondary: "✨", plate: "🍳", effect: "shine" }),
+});
+
+function visualForCommand(command = {}) {
+  return actionVisuals[command.visualKey]
+    || actionVisuals[command.scene]
+    || actionVisuals[command.type]
+    || actionVisuals.crack;
+}
+
 function createRhythmOverlay() {
   const overlay = document.createElement("section");
   overlay.className = "overlay rhythm-overlay";
@@ -57,7 +77,7 @@ function createRhythmOverlay() {
           <small data-rhythm-dish>元气煎蛋</small>
         </span>
         <span>时间 <strong data-rhythm-time>30</strong>s</span>
-        <span>煎蛋 <strong data-rhythm-eggs>0</strong>个</span>
+        <span><small data-rhythm-unit-label>煎蛋</small> <strong data-rhythm-eggs>0</strong>个</span>
         <span>失败 <strong data-rhythm-fails>0</strong></span>
       </div>
 
@@ -90,6 +110,7 @@ function createRhythmOverlay() {
         <div class="rhythm-mascot" data-rhythm-mascot aria-hidden="true"></div>
         <div class="rhythm-cook-scene" data-rhythm-scene data-scene="crack" aria-hidden="true">
           <span class="scene-egg" data-scene-egg>🥚</span>
+          <span class="scene-secondary" data-scene-secondary>💢</span>
           <span class="scene-pan" data-scene-pan>🍳</span>
           <span class="scene-fire" data-scene-fire>🔥</span>
           <span class="scene-plate" data-scene-plate>🍽️</span>
@@ -122,11 +143,12 @@ function createRhythmOverlay() {
       <div class="rhythm-result" data-rhythm-result hidden>
         <h3 data-rhythm-result-title>菜品完成：元气煎蛋</h3>
         <dl>
-          <div><dt>完成煎蛋</dt><dd data-rhythm-final-eggs>0 个</dd></div>
+          <div><dt>完成数量</dt><dd data-rhythm-final-eggs>0 个</dd></div>
           <div><dt>失败动作</dt><dd data-rhythm-final-fails>0</dd></div>
           <div><dt>星级</dt><dd data-rhythm-stars>☆☆☆</dd></div>
           <div><dt>获得金币</dt><dd data-rhythm-final-coins>+0</dd></div>
         </dl>
+        <p class="rhythm-result-badges" data-rhythm-result-badges hidden></p>
         <div class="rhythm-result-actions">
           <button class="primary-button" type="button" data-rhythm-retry><span>再试一次</span></button>
           <button class="primary-button" type="button" data-rhythm-next-level hidden><span>下一关</span></button>
@@ -165,6 +187,10 @@ function commandIcon(type) {
   if (type === RHYTHM_COMMAND_TYPES.MASH) return "🥣";
   if (type === RHYTHM_COMMAND_TYPES.HOLD) return "🍳";
   return "🥚";
+}
+
+function stepIcon(command) {
+  return visualForCommand(command).icon || commandIcon(command.type);
 }
 
 export function getRhythmMapCards(levels = RHYTHM_DISH_LEVELS, progress = {}) {
@@ -303,6 +329,7 @@ export function createRhythmMode({
   const refs = {
     level: overlay.querySelector("[data-rhythm-level]"),
     dish: overlay.querySelector("[data-rhythm-dish]"),
+    unitLabel: overlay.querySelector("[data-rhythm-unit-label]"),
     time: overlay.querySelector("[data-rhythm-time]"),
     eggs: overlay.querySelector("[data-rhythm-eggs]"),
     fails: overlay.querySelector("[data-rhythm-fails]"),
@@ -319,6 +346,11 @@ export function createRhythmMode({
     stage: overlay.querySelector(".rhythm-stage"),
     mascot: overlay.querySelector("[data-rhythm-mascot]"),
     scene: overlay.querySelector("[data-rhythm-scene]"),
+    sceneEgg: overlay.querySelector("[data-scene-egg]"),
+    sceneSecondary: overlay.querySelector("[data-scene-secondary]"),
+    scenePan: overlay.querySelector("[data-scene-pan]"),
+    scenePlate: overlay.querySelector("[data-scene-plate]"),
+    sceneSparkle: overlay.querySelector("[data-scene-sparkle]"),
     commandBox: overlay.querySelector("[data-rhythm-command]"),
     commandStep: overlay.querySelector("[data-rhythm-command-step]"),
     commandIcon: overlay.querySelector("[data-rhythm-command-icon]"),
@@ -342,6 +374,7 @@ export function createRhythmMode({
     finalFails: overlay.querySelector("[data-rhythm-final-fails]"),
     finalCoins: overlay.querySelector("[data-rhythm-final-coins]"),
     stars: overlay.querySelector("[data-rhythm-stars]"),
+    resultBadges: overlay.querySelector("[data-rhythm-result-badges]"),
     retry: overlay.querySelector("[data-rhythm-retry]"),
     nextLevel: overlay.querySelector("[data-rhythm-next-level]"),
     homeButtons: overlay.querySelectorAll("[data-rhythm-home]"),
@@ -371,7 +404,7 @@ export function createRhythmMode({
 
   function renderStepProgress(level) {
     refs.stepProgress.innerHTML = getDishStepCommands(level)
-      .map((command, index) => `<span data-step-index="${index}">${commandIcon(command.type)}</span>`)
+      .map((command, index) => `<span data-step-index="${index}">${stepIcon(command)}</span>`)
       .join("");
   }
 
@@ -458,6 +491,7 @@ export function createRhythmMode({
     renderStepProgress(picked.level);
     refs.goalCard.hidden = false;
     refs.time.textContent = Math.ceil(picked.level.durationMs / 1000);
+    refs.unitLabel.textContent = picked.level.unitName || "成品";
     refs.eggs.textContent = "0";
     refs.fails.textContent = "0";
     refs.actionButton.classList.remove("is-holding", "is-tapping");
@@ -527,12 +561,15 @@ export function createRhythmMode({
       totalEggs: (Number(progress.totalEggs) || 0) + result.completedEggs,
       totalCoinsEarned: (Number(progress.totalCoinsEarned) || 0) + result.coinsEarned,
     });
-    rhythmProgress = recordRhythmLevelResult(
+    const progressUpdate = getRhythmResultProgressUpdate(
       rhythmProgress,
       activeLevelIndex,
       result.stars,
       RHYTHM_DISH_LEVELS.length,
     );
+    rhythmProgress = progressUpdate.progress;
+    result.newBestStars = progressUpdate.newBestStars;
+    result.unlockedNext = progressUpdate.unlockedNext;
     saveRhythmProgress(rhythmProgress, localStorage);
   }
 
@@ -564,6 +601,12 @@ export function createRhythmMode({
     refs.finalFails.textContent = result.failedActions;
     refs.finalCoins.textContent = `+${result.coinsEarned}`;
     refs.stars.textContent = formatStars(result.stars);
+    const resultBadges = [
+      result.newBestStars ? "新纪录！" : "",
+      result.unlockedNext ? "解锁新关卡！" : "",
+    ].filter(Boolean);
+    refs.resultBadges.textContent = resultBadges.join(" · ");
+    refs.resultBadges.hidden = resultBadges.length === 0;
     refs.nextLevel.hidden = !resultUi.showNextLevel;
     playCue?.(result.stars >= 2 ? "perfect" : "good");
     vibrate?.(result.stars >= 2 ? [35, 20, 55] : 20);
@@ -582,12 +625,13 @@ export function createRhythmMode({
           vibrate?.([25, 20, 25]);
         }
       } else if (event.type === "eggCompleted") {
+        const unitName = game.getSnapshot().level?.unitName || "成品";
         refs.scene.classList.remove("is-egg-complete");
         void refs.scene.offsetWidth;
         refs.scene.classList.add("is-egg-complete");
         window.clearTimeout(sceneTimer);
         sceneTimer = window.setTimeout(() => refs.scene.classList.remove("is-egg-complete"), 680);
-        showActionFeedback("煎蛋完成！", "complete");
+        showActionFeedback(`+1 ${unitName}`, "complete");
         spawnActionFx(RHYTHM_COMMAND_TYPES.TAP, "success", "serve");
         playCue?.("perfect");
         vibrate?.([22, 18, 36]);
@@ -695,6 +739,7 @@ export function createRhythmMode({
     }
 
     const ui = COMMAND_UI[command.type] || COMMAND_UI[RHYTHM_COMMAND_TYPES.TAP];
+    const visual = visualForCommand(command);
     const nextCommand = snapshot.nextCommand;
     const stepIndex = Math.min(
       snapshot.actionsPerDish - 1,
@@ -705,14 +750,20 @@ export function createRhythmMode({
       icon.classList.toggle("is-done", index < stepIndex);
     });
     refs.commandBox.dataset.type = command.type;
-    refs.scene.dataset.scene = command.scene || command.type;
+    refs.scene.dataset.scene = visual.scene || command.scene || command.type;
+    refs.scene.dataset.visual = command.visualKey || visual.effect || command.scene || command.type;
+    refs.scene.dataset.effect = visual.effect || "";
     refs.scene.dataset.holding = String(snapshot.holdActive);
-    refs.commandIcon.textContent = ui.icon;
+    refs.sceneEgg.textContent = visual.primary || visual.icon || "🥚";
+    refs.sceneSecondary.textContent = visual.secondary || "";
+    refs.scenePan.textContent = visual.pan || "🍳";
+    refs.scenePlate.textContent = visual.plate || "🍽️";
+    refs.sceneSparkle.textContent = visual.sparkle || "✨";
+    refs.commandIcon.textContent = visual.icon || ui.icon;
     refs.commandStep.textContent = ui.code;
     refs.commandType.textContent = command.prompt || ui.fallbackPrompt;
     refs.commandLabel.textContent = command.actionName || ui.fallbackPrompt;
-    refs.commandHint.textContent =
-      command.helperText || COMMAND_HINTS[command.type] || "按提示操作";
+    refs.commandHint.textContent = "";
     refs.commandNext.textContent = nextCommand
       ? `下一步：${nextCommand.actionName || COMMAND_LABELS[nextCommand.type]}`
       : "最后一道";

@@ -7361,6 +7361,12 @@ img,
   font-size: clamp(38px, 12vw, 58px);
 }
 
+.scene-secondary {
+  top: 30%;
+  left: 60%;
+  font-size: clamp(25px, 8vw, 40px);
+}
+
 .scene-pan {
   top: 50%;
   left: 50%;
@@ -7389,10 +7395,26 @@ img,
 }
 
 .rhythm-cook-scene[data-scene="crack"] .scene-egg,
-.rhythm-cook-scene[data-scene="mash"] .scene-egg {
+.rhythm-cook-scene[data-scene="crack"] .scene-secondary,
+.rhythm-cook-scene[data-scene="mash"] .scene-egg,
+.rhythm-cook-scene[data-scene="mash"] .scene-secondary {
   opacity: 1;
   transform: scale(1);
   filter: drop-shadow(0 8px 10px rgba(123, 76, 32, 0.16));
+}
+
+.rhythm-cook-scene[data-effect="crack"] .scene-egg {
+  animation: rhythm-egg-crack 520ms ease-in-out infinite alternate;
+}
+
+.rhythm-cook-scene[data-effect="spin"] .scene-egg,
+.rhythm-cook-scene[data-effect="shake"] .scene-egg {
+  animation: rhythm-bowl-spin 680ms linear infinite;
+}
+
+.rhythm-cook-scene[data-effect="spin"] .scene-secondary,
+.rhythm-cook-scene[data-effect="shake"] .scene-secondary {
+  animation: rhythm-stir-swirl 560ms ease-in-out infinite alternate;
 }
 
 .rhythm-cook-scene[data-scene="fry"] .scene-pan,
@@ -7414,13 +7436,31 @@ img,
   animation: rhythm-fire-pulse 360ms ease-in-out infinite alternate;
 }
 
+.rhythm-cook-scene[data-effect="golden"] .scene-secondary,
+.rhythm-cook-scene[data-effect="toast"] .scene-secondary {
+  opacity: 1;
+  filter: saturate(1.35) brightness(1.12);
+  animation: rhythm-golden-pulse 620ms ease-in-out infinite alternate;
+}
+
 .rhythm-cook-scene[data-scene="serve"] .scene-plate,
+.rhythm-cook-scene[data-scene="serve"] .scene-egg,
+.rhythm-cook-scene[data-scene="serve"] .scene-secondary,
 .rhythm-cook-scene[data-scene="serve"] .scene-sparkle {
   opacity: 1;
 }
 
 .rhythm-cook-scene[data-scene="serve"] .scene-plate {
   transform: translate(-50%, -50%) scale(1);
+}
+
+.rhythm-cook-scene[data-effect="slide"] .scene-egg,
+.rhythm-cook-scene[data-effect="drop"] .scene-egg {
+  animation: rhythm-food-slide 520ms ease-in-out infinite alternate;
+}
+
+.rhythm-cook-scene[data-effect="shine"] .scene-sparkle {
+  animation: rhythm-plate-shine 620ms ease-in-out infinite alternate;
 }
 
 .rhythm-cook-scene.is-egg-complete .scene-plate,
@@ -7431,15 +7471,15 @@ img,
 .rhythm-command {
   position: absolute;
   z-index: 3;
-  bottom: 16px;
+  bottom: 12px;
   left: 50%;
   display: inline-flex;
   width: auto;
   max-width: min(78%, 270px);
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 6px 10px;
   transform: translateX(-50%);
   border: 3px solid white;
   border-radius: 999px;
@@ -7460,7 +7500,7 @@ img,
 
 .rhythm-command small {
   color: #9b6848;
-  font-size: 11px;
+  font-size: 10px;
   font-style: normal;
   font-weight: 900;
 }
@@ -7476,7 +7516,7 @@ img,
 
 .rhythm-command strong {
   color: #ef5c2d;
-  font-size: clamp(22px, 6vw, 28px);
+  font-size: clamp(19px, 5.2vw, 24px);
   font-weight: 1000;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -7863,6 +7903,23 @@ img,
   font-weight: 1000;
 }
 
+.rhythm-result-badges {
+  margin: 0;
+  padding: 7px 10px;
+  border: 2px solid white;
+  border-radius: 999px;
+  color: white;
+  background: linear-gradient(90deg, #ef5c2d, #ef3f83);
+  box-shadow: 0 5px 13px rgba(142, 62, 35, 0.18);
+  font-size: 13px;
+  font-weight: 1000;
+  text-align: center;
+}
+
+.rhythm-result-badges[hidden] {
+  display: none !important;
+}
+
 .rhythm-result-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -8016,6 +8073,44 @@ img,
   to {
     filter: brightness(1.16) saturate(1.25);
     transform: translate(-50%, -54%) scale(1.34);
+  }
+}
+
+@keyframes rhythm-egg-crack {
+  to {
+    transform: translateY(-5px) scale(1.06) rotate(-4deg);
+  }
+}
+
+@keyframes rhythm-bowl-spin {
+  to {
+    transform: scale(1) rotate(360deg);
+  }
+}
+
+@keyframes rhythm-stir-swirl {
+  to {
+    transform: translate(5px, -4px) scale(1.12) rotate(12deg);
+  }
+}
+
+@keyframes rhythm-golden-pulse {
+  to {
+    transform: scale(1.1);
+    filter: saturate(1.55) brightness(1.22) drop-shadow(0 0 14px rgba(255, 185, 40, 0.58));
+  }
+}
+
+@keyframes rhythm-food-slide {
+  to {
+    transform: translate(12px, -3px) scale(1.04);
+  }
+}
+
+@keyframes rhythm-plate-shine {
+  to {
+    transform: scale(1.18) rotate(8deg);
+    filter: drop-shadow(0 0 16px rgba(255, 218, 70, 0.76));
   }
 }
 

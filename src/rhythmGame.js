@@ -177,6 +177,7 @@ function normalizeCommand(command, index) {
       endAtMs,
       expireAtMs: endAtMs,
       targetTaps: Math.max(1, Math.floor(Number(command.targetTaps) || 6)),
+      visualKey: command.visualKey || command.scene || "whisk",
       dishStepIndex: Math.max(0, Math.floor(Number(command.dishStepIndex) || 0)),
     };
   }
@@ -194,6 +195,7 @@ function normalizeCommand(command, index) {
     startAtMs,
     targetAtMs,
     targetHoldMs,
+    visualKey: command.visualKey || command.scene || type,
     dishStepIndex: Math.max(0, Math.floor(Number(command.dishStepIndex) || 0)),
     inputStartAtMs:
       type === RHYTHM_COMMAND_TYPES.TAP
@@ -246,6 +248,12 @@ function fallbackStepTemplate(stepIndex) {
         ? "mash"
         : type === RHYTHM_COMMAND_TYPES.HOLD
           ? "fry"
+          : "crack",
+    visualKey:
+      type === RHYTHM_COMMAND_TYPES.MASH
+        ? "whisk"
+        : type === RHYTHM_COMMAND_TYPES.HOLD
+          ? "fry-egg"
           : "crack",
     dishStepIndex: stepIndex,
     startAtMs: 0,

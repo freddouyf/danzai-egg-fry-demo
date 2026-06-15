@@ -42,6 +42,24 @@ export function recordRhythmLevelResult(progress, levelIndex, stars, totalLevels
   return next;
 }
 
+export function getRhythmResultProgressUpdate(progress, levelIndex, stars, totalLevels = 3) {
+  const before = normalizeRhythmProgress(progress, totalLevels);
+  const index = Math.min(
+    before.bestStarsByLevel.length - 1,
+    Math.max(0, Math.floor(Number(levelIndex) || 0)),
+  );
+  const earnedStars = Math.min(3, Math.max(0, Math.floor(Number(stars) || 0)));
+  const previousBestStars = before.bestStarsByLevel[index] || 0;
+  const previousUnlockedLevelIndex = before.unlockedLevelIndex;
+  const next = recordRhythmLevelResult(before, index, earnedStars, totalLevels);
+  return {
+    progress: next,
+    newBestStars: earnedStars > previousBestStars,
+    unlockedNext: next.unlockedLevelIndex > previousUnlockedLevelIndex,
+    previousBestStars,
+  };
+}
+
 export function readRhythmProgress(storage = globalThis.localStorage, totalLevels = 3) {
   try {
     const raw = JSON.parse(storage.getItem(RHYTHM_PROGRESS_KEY) || "{}");

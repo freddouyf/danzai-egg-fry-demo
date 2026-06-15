@@ -21,6 +21,7 @@ import {
   RHYTHM_TEST_LEVEL,
 } from "../src/rhythmLevels.js";
 import {
+  actionVisuals,
   canRunRhythmClock,
   formatRhythmLevelInfo,
   getRhythmMapCards,
@@ -29,6 +30,7 @@ import {
 } from "../src/rhythmMode.js";
 import {
   createDefaultRhythmProgress,
+  getRhythmResultProgressUpdate,
   isRhythmLevelUnlocked,
   recordRhythmLevelResult,
 } from "../src/rhythmProgress.js";
@@ -208,6 +210,13 @@ test("breakfast street level one is a 3 step dish", () => {
   );
 });
 
+test("level one steps expose reusable visual keys", () => {
+  assert.deepEqual(
+    RHYTHM_DISH_LEVELS[0].commands.map((command) => command.visualKey),
+    ["crack", "whisk", "fry-egg"],
+  );
+});
+
 test("breakfast street level two is a 4 step dish", () => {
   assert.equal(RHYTHM_DISH_LEVELS[1].dishName, "黄金蛋卷");
   assert.equal(RHYTHM_DISH_LEVELS[1].actionsPerDish, 4);
@@ -219,6 +228,13 @@ test("breakfast street level two is a 4 step dish", () => {
       RHYTHM_COMMAND_TYPES.HOLD,
       RHYTHM_COMMAND_TYPES.TAP,
     ],
+  );
+});
+
+test("level two steps expose reusable visual keys", () => {
+  assert.deepEqual(
+    RHYTHM_DISH_LEVELS[1].commands.map((command) => command.visualKey),
+    ["crack", "whisk", "omelette-fry", "roll"],
   );
 });
 
@@ -234,6 +250,21 @@ test("breakfast street level three is a 5 step dish", () => {
       RHYTHM_COMMAND_TYPES.TAP,
     ],
   );
+});
+
+test("level three steps expose reusable visual keys", () => {
+  assert.deepEqual(
+    RHYTHM_DISH_LEVELS[2].commands.map((command) => command.visualKey),
+    ["toast", "bake", "egg-on-plate", "stir", "plate"],
+  );
+});
+
+test("all rhythm visual keys have UI mappings", () => {
+  for (const level of RHYTHM_DISH_LEVELS) {
+    for (const command of level.commands) {
+      assert.ok(actionVisuals[command.visualKey], `${command.id} missing visual mapping`);
+    }
+  }
 });
 
 test("initial rhythm step is TAP", () => {
@@ -713,6 +744,20 @@ test("replaying an unlocked rhythm level never lowers best stars", () => {
   const replayLoss = recordRhythmLevelResult(threeStar, 0, 1, RHYTHM_DISH_LEVELS.length);
   assert.equal(replayLoss.bestStarsByLevel[0], 3);
   assert.equal(replayLoss.unlockedLevelIndex, 1);
+});
+
+test("rhythm progress update reports new best stars and unlocked next level", () => {
+  const initial = createDefaultRhythmProgress(RHYTHM_DISH_LEVELS.length);
+  const firstClear = getRhythmResultProgressUpdate(initial, 0, 2, RHYTHM_DISH_LEVELS.length);
+  assert.equal(firstClear.newBestStars, true);
+  assert.equal(firstClear.unlockedNext, true);
+  assert.equal(firstClear.progress.bestStarsByLevel[0], 2);
+  assert.equal(firstClear.progress.unlockedLevelIndex, 1);
+
+  const lowerReplay = getRhythmResultProgressUpdate(firstClear.progress, 0, 1, RHYTHM_DISH_LEVELS.length);
+  assert.equal(lowerReplay.newBestStars, false);
+  assert.equal(lowerReplay.unlockedNext, false);
+  assert.equal(lowerReplay.progress.bestStarsByLevel[0], 2);
 });
 
 test("rhythm map cards expose lock state, best stars and star goals", () => {
