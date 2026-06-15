@@ -8353,3 +8353,252 @@ img,
     transform: translate(-50%, -50%) scale(1);
   }
 }
+
+.business-button {
+  border: 0;
+  border-radius: 22px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #ffe26c, #ff9b4a);
+  color: #5f2b00;
+  box-shadow: 0 10px 0 rgba(175, 89, 14, 0.22), 0 18px 32px rgba(255, 155, 74, 0.28);
+  font-weight: 900;
+}
+
+.business-button span,
+.business-button small {
+  display: block;
+}
+
+.business-button span {
+  font-size: 18px;
+}
+
+.business-button small {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.82;
+}
+
+.business-overlay {
+  padding: max(14px, env(safe-area-inset-top)) 12px max(14px, env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(255, 245, 209, 0.98), rgba(255, 218, 164, 0.96));
+  overflow-y: auto;
+}
+
+.business-card {
+  width: min(100%, 430px);
+  margin: 0 auto;
+  display: grid;
+  gap: 12px;
+  color: #5b3414;
+}
+
+.business-header,
+.business-stats,
+.business-build,
+.business-panel {
+  border: 2px solid rgba(119, 70, 21, 0.12);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 12px 26px rgba(173, 105, 38, 0.12);
+}
+
+.business-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+}
+
+.business-header small {
+  display: block;
+  color: #a5681f;
+  font-weight: 800;
+}
+
+.business-header h2,
+.business-panel h3 {
+  margin: 0;
+}
+
+.business-home {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+.business-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 10px;
+  text-align: center;
+}
+
+.business-stats span {
+  display: grid;
+  gap: 2px;
+  font-size: 11px;
+  color: #93602a;
+}
+
+.business-stats strong {
+  font-size: 17px;
+  color: #4b2609;
+}
+
+.business-build {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+}
+
+.business-build div {
+  min-height: 28px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: #fff2bd;
+  font-weight: 800;
+}
+
+.business-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.business-panel p {
+  margin: 0;
+  color: #855826;
+  line-height: 1.45;
+}
+
+.business-order-list,
+.business-upgrade-list {
+  display: grid;
+  gap: 10px;
+}
+
+.business-order-card,
+.business-upgrade-card {
+  width: 100%;
+  border: 0;
+  border-radius: 18px;
+  padding: 12px;
+  text-align: left;
+  background: linear-gradient(135deg, #fff8df, #ffe7a8);
+  color: #58310f;
+  box-shadow: inset 0 0 0 2px rgba(120, 75, 22, 0.08), 0 7px 0 rgba(166, 92, 14, 0.14);
+}
+
+.business-order-card span,
+.business-upgrade-card span {
+  font-size: 12px;
+  color: #9b682e;
+  font-weight: 800;
+}
+
+.business-order-card strong,
+.business-upgrade-card strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.business-order-card small,
+.business-order-card em,
+.business-order-card b,
+.business-upgrade-card small,
+.business-upgrade-card em {
+  display: block;
+  margin-top: 5px;
+  font-style: normal;
+  font-size: 12px;
+}
+
+.business-order-card b {
+  color: #bf5d0a;
+}
+
+.business-cooking {
+  text-align: center;
+}
+
+.business-action-track {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 18px;
+  background: #fff1c5;
+}
+
+.business-action-track span {
+  min-width: 62px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #9a6830;
+  font-weight: 900;
+}
+
+.business-action-track span.is-active {
+  background: #ff8f3f;
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 14px rgba(255, 143, 63, 0.32);
+}
+
+.business-action-track span.is-done {
+  background: #8bdc7a;
+  color: #28541b;
+}
+
+.business-cooking-actions,
+.business-result-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.business-upgrade-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 10px;
+}
+
+.business-upgrade-card span {
+  grid-row: span 3;
+  font-size: 28px;
+}
+
+.business-result dl {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 0;
+}
+
+.business-result dl div {
+  padding: 10px;
+  border-radius: 16px;
+  background: #fff3c5;
+}
+
+.business-result dt {
+  font-size: 12px;
+  color: #946129;
+}
+
+.business-result dd {
+  margin: 2px 0 0;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.business-final-build {
+  padding: 10px;
+  border-radius: 16px;
+  background: #fff1c5;
+  font-weight: 800;
+}

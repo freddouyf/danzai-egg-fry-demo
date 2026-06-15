@@ -1,4 +1,5 @@
 ﻿import "./style.css";
+import { createBusinessMode } from "./businessMode.js";
 import { createRhythmMode } from "./rhythmMode.js";
 import {
   chooseDanzaiAsset,
@@ -83,6 +84,7 @@ const elements = {
   upgradeRerollCount: document.querySelector("#upgradeRerollCount"),
   startButton: document.querySelector("#startButton"),
   rhythmButton: document.querySelector("#rhythmButton"),
+  businessButton: document.querySelector("#businessButton"),
   shopButton: document.querySelector("#shopButton"),
   shopCloseButton: document.querySelector("#shopCloseButton"),
   recordsButton: document.querySelector("#recordsButton"),
@@ -175,7 +177,7 @@ if (elements.hud && elements.combatReadout && elements.pauseButton) {
 const pauseUpgradePanel = document.createElement("section");
 pauseUpgradePanel.className = "pause-upgrades";
 pauseUpgradePanel.innerHTML = `
-  <strong>褰撳墠寮哄寲</strong>
+  <strong>当前强化</strong>
   <div class="pause-upgrade-list"></div>
 `;
 elements.pauseOverlay
@@ -200,6 +202,7 @@ let wardrobe = readWardrobe();
 let progress = readProgress();
 let audioContext = null;
 let rhythmMode = null;
+let businessMode = null;
 
 function readWallet() {
   try {
@@ -604,6 +607,7 @@ function resetTransientGameUi() {
 function startGame() {
   ensureAudio();
   rhythmMode?.stop({ showHome: false });
+  businessMode?.stop({ showHome: false });
   window.clearTimeout(stageResultTimer);
   pendingPanIntroEvent = null;
   resetTransientGameUi();
@@ -1540,8 +1544,15 @@ rhythmMode = createRhythmMode({
   saveProgress,
 });
 
+businessMode = createBusinessMode({
+  root: elements.app,
+  triggerButton: elements.businessButton,
+  homeOverlay: elements.startOverlay,
+  ensureAudio,
+});
+
 window.addEventListener("keydown", (event) => {
-  if (rhythmMode?.isActive()) return;
+  if (rhythmMode?.isActive() || businessMode?.isActive()) return;
   if (event.key === "Escape" && elements.mechanicsOverlay.classList.contains("is-visible")) {
     event.preventDefault();
     closeMechanics();
