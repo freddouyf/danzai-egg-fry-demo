@@ -7,113 +7,128 @@ import {
   RealtimeKitchenGame,
 } from "../src/realtimeKitchenGame.js";
 
-test("realtime kitchen initializes with two orders", () => {
+test("realtime kitchen initializes the first customer order", () => {
   const game = new RealtimeKitchenGame();
   const snapshot = game.getSnapshot();
 
   assert.equal(snapshot.state, "playing");
-  assert.equal(snapshot.orders.length, 2);
-  assert.equal(snapshot.coins, 0);
-  assert.equal(snapshot.chaos, 0);
+  assert.equal(snapshot.currentOrder.dishName, "快手煎蛋");
+  assert.equal(snapshot.currentStep.type, "ingredient");
+  assert.equal(snapshot.currentStep.ingredientId, "egg");
+  assert.equal(snapshot.currentStep.targetId, "pan");
 });
 
-test("update reduces time and customer patience", () => {
+test("service target is three customers", () => {
+  const game = new RealtimeKitchenGame();
+  assert.equal(game.getSnapshot().serviceTarget, 3);
+});
+
+test("two walked out customers fail the level", () => {
+  const game = new RealtimeKitchenGame();
+  game.update(999999);
+  assert.equal(game.getSnapshot().walkedOutCustomers, 1);
+  assert.equal(game.getSnapshot().state, "playing");
+
+  game.update(999999);
+  const snapshot = game.getSnapshot();
+  assert.equal(snapshot.walkedOutCustomers, 2);
+  assert.equal(snapshot.state, "ended");
+  assert.equal(snapshot.result.passed, false);
+});
+
+test("correct ingredient drop advances the step", () => {
+  const game = new RealtimeKitchenGame();
+  game.dropIngredient("egg", "pan");
+  const snapshot = game.getSnapshot();
+
+  assert.equal(snapshot.currentStep.type, "action");
+  assert.equal(snapshot.currentStep.actionType, "tap");
+});
+
+test("wrong ingredient drop does not advance and costs patience", () => {
   const game = new RealtimeKitchenGame();
   const before = game.getSnapshot();
-  game.update(1000);
+  game.dropIngredient("scallion", "pan");
   const after = game.getSnapshot();
 
-  assert.equal(after.remainingMs, before.remainingMs - 1000);
-  assert.equal(after.orders[0].remainingPatienceMs, before.orders[0].remainingPatienceMs - 1000);
+  assert.equal(after.currentStepIndex, before.currentStepIndex);
+  assert.equal(after.currentOrder.remainingPatienceMs, before.currentOrder.remainingPatienceMs - 1000);
+  assert.equal(after.lastFeedback, "不是这个食材！");
 });
 
-test("timed out orders fail and increase chaos", () => {
+test("TAP success advances", () => {
   const game = new RealtimeKitchenGame();
-  game.update(30000);
-  const snapshot = game.getSnapshot();
-
-  assert.ok(snapshot.failedOrders > 0);
-  assert.ok(snapshot.chaos >= 2);
-  assert.equal(snapshot.orders.length, 2);
-});
-
-test("selectOrder sets active order", () => {
-  const game = new RealtimeKitchenGame();
-  const order = game.getSnapshot().orders[0];
-  game.selectOrder(order.instanceId);
-
-  assert.equal(game.getSnapshot().activeOrder.instanceId, order.instanceId);
-});
-
-test("successful actions advance steps", () => {
-  const game = new RealtimeKitchenGame();
-  const order = game.getSnapshot().orders[0];
-  game.selectOrder(order.instanceId);
+  game.dropIngredient("egg", "pan");
   game.completeTap();
 
-  const snapshot = game.getSnapshot();
-  assert.equal(snapshot.activeActionIndex, 1);
-  assert.equal(snapshot.activeAction.type, "hold");
+  assert.equal(game.getSnapshot().currentStep.actionType, "hold");
 });
 
-test("completing all actions finishes order and grants coins", () => {
+test("HOLD success window is inclusive", () => {
+  const action = { targetMs: 1000, windowMs: 200, maxMs: 1600 };
+  assert.equal(judgeHoldAction(action, 800), true);
+  assert.equal(judgeHoldAction(action, 1000), true);
+  assert.equal(judgeHoldAction(action, 1200), true);
+  assert.equal(judgeHoldAction(action, 799), false);
+  assert.equal(judgeHoldAction(action, 1201), false);
+});
+
+test("MASH reaching target advances", () => {
   const game = new RealtimeKitchenGame();
-  const order = game.getSnapshot().orders[0];
-  game.selectOrder(order.instanceId);
+  game.dropIngredient("egg", "pan");
   game.completeTap();
   game.completeHold(900);
+  game.completeSwipe(90);
+  game.dropIngredient("egg", "pan");
+  game.completeHold(1000);
+  game.dropIngredient("bread", "plate");
+  game.completeSwipe(100);
+  game.dropIngredient("egg", "pan");
+  game.dropIngredient("chili", "pan");
+  assert.equal(game.getSnapshot().currentStep.actionType, "mash");
 
-  const snapshot = game.getSnapshot();
-  assert.equal(snapshot.completedOrders, 1);
-  assert.equal(snapshot.coins, order.rewardCoins);
-  assert.equal(snapshot.activeOrder, null);
+  game.completeMash(8);
+  assert.equal(game.getSnapshot().currentStep.actionType, "swipe");
 });
 
-test("failed action increases chaos", () => {
+test("SWIPE reaching target advances", () => {
   const game = new RealtimeKitchenGame();
-  const order = game.getSnapshot().orders[0];
-  game.selectOrder(order.instanceId);
+  game.dropIngredient("egg", "pan");
   game.completeTap();
-  game.completeHold(100);
+  game.completeHold(900);
+  assert.equal(game.getSnapshot().currentStep.actionType, "swipe");
 
+  game.completeSwipe(90);
   const snapshot = game.getSnapshot();
-  assert.equal(snapshot.failedActions, 1);
-  assert.equal(snapshot.chaos, 1);
+  assert.equal(snapshot.servedCustomers, 1);
+  assert.equal(snapshot.coins, 18);
 });
 
-test("run ends when 60 seconds expire", () => {
+test("completing three customers passes the level", () => {
   const game = new RealtimeKitchenGame();
-  game.update(60000);
 
-  assert.equal(game.getSnapshot().state, "ended");
-});
-
-test("run ends early when chaos reaches max", () => {
-  const game = new RealtimeKitchenGame();
-  game.chaos = 9;
-  const order = game.getSnapshot().orders[0];
-  game.selectOrder(order.instanceId);
+  game.dropIngredient("egg", "pan");
   game.completeTap();
-  game.completeHold(100);
+  game.completeHold(900);
+  game.completeSwipe(90);
 
-  assert.equal(game.getSnapshot().state, "ended");
-});
+  game.dropIngredient("egg", "pan");
+  game.completeHold(1000);
+  game.dropIngredient("bread", "plate");
+  game.completeSwipe(90);
 
-test("realtime kitchen numeric fields never become NaN", () => {
-  const game = new RealtimeKitchenGame();
-  game.update(Number.NaN);
+  game.dropIngredient("egg", "pan");
+  game.dropIngredient("chili", "pan");
+  game.completeMash(8);
+  game.completeSwipe(90);
+
   const snapshot = game.getSnapshot();
-
-  [
-    snapshot.remainingMs,
-    snapshot.coins,
-    snapshot.chaos,
-    snapshot.completedOrders,
-    snapshot.failedOrders,
-  ].forEach((value) => assert.equal(Number.isFinite(value), true));
+  assert.equal(snapshot.state, "ended");
+  assert.equal(snapshot.result.passed, true);
+  assert.equal(snapshot.result.servedCustomers, 3);
 });
 
-test("realtime action judges cover hold mash and swipe", () => {
+test("action judges cover hold mash and swipe", () => {
   assert.equal(judgeHoldAction({ targetMs: 1000, windowMs: 200, maxMs: 1600 }, 1000), true);
   assert.equal(judgeHoldAction({ targetMs: 1000, windowMs: 200, maxMs: 1600 }, 300), false);
   assert.equal(judgeMashAction({ targetTaps: 5 }, 5), true);
