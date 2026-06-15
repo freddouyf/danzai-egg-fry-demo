@@ -1,4 +1,5 @@
 ﻿import "./style.css";
+import { createRealtimeKitchenMode } from "./realtimeKitchenMode.js";
 import { createRhythmMode } from "./rhythmMode.js";
 import {
   chooseDanzaiAsset,
@@ -83,6 +84,7 @@ const elements = {
   upgradeRerollCount: document.querySelector("#upgradeRerollCount"),
   startButton: document.querySelector("#startButton"),
   rhythmButton: document.querySelector("#rhythmButton"),
+  realtimeButton: document.querySelector("#realtimeButton"),
   shopButton: document.querySelector("#shopButton"),
   shopCloseButton: document.querySelector("#shopCloseButton"),
   recordsButton: document.querySelector("#recordsButton"),
@@ -200,6 +202,7 @@ let wardrobe = readWardrobe();
 let progress = readProgress();
 let audioContext = null;
 let rhythmMode = null;
+let realtimeMode = null;
 
 function readWallet() {
   try {
@@ -604,6 +607,7 @@ function resetTransientGameUi() {
 function startGame() {
   ensureAudio();
   rhythmMode?.stop({ showHome: false });
+  realtimeMode?.stop({ showHome: false });
   window.clearTimeout(stageResultTimer);
   pendingPanIntroEvent = null;
   resetTransientGameUi();
@@ -1540,8 +1544,15 @@ rhythmMode = createRhythmMode({
   saveProgress,
 });
 
+realtimeMode = createRealtimeKitchenMode({
+  root: elements.app,
+  triggerButton: elements.realtimeButton,
+  homeOverlay: elements.startOverlay,
+  ensureAudio,
+});
+
 window.addEventListener("keydown", (event) => {
-  if (rhythmMode?.isActive()) return;
+  if (rhythmMode?.isActive() || realtimeMode?.isActive()) return;
   if (event.key === "Escape" && elements.mechanicsOverlay.classList.contains("is-visible")) {
     event.preventDefault();
     closeMechanics();
