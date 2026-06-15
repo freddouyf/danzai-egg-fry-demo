@@ -175,7 +175,7 @@ if (elements.hud && elements.combatReadout && elements.pauseButton) {
 const pauseUpgradePanel = document.createElement("section");
 pauseUpgradePanel.className = "pause-upgrades";
 pauseUpgradePanel.innerHTML = `
-  <strong>褰撳墠寮哄寲</strong>
+  <strong>当前强化</strong>
   <div class="pause-upgrade-list"></div>
 `;
 elements.pauseOverlay
