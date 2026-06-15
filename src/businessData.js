@@ -7,6 +7,30 @@ export const BUSINESS_ACTION_LABELS = Object.freeze({
   swipe: "SWIPE",
 });
 
+export const BUSINESS_COOKING_APPROACHES = Object.freeze({
+  steady: Object.freeze({
+    id: "steady",
+    name: "稳稳做",
+    short: "金币 -10% · 混乱 -1",
+    coinDelta: -0.1,
+    chaosDelta: -1,
+  }),
+  normal: Object.freeze({
+    id: "normal",
+    name: "正常做",
+    short: "正常收益",
+    coinDelta: 0,
+    chaosDelta: 0,
+  }),
+  quick: Object.freeze({
+    id: "quick",
+    name: "快手做",
+    short: "金币 +20% · 混乱 +1",
+    coinDelta: 0.2,
+    chaosDelta: 1,
+  }),
+});
+
 export const BUSINESS_ORDERS_BY_WAVE = Object.freeze([
   Object.freeze([
     Object.freeze({

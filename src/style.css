@@ -8508,6 +8508,8 @@ img,
 .business-order-card small,
 .business-order-card em,
 .business-order-card b,
+.business-order-card i,
+.business-order-card mark,
 .business-upgrade-card small,
 .business-upgrade-card em {
   display: block;
@@ -8518,6 +8520,19 @@ img,
 
 .business-order-card b {
   color: #bf5d0a;
+}
+
+.business-order-card i {
+  color: #76512a;
+}
+
+.business-order-card mark {
+  width: fit-content;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #fff0a7;
+  color: #945111;
+  font-weight: 900;
 }
 
 .business-cooking {
@@ -8559,6 +8574,49 @@ img,
 .business-result-actions {
   display: grid;
   gap: 10px;
+}
+
+.business-pending {
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: #fff7d8;
+  font-weight: 900;
+}
+
+.business-approach-button {
+  border: 0;
+  border-radius: 18px;
+  padding: 12px;
+  color: #4e2b0c;
+  text-align: left;
+  box-shadow: inset 0 0 0 2px rgba(111, 67, 19, 0.08), 0 7px 0 rgba(134, 80, 13, 0.12);
+}
+
+.business-approach-button strong,
+.business-approach-button small {
+  display: block;
+}
+
+.business-approach-button strong {
+  font-size: 17px;
+}
+
+.business-approach-button small {
+  margin-top: 4px;
+  font-weight: 800;
+  opacity: 0.78;
+}
+
+.business-approach-button.is-steady {
+  background: linear-gradient(135deg, #dff8cb, #bdf0a8);
+}
+
+.business-approach-button.is-normal {
+  background: linear-gradient(135deg, #fff6d6, #ffe4a3);
+}
+
+.business-approach-button.is-quick {
+  background: linear-gradient(135deg, #ffd4aa, #ff9f67);
 }
 
 .business-upgrade-card {
