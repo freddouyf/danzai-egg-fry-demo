@@ -146,6 +146,11 @@ function createRhythmOverlay() {
       <button class="rhythm-action-button" type="button" data-rhythm-action>
         <span data-rhythm-action-icon>👆</span>
         <strong data-rhythm-action-label>点击</strong>
+        <em class="rhythm-swipe-slider" data-rhythm-swipe-slider aria-hidden="true">
+          <i data-rhythm-swipe-fill></i>
+          <b data-rhythm-swipe-knob>➡️</b>
+          <small>拖到发光</small>
+        </em>
       </button>
 
       <div class="rhythm-result" data-rhythm-result hidden>
@@ -284,6 +289,46 @@ function commandProgress(snapshot) {
   };
 }
 
+function clamp01(value) {
+  return Math.min(1, Math.max(0, Number(value) || 0));
+}
+
+function numberOr(value, fallback) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+export function calculateSwipeSliderProgress({
+  startX = 0,
+  startY = 0,
+  currentX = 0,
+  currentY = 0,
+} = {}, {
+  minDistancePx = 70,
+  direction = "any",
+} = {}) {
+  const dx = Number(currentX) - Number(startX);
+  const dy = Number(currentY) - Number(startY);
+  const required = Math.max(1, Math.floor(Number(minDistancePx) || 70));
+  const normalizedDirection = direction || "any";
+  const directedDistance =
+    normalizedDirection === "left"
+      ? -dx
+      : normalizedDirection === "right"
+        ? dx
+        : normalizedDirection === "up"
+          ? -dy
+          : normalizedDirection === "down"
+            ? dy
+            : Math.max(Math.abs(dx), Math.abs(dy));
+  const progress = clamp01(directedDistance / required);
+  return {
+    progress,
+    percent: Math.round(progress * 100),
+    ready: progress >= 1,
+  };
+}
+
 function levelAt(index) {
   const safeIndex = Math.min(
     RHYTHM_DISH_LEVELS.length - 1,
@@ -386,6 +431,9 @@ export function createRhythmMode({
     actionButton: overlay.querySelector("[data-rhythm-action]"),
     actionIcon: overlay.querySelector("[data-rhythm-action-icon]"),
     actionLabel: overlay.querySelector("[data-rhythm-action-label]"),
+    swipeSlider: overlay.querySelector("[data-rhythm-swipe-slider]"),
+    swipeFill: overlay.querySelector("[data-rhythm-swipe-fill]"),
+    swipeKnob: overlay.querySelector("[data-rhythm-swipe-knob]"),
     result: overlay.querySelector("[data-rhythm-result]"),
     resultTitle: overlay.querySelector("[data-rhythm-result-title]"),
     finalEggs: overlay.querySelector("[data-rhythm-final-eggs]"),
@@ -419,6 +467,27 @@ export function createRhythmMode({
 
   function refreshMascot() {
     mountMascot?.(refs.mascot, active ? "happy" : "idle");
+  }
+
+  function resetSwipeSlider() {
+    refs.actionButton.style.setProperty("--swipe-progress", "0%");
+    refs.actionButton.classList.remove("is-swiping", "is-swipe-ready");
+    refs.stage.classList.remove("is-swiping");
+    refs.swipeKnob.textContent = "➡️";
+  }
+
+  function updateSwipeSlider(command, currentX, currentY) {
+    if (!swipeStart || !command) return;
+    const slider = calculateSwipeSliderProgress({
+      startX: swipeStart.x,
+      startY: swipeStart.y,
+      currentX,
+      currentY,
+    }, command);
+    refs.actionButton.style.setProperty("--swipe-progress", `${slider.percent}%`);
+    refs.actionButton.classList.toggle("is-swipe-ready", slider.ready);
+    refs.swipeKnob.textContent = slider.ready ? "✨" : "➡️";
+    refs.trackCopy.textContent = slider.ready ? "松手完成！" : `滑动 ${slider.percent}%`;
   }
 
   function renderStepProgress(level) {
@@ -514,9 +583,9 @@ export function createRhythmMode({
     refs.eggs.textContent = "0";
     refs.fails.textContent = "0";
     refs.actionButton.classList.remove("is-holding", "is-tapping");
-    refs.actionButton.classList.remove("is-swiping");
     refs.stage.classList.remove("is-mashing");
-    refs.stage.classList.remove("is-swiping");
+    swipeStart = null;
+    resetSwipeSlider();
     refs.scene.classList.remove("is-mashing", "is-egg-complete");
     refs.track.classList.remove("is-mash-good", "is-mash-perfect");
     homeOverlay?.classList.remove("is-visible");
@@ -539,9 +608,9 @@ export function createRhythmMode({
     refs.commandBox.hidden = false;
     refs.stepProgress.hidden = false;
     refs.actionButton.classList.remove("is-holding", "is-tapping");
-    refs.actionButton.classList.remove("is-swiping");
     refs.stage.classList.remove("is-mashing");
-    refs.stage.classList.remove("is-swiping");
+    swipeStart = null;
+    resetSwipeSlider();
     refs.scene.classList.remove("is-mashing", "is-egg-complete");
     refs.track.classList.remove("is-mash-good", "is-mash-perfect");
     game.drainEvents();
@@ -612,9 +681,9 @@ export function createRhythmMode({
     refs.stepProgress.hidden = !resultUi.showStepProgress;
     refs.goalCard.hidden = !resultUi.showGoalCard;
     refs.actionButton.classList.remove("is-holding", "is-tapping");
-    refs.actionButton.classList.remove("is-swiping");
     refs.stage.classList.remove("is-mashing");
-    refs.stage.classList.remove("is-swiping");
+    swipeStart = null;
+    resetSwipeSlider();
     refs.scene.classList.remove("is-mashing", "is-egg-complete");
     refs.track.classList.remove("is-mash-good", "is-mash-perfect");
     overlay.classList.add("is-ended");
@@ -762,6 +831,10 @@ export function createRhythmMode({
 
     if (command.id !== lastCommandId) {
       lastCommandId = command.id;
+      if (!swipeStart || command.type !== RHYTHM_COMMAND_TYPES.SWIPE) {
+        swipeStart = null;
+        resetSwipeSlider();
+      }
       refs.commandBox.classList.remove("is-entering");
       void refs.commandBox.offsetWidth;
       refs.commandBox.classList.add("is-entering");
@@ -821,16 +894,31 @@ export function createRhythmMode({
       game.holdStart(nowElapsed());
     } else if (command?.type === RHYTHM_COMMAND_TYPES.SWIPE) {
       swipeStart = {
-        x: Number(event?.clientX) || 0,
-        y: Number(event?.clientY) || 0,
+        x: numberOr(event?.clientX, 0),
+        y: numberOr(event?.clientY, 0),
       };
       refs.actionButton.classList.add("is-swiping");
       refs.stage.classList.add("is-swiping");
+      updateSwipeSlider(command, swipeStart.x, swipeStart.y);
     } else {
       game.tap(nowElapsed());
     }
     handleEvents();
     render();
+    if (command?.type === RHYTHM_COMMAND_TYPES.SWIPE && swipeStart) {
+      updateSwipeSlider(command, swipeStart.x, swipeStart.y);
+    }
+  }
+
+  function movePrimaryInput(event) {
+    if (!swipeStart) return;
+    if (event?.cancelable) event.preventDefault();
+    if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
+    const command = game.getSnapshot().activeCommand;
+    if (command?.type !== RHYTHM_COMMAND_TYPES.SWIPE) return;
+    swipeStart.currentX = numberOr(event?.clientX, swipeStart.x);
+    swipeStart.currentY = numberOr(event?.clientY, swipeStart.y);
+    updateSwipeSlider(command, swipeStart.currentX, swipeStart.currentY);
   }
 
   function releasePrimaryInput(event) {
@@ -838,8 +926,6 @@ export function createRhythmMode({
     if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
     const command = game.getSnapshot().activeCommand;
     refs.actionButton.classList.remove("is-holding");
-    refs.actionButton.classList.remove("is-swiping");
-    refs.stage.classList.remove("is-swiping");
     if (command?.type === RHYTHM_COMMAND_TYPES.HOLD) {
       game.holdEnd(nowElapsed());
       handleEvents();
@@ -848,10 +934,17 @@ export function createRhythmMode({
       game.swipe({
         startX: swipeStart.x,
         startY: swipeStart.y,
-        endX: Number(event?.clientX) || (event?.code === "Space" ? swipeStart.x + command.minDistancePx : swipeStart.x),
-        endY: Number(event?.clientY) || swipeStart.y,
+        endX: numberOr(
+          event?.clientX,
+          numberOr(
+            swipeStart.currentX,
+            event?.code === "Space" ? swipeStart.x + command.minDistancePx : swipeStart.x,
+          ),
+        ),
+        endY: numberOr(event?.clientY, numberOr(swipeStart.currentY, swipeStart.y)),
       }, nowElapsed());
       swipeStart = null;
+      resetSwipeSlider();
       handleEvents();
       render();
     }
@@ -859,11 +952,15 @@ export function createRhythmMode({
 
   function cancelActiveHold() {
     if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
+    if (swipeStart) {
+      swipeStart = null;
+      resetSwipeSlider();
+      return;
+    }
     if (!game.getSnapshot().holdActive) return;
     refs.actionButton.classList.remove("is-holding");
-    refs.actionButton.classList.remove("is-swiping");
-    refs.stage.classList.remove("is-swiping");
     swipeStart = null;
+    resetSwipeSlider();
     game.cancelHold(nowElapsed());
     handleEvents();
     render();
@@ -874,8 +971,12 @@ export function createRhythmMode({
     refs.actionButton.setPointerCapture?.(event.pointerId);
     performPrimaryInput(event);
   });
+  refs.actionButton.addEventListener("pointermove", movePrimaryInput);
   refs.actionButton.addEventListener("pointerup", releasePrimaryInput);
-  refs.actionButton.addEventListener("pointercancel", releasePrimaryInput);
+  refs.actionButton.addEventListener("pointercancel", (event) => {
+    if (event?.cancelable) event.preventDefault();
+    cancelActiveHold();
+  });
   refs.actionButton.addEventListener(
     "touchstart",
     (event) => event.preventDefault(),

@@ -23,6 +23,7 @@ import {
 } from "../src/rhythmLevels.js";
 import {
   actionVisuals,
+  calculateSwipeSliderProgress,
   canRunRhythmClock,
   formatRhythmLevelInfo,
   getRhythmMapCards,
@@ -285,6 +286,40 @@ test("SWIPE any direction accepts vertical or horizontal swipes", () => {
   assert.equal(
     judgeSwipe({ startX: 0, startY: 0, endX: -80, endY: 0 }, { minDistancePx: 70, direction: "any" }),
     RHYTHM_HIT_QUALITY.PERFECT,
+  );
+});
+
+test("SWIPE slider progress reaches ready state at threshold", () => {
+  assert.deepEqual(
+    calculateSwipeSliderProgress(
+      { startX: 0, startY: 0, currentX: 35, currentY: 0 },
+      { minDistancePx: 70, direction: "right" },
+    ),
+    { progress: 0.5, percent: 50, ready: false },
+  );
+  assert.equal(
+    calculateSwipeSliderProgress(
+      { startX: 0, startY: 0, currentX: 70, currentY: 0 },
+      { minDistancePx: 70, direction: "right" },
+    ).ready,
+    true,
+  );
+});
+
+test("SWIPE slider progress respects direction and any mode", () => {
+  assert.equal(
+    calculateSwipeSliderProgress(
+      { startX: 100, startY: 0, currentX: 0, currentY: 0 },
+      { minDistancePx: 70, direction: "right" },
+    ).percent,
+    0,
+  );
+  assert.equal(
+    calculateSwipeSliderProgress(
+      { startX: 100, startY: 100, currentX: 100, currentY: 20 },
+      { minDistancePx: 70, direction: "any" },
+    ).ready,
+    true,
   );
 });
 
