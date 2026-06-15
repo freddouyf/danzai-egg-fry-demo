@@ -66,8 +66,9 @@ function buildSuccessWindow({ startMs, endMs, minMs = 0, maxMs }) {
 export function getTapSuccessWindow(command) {
   const startAtMs = Math.floor(Number(command?.startAtMs) || 0);
   const targetAtMs = Math.max(startAtMs, Math.floor(Number(command?.targetAtMs) || startAtMs));
-  const successStartMs = targetAtMs - RHYTHM_WINDOWS.TAP.goodMs;
-  const successEndMs = targetAtMs + RHYTHM_WINDOWS.TAP.goodMs;
+  const goodMs = Math.max(1, Math.floor(Number(command?.goodMs) || RHYTHM_WINDOWS.TAP.goodMs));
+  const successStartMs = targetAtMs - goodMs;
+  const successEndMs = targetAtMs + goodMs;
   const maxMs = Math.max(
     successEndMs,
     Math.floor(Number(command?.expireAtMs) || successEndMs),
@@ -82,8 +83,9 @@ export function getTapSuccessWindow(command) {
 
 export function getHoldSuccessWindow(command) {
   const targetHoldMs = Math.max(250, Math.floor(Number(command?.targetHoldMs) || 250));
-  const successStartMs = targetHoldMs - RHYTHM_WINDOWS.HOLD.goodMs;
-  const successEndMs = targetHoldMs + RHYTHM_WINDOWS.HOLD.goodMs;
+  const goodMs = Math.max(1, Math.floor(Number(command?.goodMs) || RHYTHM_WINDOWS.HOLD.goodMs));
+  const successStartMs = targetHoldMs - goodMs;
+  const successEndMs = targetHoldMs + goodMs;
   const maxMs = Math.max(targetHoldMs + 450, targetHoldMs * 1.45, successEndMs);
   return buildSuccessWindow({
     startMs: successStartMs,
@@ -175,6 +177,7 @@ function normalizeCommand(command, index) {
       endAtMs,
       expireAtMs: endAtMs,
       targetTaps: Math.max(1, Math.floor(Number(command.targetTaps) || 6)),
+      dishStepIndex: Math.max(0, Math.floor(Number(command.dishStepIndex) || 0)),
     };
   }
 
@@ -191,6 +194,7 @@ function normalizeCommand(command, index) {
     startAtMs,
     targetAtMs,
     targetHoldMs,
+    dishStepIndex: Math.max(0, Math.floor(Number(command.dishStepIndex) || 0)),
     inputStartAtMs:
       type === RHYTHM_COMMAND_TYPES.TAP
         ? Math.max(
@@ -205,25 +209,32 @@ function normalizeCommand(command, index) {
 function normalizeLevel(level) {
   const title = level?.title || RHYTHM_TEST_LEVEL.title;
   const dishName = level?.dishName || title;
+  const commands = (level?.commands || RHYTHM_TEST_LEVEL.commands).map(normalizeCommand);
+  const inferredActionsPerDish = commands.reduce(
+    (max, command) => Math.max(max, command.dishStepIndex + 1),
+    DEFAULT_ACTIONS_PER_DISH,
+  );
   return {
     ...RHYTHM_TEST_LEVEL,
     ...level,
     title,
     dishName,
     durationMs: Math.max(5_000, Math.floor(Number(level?.durationMs) || RHYTHM_TEST_LEVEL.durationMs)),
+    unitName: level?.unitName || "成品",
+    tapDurationMs: Math.max(600, Math.floor(Number(level?.tapDurationMs) || Number(RHYTHM_TEST_LEVEL.tapDurationMs) || 1_300)),
     actionsPerDish: Math.max(
       1,
-      Math.floor(Number(level?.actionsPerDish) || Number(RHYTHM_TEST_LEVEL.actionsPerDish) || DEFAULT_ACTIONS_PER_DISH),
+      Math.floor(Number(level?.actionsPerDish) || inferredActionsPerDish),
     ),
     starEggs: level?.starEggs || RHYTHM_TEST_LEVEL.starEggs || DEFAULT_STAR_EGGS,
-    commands: (level?.commands || RHYTHM_TEST_LEVEL.commands).map(normalizeCommand),
+    commands,
   };
 }
 
 function fallbackStepTemplate(stepIndex) {
   const type = RHYTHM_DISH_STEP_TYPES[stepIndex] || RHYTHM_COMMAND_TYPES.TAP;
-  const names = ["敲蛋", "打蛋", "煎熟出锅"];
-  const prompts = ["敲蛋！", "快速打蛋！", "按住煎熟！"];
+  const names = ["敲蛋", "打蛋", "煎熟出锅", "出锅", "装盘"];
+  const prompts = ["敲蛋！", "快速打蛋！", "按住煎熟！", "出锅！", "装盘！"];
   return normalizeCommand({
     id: `fallback-step-${stepIndex}`,
     input: type,
@@ -246,10 +257,11 @@ function fallbackStepTemplate(stepIndex) {
   }, stepIndex);
 }
 
-function buildStepTemplates(commands) {
+function buildStepTemplates(commands, actionsPerDish = DEFAULT_ACTIONS_PER_DISH) {
   const usedIds = new Set();
-  return RHYTHM_DISH_STEP_TYPES.map((type, stepIndex) => {
+  return Array.from({ length: actionsPerDish }, (_, stepIndex) => {
     const byStep = commands.find((command) => command.dishStepIndex === stepIndex);
+    const type = byStep?.type || RHYTHM_DISH_STEP_TYPES[stepIndex] || RHYTHM_COMMAND_TYPES.TAP;
     const byType = commands.find((command) => command.type === type && !usedIds.has(command.id));
     const picked = byStep || byType || fallbackStepTemplate(stepIndex);
     usedIds.add(picked.id);
@@ -260,7 +272,7 @@ function buildStepTemplates(commands) {
 export class RhythmCookingGame {
   constructor(level = RHYTHM_TEST_LEVEL) {
     this.level = normalizeLevel(level);
-    this.stepTemplates = buildStepTemplates(this.level.commands);
+    this.stepTemplates = buildStepTemplates(this.level.commands, this.level.actionsPerDish);
     this.events = [];
     this.reset();
   }
@@ -312,7 +324,7 @@ export class RhythmCookingGame {
 
   createStepCommand(stepIndex, startAtMs = this.elapsedMs, { preview = false } = {}) {
     const template = this.stepTemplates[stepIndex] || fallbackStepTemplate(stepIndex);
-    const type = RHYTHM_DISH_STEP_TYPES[stepIndex] || template.type || RHYTHM_COMMAND_TYPES.TAP;
+    const type = template.type || RHYTHM_DISH_STEP_TYPES[stepIndex] || RHYTHM_COMMAND_TYPES.TAP;
     const baseStart = Number(template.startAtMs) || 0;
     const idSuffix = preview ? "preview" : `${this.eggAttemptIndex}-${this.commandIndex}`;
 
@@ -358,6 +370,7 @@ export class RhythmCookingGame {
       id: `${template.id}-${idSuffix}`,
       type,
       input: type,
+      goodMs: template.goodMs,
       dishStepIndex: stepIndex,
       eggIndex: this.eggAttemptIndex,
       startAtMs,

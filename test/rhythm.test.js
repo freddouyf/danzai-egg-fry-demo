@@ -23,9 +23,15 @@ import {
 import {
   canRunRhythmClock,
   formatRhythmLevelInfo,
+  getRhythmMapCards,
   getRhythmResultUiState,
   shouldShowRhythmNextLevel,
 } from "../src/rhythmMode.js";
+import {
+  createDefaultRhythmProgress,
+  isRhythmLevelUnlocked,
+  recordRhythmLevelResult,
+} from "../src/rhythmProgress.js";
 
 const LOOP_LEVEL = {
   id: "loop-test",
@@ -128,10 +134,22 @@ function failHoldLate(game) {
 }
 
 function completeEgg(game) {
-  assert.equal(completeTap(game).actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
-  assert.equal(completeMash(game).actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
-  const hit = completeHold(game);
-  assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+  const startEggs = game.getSnapshot().completedEggs;
+  let hit = null;
+  let guard = 0;
+  while (game.getSnapshot().completedEggs === startEggs && guard < 8) {
+    const command = activeCommand(game);
+    if (command.type === RHYTHM_COMMAND_TYPES.TAP) {
+      hit = completeTap(game);
+    } else if (command.type === RHYTHM_COMMAND_TYPES.MASH) {
+      hit = completeMash(game);
+    } else if (command.type === RHYTHM_COMMAND_TYPES.HOLD) {
+      hit = completeHold(game);
+    }
+    assert.equal(hit.actionResult, RHYTHM_ACTION_RESULT.SUCCESS);
+    guard += 1;
+  }
+  assert.equal(game.getSnapshot().completedEggs, startEggs + 1);
   return hit;
 }
 
@@ -174,11 +192,47 @@ test("rhythm level one is a 30 second fried egg completion challenge with TAP MA
   assert.deepEqual(RHYTHM_TEST_LEVEL.starEggs, [2, 4, 6]);
   assert.deepEqual(
     RHYTHM_TEST_LEVEL.commands.slice(0, 3).map((command) => command.actionName),
-    ["敲蛋", "打蛋", "煎熟出锅"],
+    ["敲蛋", "快速打蛋", "按住煎熟"],
   );
   assert.deepEqual(
     RHYTHM_TEST_LEVEL.commands.slice(0, 3).map((command) => command.input),
     [RHYTHM_COMMAND_TYPES.TAP, RHYTHM_COMMAND_TYPES.MASH, RHYTHM_COMMAND_TYPES.HOLD],
+  );
+});
+
+test("breakfast street level one is a 3 step dish", () => {
+  assert.equal(RHYTHM_DISH_LEVELS[0].actionsPerDish, 3);
+  assert.deepEqual(
+    RHYTHM_DISH_LEVELS[0].commands.map((command) => command.input),
+    [RHYTHM_COMMAND_TYPES.TAP, RHYTHM_COMMAND_TYPES.MASH, RHYTHM_COMMAND_TYPES.HOLD],
+  );
+});
+
+test("breakfast street level two is a 4 step dish", () => {
+  assert.equal(RHYTHM_DISH_LEVELS[1].dishName, "黄金蛋卷");
+  assert.equal(RHYTHM_DISH_LEVELS[1].actionsPerDish, 4);
+  assert.deepEqual(
+    RHYTHM_DISH_LEVELS[1].commands.map((command) => command.input),
+    [
+      RHYTHM_COMMAND_TYPES.TAP,
+      RHYTHM_COMMAND_TYPES.MASH,
+      RHYTHM_COMMAND_TYPES.HOLD,
+      RHYTHM_COMMAND_TYPES.TAP,
+    ],
+  );
+});
+
+test("breakfast street level three is a 5 step dish", () => {
+  assert.equal(RHYTHM_DISH_LEVELS[2].actionsPerDish, 5);
+  assert.deepEqual(
+    RHYTHM_DISH_LEVELS[2].commands.map((command) => command.input),
+    [
+      RHYTHM_COMMAND_TYPES.TAP,
+      RHYTHM_COMMAND_TYPES.HOLD,
+      RHYTHM_COMMAND_TYPES.TAP,
+      RHYTHM_COMMAND_TYPES.MASH,
+      RHYTHM_COMMAND_TYPES.TAP,
+    ],
   );
 });
 
@@ -539,7 +593,7 @@ test("later rhythm levels avoid long fixed waits between steps", () => {
 test("rhythm prototype has simple dish names for later levels", () => {
   assert.deepEqual(
     RHYTHM_DISH_LEVELS.map((level) => level.dishName),
-    ["元气煎蛋", "黄金蛋液", "早餐拼盘"],
+    ["元气煎蛋", "黄金蛋卷", "早餐拼盘"],
   );
 });
 
@@ -574,6 +628,22 @@ test("2, 4 and 6 completed eggs map to 1, 2 and 3 stars", () => {
   assert.equal(calculateRhythmStarsFromEggs(4), 2);
   assert.equal(calculateRhythmStarsFromEggs(5), 2);
   assert.equal(calculateRhythmStarsFromEggs(6), 3);
+});
+
+test("level two uses 2, 4 and 6 completed dishes for 1, 2 and 3 stars", () => {
+  const thresholds = RHYTHM_DISH_LEVELS[1].starEggs;
+  assert.equal(calculateRhythmStarsFromEggs(1, thresholds), 0);
+  assert.equal(calculateRhythmStarsFromEggs(2, thresholds), 1);
+  assert.equal(calculateRhythmStarsFromEggs(4, thresholds), 2);
+  assert.equal(calculateRhythmStarsFromEggs(6, thresholds), 3);
+});
+
+test("level three uses 1, 3 and 5 completed dishes for 1, 2 and 3 stars", () => {
+  const thresholds = RHYTHM_DISH_LEVELS[2].starEggs;
+  assert.equal(calculateRhythmStarsFromEggs(0, thresholds), 0);
+  assert.equal(calculateRhythmStarsFromEggs(1, thresholds), 1);
+  assert.equal(calculateRhythmStarsFromEggs(3, thresholds), 2);
+  assert.equal(calculateRhythmStarsFromEggs(5, thresholds), 3);
 });
 
 test("rhythm coins use base 20 plus stars and completed eggs", () => {
@@ -623,6 +693,41 @@ test("1 star level one result unlocks and shows level two", () => {
     }),
     true,
   );
+});
+
+test("rhythm progress unlocks level two and level three with at least one star", () => {
+  const initial = createDefaultRhythmProgress(RHYTHM_DISH_LEVELS.length);
+  assert.equal(isRhythmLevelUnlocked(initial, 0), true);
+  assert.equal(isRhythmLevelUnlocked(initial, 1), false);
+  const afterLevelOne = recordRhythmLevelResult(initial, 0, 1, RHYTHM_DISH_LEVELS.length);
+  assert.equal(afterLevelOne.unlockedLevelIndex, 1);
+  assert.equal(isRhythmLevelUnlocked(afterLevelOne, 1), true);
+  const afterLevelTwo = recordRhythmLevelResult(afterLevelOne, 1, 1, RHYTHM_DISH_LEVELS.length);
+  assert.equal(afterLevelTwo.unlockedLevelIndex, 2);
+  assert.equal(isRhythmLevelUnlocked(afterLevelTwo, 2), true);
+});
+
+test("replaying an unlocked rhythm level never lowers best stars", () => {
+  const initial = createDefaultRhythmProgress(RHYTHM_DISH_LEVELS.length);
+  const threeStar = recordRhythmLevelResult(initial, 0, 3, RHYTHM_DISH_LEVELS.length);
+  const replayLoss = recordRhythmLevelResult(threeStar, 0, 1, RHYTHM_DISH_LEVELS.length);
+  assert.equal(replayLoss.bestStarsByLevel[0], 3);
+  assert.equal(replayLoss.unlockedLevelIndex, 1);
+});
+
+test("rhythm map cards expose lock state, best stars and star goals", () => {
+  const progress = recordRhythmLevelResult(
+    createDefaultRhythmProgress(RHYTHM_DISH_LEVELS.length),
+    0,
+    2,
+    RHYTHM_DISH_LEVELS.length,
+  );
+  const cards = getRhythmMapCards(RHYTHM_DISH_LEVELS, progress);
+  assert.equal(cards[0].unlocked, true);
+  assert.equal(cards[0].bestStars, 2);
+  assert.equal(cards[0].goalText, "2 个 = ★ · 4 个 = ★★ · 6 个 = ★★★");
+  assert.equal(cards[1].unlocked, true);
+  assert.equal(cards[2].unlocked, false);
 });
 
 test("last rhythm level never shows the next-level entrance", () => {

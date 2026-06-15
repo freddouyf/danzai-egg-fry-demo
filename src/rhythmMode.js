@@ -2,11 +2,14 @@ import {
   getHoldSuccessWindow,
   getTapSuccessWindow,
   RhythmCookingGame,
-  unlockRhythmLevelIndex,
 } from "./rhythmGame.js";
 import { RHYTHM_COMMAND_TYPES, RHYTHM_DISH_LEVELS } from "./rhythmLevels.js";
-
-const RHYTHM_UNLOCK_KEY = "danzai-rhythm-unlocked-level";
+import {
+  isRhythmLevelUnlocked,
+  readRhythmProgress,
+  recordRhythmLevelResult,
+  saveRhythmProgress,
+} from "./rhythmProgress.js";
 
 const COMMAND_LABELS = {
   [RHYTHM_COMMAND_TYPES.TAP]: "TAP",
@@ -58,12 +61,23 @@ function createRhythmOverlay() {
         <span>失败 <strong data-rhythm-fails>0</strong></span>
       </div>
 
+      <div class="rhythm-map" data-rhythm-map hidden>
+        <header>
+          <span>
+            <strong>早餐街</strong>
+            <small>通关上一关后解锁下一关</small>
+          </span>
+          <button class="secondary-button rhythm-map-exit" type="button" data-rhythm-exit>返回首页</button>
+        </header>
+        <div class="rhythm-map-list" data-rhythm-map-list></div>
+      </div>
+
       <div class="rhythm-stage">
         <div class="rhythm-goal-card" data-rhythm-goal-card>
           <strong data-rhythm-goal-title>元气煎蛋</strong>
-          <p>目标：30 秒内尽可能多做煎蛋</p>
+          <p data-rhythm-goal-desc>目标：30 秒内尽可能多做煎蛋</p>
           <span data-rhythm-goal-stars>2 个 = ★ · 4 个 = ★★ · 6 个 = ★★★</span>
-          <small>每个煎蛋：敲蛋 → 快速打蛋 → 按住煎熟</small>
+          <small data-rhythm-goal-flow>流程：敲蛋 → 快速打蛋 → 按住煎熟</small>
           <button class="primary-button" type="button" data-rhythm-goal-start>
             <span>开始做菜</span>
           </button>
@@ -133,6 +147,37 @@ function formatGoalText(level) {
   return `${one} 个 = ★ · ${two} 个 = ★★ · ${three} 个 = ★★★`;
 }
 
+function getDishStepCommands(level = {}) {
+  const actionsPerDish = Math.max(1, Math.floor(Number(level.actionsPerDish) || 1));
+  return Array.from({ length: actionsPerDish }, (_, stepIndex) => (
+    level.commands?.find((command) => command.dishStepIndex === stepIndex)
+    || level.commands?.[stepIndex]
+  )).filter(Boolean);
+}
+
+function formatActionFlow(level = {}) {
+  return getDishStepCommands(level)
+    .map((command) => command.actionName || command.prompt || COMMAND_LABELS[command.type] || "做菜")
+    .join(" → ");
+}
+
+function commandIcon(type) {
+  if (type === RHYTHM_COMMAND_TYPES.MASH) return "🥣";
+  if (type === RHYTHM_COMMAND_TYPES.HOLD) return "🍳";
+  return "🥚";
+}
+
+export function getRhythmMapCards(levels = RHYTHM_DISH_LEVELS, progress = {}) {
+  return levels.map((level, index) => ({
+    index,
+    title: level.title || `第 ${index + 1} 关`,
+    dishName: level.dishName,
+    bestStars: Math.max(0, Math.floor(Number(progress.bestStarsByLevel?.[index]) || 0)),
+    unlocked: isRhythmLevelUnlocked(progress, index),
+    goalText: formatGoalText(level),
+  }));
+}
+
 export function formatRhythmLevelInfo(levelIndex = 0, level = {}) {
   const safeIndex = Math.max(0, Math.floor(Number(levelIndex) || 0));
   return {
@@ -193,22 +238,6 @@ function commandProgress(snapshot) {
         : "现在！",
     ...windowToPercent(getTapSuccessWindow(command)),
   };
-}
-
-function readUnlockedLevelIndex() {
-  try {
-    return Math.max(0, Math.floor(Number(localStorage.getItem(RHYTHM_UNLOCK_KEY)) || 0));
-  } catch {
-    return 0;
-  }
-}
-
-function saveUnlockedLevelIndex(index) {
-  try {
-    localStorage.setItem(RHYTHM_UNLOCK_KEY, String(Math.max(0, Math.floor(Number(index) || 0))));
-  } catch {
-    // Local storage can be unavailable in private contexts.
-  }
 }
 
 function levelAt(index) {
@@ -277,12 +306,16 @@ export function createRhythmMode({
     time: overlay.querySelector("[data-rhythm-time]"),
     eggs: overlay.querySelector("[data-rhythm-eggs]"),
     fails: overlay.querySelector("[data-rhythm-fails]"),
+    map: overlay.querySelector("[data-rhythm-map]"),
+    mapList: overlay.querySelector("[data-rhythm-map-list]"),
+    mapExit: overlay.querySelector("[data-rhythm-exit]"),
     goalCard: overlay.querySelector("[data-rhythm-goal-card]"),
     goalTitle: overlay.querySelector("[data-rhythm-goal-title]"),
+    goalDesc: overlay.querySelector("[data-rhythm-goal-desc]"),
     goalStars: overlay.querySelector("[data-rhythm-goal-stars]"),
+    goalFlow: overlay.querySelector("[data-rhythm-goal-flow]"),
     goalStart: overlay.querySelector("[data-rhythm-goal-start]"),
     stepProgress: overlay.querySelector("[data-rhythm-step-progress]"),
-    stepIcons: overlay.querySelectorAll("[data-step-index]"),
     stage: overlay.querySelector(".rhythm-stage"),
     mascot: overlay.querySelector("[data-rhythm-mascot]"),
     scene: overlay.querySelector("[data-rhythm-scene]"),
@@ -316,7 +349,7 @@ export function createRhythmMode({
 
   const first = levelAt(0);
   let activeLevelIndex = first.index;
-  let unlockedLevelIndex = readUnlockedLevelIndex();
+  let rhythmProgress = readRhythmProgress(localStorage, RHYTHM_DISH_LEVELS.length);
   let game = new RhythmCookingGame(first.level);
   let animationFrame = 0;
   let startTime = 0;
@@ -336,8 +369,64 @@ export function createRhythmMode({
     mountMascot?.(refs.mascot, active ? "happy" : "idle");
   }
 
+  function renderStepProgress(level) {
+    refs.stepProgress.innerHTML = getDishStepCommands(level)
+      .map((command, index) => `<span data-step-index="${index}">${commandIcon(command.type)}</span>`)
+      .join("");
+  }
+
+  function renderMap() {
+    const cards = getRhythmMapCards(RHYTHM_DISH_LEVELS, rhythmProgress);
+    refs.mapList.innerHTML = "";
+    cards.forEach((card) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `rhythm-map-card${card.unlocked ? "" : " is-locked"}`;
+      button.disabled = !card.unlocked;
+      button.innerHTML = `
+        <span>${card.title}</span>
+        <strong>${card.dishName}</strong>
+        <small>${card.goalText}</small>
+        <b>${card.unlocked ? formatStars(card.bestStars) : "未解锁"}</b>
+      `;
+      button.addEventListener("click", () => startRun(card.index));
+      refs.mapList.append(button);
+    });
+  }
+
+  function openMap() {
+    active = false;
+    settled = false;
+    awaitingGoal = false;
+    window.cancelAnimationFrame(animationFrame);
+    rhythmProgress = readRhythmProgress(localStorage, RHYTHM_DISH_LEVELS.length);
+    overlay.hidden = false;
+    overlay.classList.add("is-visible", "is-map");
+    overlay.classList.remove("is-ended", "is-goal", "is-holding");
+    refs.map.hidden = false;
+    refs.stage.hidden = true;
+    refs.track.hidden = true;
+    refs.actionButton.hidden = true;
+    refs.result.hidden = true;
+    refs.commandBox.hidden = true;
+    refs.stepProgress.hidden = true;
+    refs.goalCard.hidden = true;
+    refs.nextLevel.hidden = true;
+    homeOverlay?.classList.remove("is-visible");
+    renderMap();
+  }
+
   function startRun(levelIndex = activeLevelIndex) {
-    const picked = levelAt(Math.min(levelIndex, unlockedLevelIndex));
+    rhythmProgress = readRhythmProgress(localStorage, RHYTHM_DISH_LEVELS.length);
+    const requestedIndex = Math.min(
+      RHYTHM_DISH_LEVELS.length - 1,
+      Math.max(0, Math.floor(Number(levelIndex) || 0)),
+    );
+    if (!isRhythmLevelUnlocked(rhythmProgress, requestedIndex)) {
+      openMap();
+      return;
+    }
+    const picked = levelAt(requestedIndex);
     activeLevelIndex = picked.index;
     game = new RhythmCookingGame(picked.level);
     settled = false;
@@ -347,8 +436,11 @@ export function createRhythmMode({
     lastCommandId = "";
     overlay.hidden = false;
     overlay.classList.add("is-visible");
+    overlay.classList.remove("is-map");
     overlay.classList.add("is-goal");
     overlay.classList.remove("is-ended", "is-holding");
+    refs.map.hidden = true;
+    refs.stage.hidden = false;
     refs.result.hidden = true;
     refs.track.hidden = true;
     refs.actionButton.hidden = true;
@@ -357,10 +449,13 @@ export function createRhythmMode({
     refs.commandBox.hidden = true;
     refs.stepProgress.hidden = true;
     refs.goalTitle.textContent = picked.level.dishName;
+    refs.goalDesc.textContent = `${Math.ceil(picked.level.durationMs / 1000)} 秒内尽可能多做${picked.level.unitName || "成品"}`;
     refs.goalStars.textContent = formatGoalText(picked.level);
+    refs.goalFlow.textContent = `流程：${formatActionFlow(picked.level)}`;
     const levelInfo = formatRhythmLevelInfo(picked.index, picked.level);
     refs.level.textContent = levelInfo.levelText;
     refs.dish.textContent = levelInfo.dishText;
+    renderStepProgress(picked.level);
     refs.goalCard.hidden = false;
     refs.time.textContent = Math.ceil(picked.level.durationMs / 1000);
     refs.eggs.textContent = "0";
@@ -403,7 +498,7 @@ export function createRhythmMode({
     spaceDown = false;
     awaitingGoal = false;
     window.cancelAnimationFrame(animationFrame);
-    overlay.classList.remove("is-visible", "is-holding", "is-goal");
+    overlay.classList.remove("is-visible", "is-holding", "is-goal", "is-map");
     overlay.hidden = true;
     if (showHome) homeOverlay?.classList.add("is-visible");
   }
@@ -432,16 +527,13 @@ export function createRhythmMode({
       totalEggs: (Number(progress.totalEggs) || 0) + result.completedEggs,
       totalCoinsEarned: (Number(progress.totalCoinsEarned) || 0) + result.coinsEarned,
     });
-    if (result.stars >= 1 && activeLevelIndex < RHYTHM_DISH_LEVELS.length - 1) {
-      const nextUnlocked = Math.min(
-        RHYTHM_DISH_LEVELS.length - 1,
-        unlockRhythmLevelIndex(unlockedLevelIndex, activeLevelIndex, result.stars),
-      );
-      if (nextUnlocked > unlockedLevelIndex) {
-        unlockedLevelIndex = nextUnlocked;
-        saveUnlockedLevelIndex(unlockedLevelIndex);
-      }
-    }
+    rhythmProgress = recordRhythmLevelResult(
+      rhythmProgress,
+      activeLevelIndex,
+      result.stars,
+      RHYTHM_DISH_LEVELS.length,
+    );
+    saveRhythmProgress(rhythmProgress, localStorage);
   }
 
   function showResult(result) {
@@ -449,7 +541,7 @@ export function createRhythmMode({
     const resultUi = getRhythmResultUiState({
       activeLevelIndex,
       result,
-      unlockedLevelIndex,
+      unlockedLevelIndex: rhythmProgress.unlockedLevelIndex,
     });
     awaitingGoal = false;
     refs.result.hidden = false;
@@ -608,7 +700,7 @@ export function createRhythmMode({
       snapshot.actionsPerDish - 1,
       Math.max(0, Number(command.dishStepIndex ?? (snapshot.commandIndex % snapshot.actionsPerDish)) || 0),
     );
-    refs.stepIcons.forEach((icon, index) => {
+    refs.stepProgress.querySelectorAll("[data-step-index]").forEach((icon, index) => {
       icon.classList.toggle("is-active", index === stepIndex);
       icon.classList.toggle("is-done", index < stepIndex);
     });
@@ -695,10 +787,11 @@ export function createRhythmMode({
   refs.goalStart.addEventListener("click", beginCooking);
   refs.retry.addEventListener("click", () => startRun(activeLevelIndex));
   refs.nextLevel.addEventListener("click", () => startRun(activeLevelIndex + 1));
+  refs.mapExit.addEventListener("click", () => stopRun({ showHome: true }));
   refs.homeButtons.forEach((button) => {
-    button.addEventListener("click", () => stopRun({ showHome: true }));
+    button.addEventListener("click", openMap);
   });
-  triggerButton?.addEventListener("click", () => startRun(0));
+  triggerButton?.addEventListener("click", openMap);
 
   window.addEventListener("keydown", (event) => {
     if (!active || event.code !== "Space" || spaceDown) return;
