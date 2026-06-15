@@ -87,6 +87,7 @@ function createRhythmOverlay() {
         <span>时间 <strong data-rhythm-time>30</strong>s</span>
         <span><small data-rhythm-unit-label>煎蛋</small> <strong data-rhythm-eggs>0</strong>个</span>
         <span>失败 <strong data-rhythm-fails>0</strong></span>
+        <button class="rhythm-pause-button" type="button" data-rhythm-pause hidden>暂停</button>
       </div>
 
       <div class="rhythm-map" data-rhythm-map hidden>
@@ -152,6 +153,15 @@ function createRhythmOverlay() {
           <small>拖到发光</small>
         </em>
       </button>
+
+      <div class="rhythm-pause-panel" data-rhythm-pause-panel hidden role="dialog" aria-modal="true">
+        <div>
+          <strong>暂停中</strong>
+          <p>节奏和倒计时已暂停</p>
+          <button class="primary-button" type="button" data-rhythm-resume><span>继续游戏</span></button>
+          <button class="secondary-button" type="button" data-rhythm-pause-home>返回主菜单</button>
+        </div>
+      </div>
 
       <div class="rhythm-result" data-rhythm-result hidden>
         <h3 data-rhythm-result-title>菜品完成：元气煎蛋</h3>
@@ -229,9 +239,10 @@ export function formatRhythmLevelInfo(levelIndex = 0, level = {}) {
 export function canRunRhythmClock({
   isActive = false,
   isGoalConfirmed = false,
+  isPaused = false,
   gameState = "idle",
 } = {}) {
-  return Boolean(isActive && isGoalConfirmed && gameState === "playing");
+  return Boolean(isActive && isGoalConfirmed && !isPaused && gameState === "playing");
 }
 
 function windowToPercent(window) {
@@ -324,7 +335,7 @@ export function calculateSwipeSliderProgress({
   const progress = clamp01(directedDistance / required);
   return {
     progress,
-    percent: Math.round(progress * 100),
+    percent: Number((progress * 100).toFixed(1)),
     ready: progress >= 1,
   };
 }
@@ -396,6 +407,7 @@ export function createRhythmMode({
     time: overlay.querySelector("[data-rhythm-time]"),
     eggs: overlay.querySelector("[data-rhythm-eggs]"),
     fails: overlay.querySelector("[data-rhythm-fails]"),
+    pauseButton: overlay.querySelector("[data-rhythm-pause]"),
     map: overlay.querySelector("[data-rhythm-map]"),
     mapList: overlay.querySelector("[data-rhythm-map-list]"),
     mapExit: overlay.querySelector("[data-rhythm-exit]"),
@@ -434,6 +446,9 @@ export function createRhythmMode({
     swipeSlider: overlay.querySelector("[data-rhythm-swipe-slider]"),
     swipeFill: overlay.querySelector("[data-rhythm-swipe-fill]"),
     swipeKnob: overlay.querySelector("[data-rhythm-swipe-knob]"),
+    pausePanel: overlay.querySelector("[data-rhythm-pause-panel]"),
+    resume: overlay.querySelector("[data-rhythm-resume]"),
+    pauseHome: overlay.querySelector("[data-rhythm-pause-home]"),
     result: overlay.querySelector("[data-rhythm-result]"),
     resultTitle: overlay.querySelector("[data-rhythm-result-title]"),
     finalEggs: overlay.querySelector("[data-rhythm-final-eggs]"),
@@ -459,6 +474,8 @@ export function createRhythmMode({
   let lastCommandId = "";
   let sceneTimer = 0;
   let awaitingGoal = false;
+  let paused = false;
+  let pausedAt = 0;
   let swipeStart = null;
 
   function nowElapsed() {
@@ -467,6 +484,23 @@ export function createRhythmMode({
 
   function refreshMascot() {
     mountMascot?.(refs.mascot, active ? "happy" : "idle");
+  }
+
+  function canPlayNow() {
+    return canRunRhythmClock({
+      isActive: active,
+      isGoalConfirmed: !awaitingGoal,
+      isPaused: paused,
+      gameState: game.state,
+    });
+  }
+
+  function hidePausePanel() {
+    paused = false;
+    pausedAt = 0;
+    refs.pausePanel.hidden = true;
+    refs.pauseButton.disabled = false;
+    overlay.classList.remove("is-paused");
   }
 
   function resetSwipeSlider() {
@@ -487,7 +521,7 @@ export function createRhythmMode({
     refs.actionButton.style.setProperty("--swipe-progress", `${slider.percent}%`);
     refs.actionButton.classList.toggle("is-swipe-ready", slider.ready);
     refs.swipeKnob.textContent = slider.ready ? "✨" : "➡️";
-    refs.trackCopy.textContent = slider.ready ? "松手完成！" : `滑动 ${slider.percent}%`;
+    refs.trackCopy.textContent = slider.ready ? "松手完成！" : `滑动 ${Math.round(slider.percent)}%`;
   }
 
   function renderStepProgress(level) {
@@ -519,6 +553,7 @@ export function createRhythmMode({
     active = false;
     settled = false;
     awaitingGoal = false;
+    hidePausePanel();
     window.cancelAnimationFrame(animationFrame);
     rhythmProgress = readRhythmProgress(localStorage, RHYTHM_DISH_LEVELS.length);
     overlay.hidden = false;
@@ -532,6 +567,7 @@ export function createRhythmMode({
     refs.commandBox.hidden = true;
     refs.stepProgress.hidden = true;
     refs.goalCard.hidden = true;
+    refs.pauseButton.hidden = true;
     refs.nextLevel.hidden = true;
     homeOverlay?.classList.remove("is-visible");
     renderMap();
@@ -553,6 +589,7 @@ export function createRhythmMode({
     settled = false;
     active = true;
     awaitingGoal = true;
+    hidePausePanel();
     startTime = 0;
     lastCommandId = "";
     overlay.hidden = false;
@@ -566,6 +603,7 @@ export function createRhythmMode({
     refs.track.hidden = true;
     refs.actionButton.hidden = true;
     refs.actionButton.disabled = false;
+    refs.pauseButton.hidden = true;
     refs.nextLevel.hidden = true;
     refs.commandBox.hidden = true;
     refs.stepProgress.hidden = true;
@@ -605,6 +643,7 @@ export function createRhythmMode({
     refs.track.hidden = false;
     refs.actionButton.hidden = false;
     refs.actionButton.disabled = false;
+    refs.pauseButton.hidden = false;
     refs.commandBox.hidden = false;
     refs.stepProgress.hidden = false;
     refs.actionButton.classList.remove("is-holding", "is-tapping");
@@ -623,14 +662,44 @@ export function createRhythmMode({
     active = false;
     spaceDown = false;
     awaitingGoal = false;
+    hidePausePanel();
+    refs.pauseButton.hidden = true;
     window.cancelAnimationFrame(animationFrame);
     overlay.classList.remove("is-visible", "is-holding", "is-goal", "is-map");
     overlay.hidden = true;
     if (showHome) homeOverlay?.classList.add("is-visible");
   }
 
+  function pauseRun() {
+    if (!canPlayNow()) return;
+    paused = true;
+    pausedAt = performance.now();
+    spaceDown = false;
+    swipeStart = null;
+    resetSwipeSlider();
+    refs.actionButton.classList.remove("is-holding", "is-tapping");
+    refs.stage.classList.remove("is-mashing");
+    refs.scene.classList.remove("is-mashing");
+    game.clearActiveHold?.();
+    refs.pauseButton.disabled = true;
+    refs.pausePanel.hidden = false;
+    overlay.classList.add("is-paused");
+    window.cancelAnimationFrame(animationFrame);
+    render();
+  }
+
+  function resumeRun() {
+    if (!active || !paused) return;
+    const pauseDuration = Math.max(0, performance.now() - pausedAt);
+    startTime += pauseDuration;
+    hidePausePanel();
+    render();
+    window.cancelAnimationFrame(animationFrame);
+    animationFrame = window.requestAnimationFrame(tick);
+  }
+
   function tick() {
-    if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
+    if (!canPlayNow()) return;
     game.update(nowElapsed());
     handleEvents();
     render();
@@ -675,6 +744,8 @@ export function createRhythmMode({
     awaitingGoal = false;
     refs.result.hidden = false;
     refs.actionButton.disabled = true;
+    refs.pauseButton.hidden = true;
+    hidePausePanel();
     refs.actionButton.hidden = !resultUi.showActionButton;
     refs.track.hidden = !resultUi.showTrack;
     refs.commandBox.hidden = !resultUi.showCommand;
@@ -887,7 +958,7 @@ export function createRhythmMode({
 
   function performPrimaryInput(event) {
     if (event?.cancelable) event.preventDefault();
-    if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
+    if (!canPlayNow()) return;
     const command = game.getSnapshot().activeCommand;
     if (command?.type === RHYTHM_COMMAND_TYPES.HOLD) {
       refs.actionButton.classList.add("is-holding");
@@ -913,7 +984,7 @@ export function createRhythmMode({
   function movePrimaryInput(event) {
     if (!swipeStart) return;
     if (event?.cancelable) event.preventDefault();
-    if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
+    if (!canPlayNow()) return;
     const command = game.getSnapshot().activeCommand;
     if (command?.type !== RHYTHM_COMMAND_TYPES.SWIPE) return;
     swipeStart.currentX = numberOr(event?.clientX, swipeStart.x);
@@ -923,7 +994,7 @@ export function createRhythmMode({
 
   function releasePrimaryInput(event) {
     if (event?.cancelable) event.preventDefault();
-    if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
+    if (!canPlayNow()) return;
     const command = game.getSnapshot().activeCommand;
     refs.actionButton.classList.remove("is-holding");
     if (command?.type === RHYTHM_COMMAND_TYPES.HOLD) {
@@ -951,7 +1022,7 @@ export function createRhythmMode({
   }
 
   function cancelActiveHold() {
-    if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
+    if (!canPlayNow()) return;
     if (swipeStart) {
       swipeStart = null;
       resetSwipeSlider();
@@ -989,6 +1060,9 @@ export function createRhythmMode({
   );
   overlay.addEventListener("contextmenu", (event) => event.preventDefault());
   refs.goalStart.addEventListener("click", beginCooking);
+  refs.pauseButton.addEventListener("click", pauseRun);
+  refs.resume.addEventListener("click", resumeRun);
+  refs.pauseHome.addEventListener("click", () => stopRun({ showHome: true }));
   refs.retry.addEventListener("click", () => startRun(activeLevelIndex));
   refs.nextLevel.addEventListener("click", () => startRun(activeLevelIndex + 1));
   refs.mapExit.addEventListener("click", () => stopRun({ showHome: true }));
@@ -998,13 +1072,20 @@ export function createRhythmMode({
   triggerButton?.addEventListener("click", openMap);
 
   window.addEventListener("keydown", (event) => {
+    if (active && event.code === "Escape") {
+      if (paused) resumeRun();
+      else pauseRun();
+      return;
+    }
     if (!active || event.code !== "Space" || spaceDown) return;
+    if (paused) return;
     spaceDown = true;
     performPrimaryInput(event);
   });
 
   window.addEventListener("keyup", (event) => {
     if (!active || event.code !== "Space") return;
+    if (paused) return;
     spaceDown = false;
     releasePrimaryInput(event);
   });

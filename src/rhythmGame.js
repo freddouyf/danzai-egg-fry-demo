@@ -634,6 +634,10 @@ export class RhythmCookingGame {
     return this.holdEnd(nowMs);
   }
 
+  clearActiveHold() {
+    this.holdStartedAtMs = null;
+  }
+
   resolveCurrentStep(quality, detail = {}) {
     if (this.stepResolved || this.state !== "playing" || !this.currentCommand) return null;
     this.stepResolved = true;

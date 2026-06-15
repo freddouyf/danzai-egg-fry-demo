@@ -323,6 +323,16 @@ test("SWIPE slider progress respects direction and any mode", () => {
   );
 });
 
+test("SWIPE slider progress keeps fractional percent for smoother dragging", () => {
+  assert.equal(
+    calculateSwipeSliderProgress(
+      { startX: 0, startY: 0, currentX: 8.75, currentY: 0 },
+      { minDistancePx: 70, direction: "right" },
+    ).percent,
+    12.5,
+  );
+});
+
 test("all rhythm visual keys have UI mappings", () => {
   for (const level of RHYTHM_DISH_LEVELS) {
     for (const command of level.commands) {
@@ -563,6 +573,21 @@ test("HOLD progress only grows while the player is holding", () => {
   assert.equal(game.getSnapshot().holdActive, true);
   assert.equal(game.getSnapshot().holdElapsedMs, 350);
   game.holdEnd(startAtMs + 500 + command.targetHoldMs);
+});
+
+test("clearing active HOLD for pause does not resolve the step", () => {
+  const game = new RhythmCookingGame(LOOP_LEVEL);
+  game.start();
+  completeTap(game);
+  completeMash(game);
+  const startAtMs = game.getSnapshot().elapsedMs + game.getSnapshot().inputGuardRemainingMs;
+  game.holdStart(startAtMs + 100);
+  game.update(startAtMs + 420);
+  game.clearActiveHold();
+  const snapshot = game.getSnapshot();
+  assert.equal(snapshot.holdActive, false);
+  assert.equal(snapshot.failedActions, 0);
+  assert.equal(snapshot.activeCommand.type, RHYTHM_COMMAND_TYPES.HOLD);
 });
 
 test("HOLD idle does not trigger a step failure", () => {
@@ -888,6 +913,18 @@ test("rhythm clock starts only after goal card confirmation", () => {
       gameState: "playing",
     }),
     true,
+  );
+});
+
+test("rhythm clock stops while paused", () => {
+  assert.equal(
+    canRunRhythmClock({
+      isActive: true,
+      isGoalConfirmed: true,
+      isPaused: true,
+      gameState: "playing",
+    }),
+    false,
   );
 });
 

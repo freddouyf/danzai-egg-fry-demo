@@ -6977,6 +6977,7 @@ img,
 }
 
 .rhythm-card {
+  position: relative;
   display: grid;
   width: min(100%, 410px);
   max-height: 100%;
@@ -6987,8 +6988,12 @@ img,
 
 .rhythm-stats {
   display: grid;
-  grid-template-columns: 1.22fr 0.86fr 0.86fr 0.86fr;
+  grid-template-columns: 1.18fr 0.78fr 0.78fr 0.72fr 48px;
   gap: 6px;
+}
+
+.rhythm-stats:has(.rhythm-pause-button[hidden]) {
+  grid-template-columns: 1.22fr 0.86fr 0.86fr 0.86fr;
 }
 
 .rhythm-stats span {
@@ -7009,6 +7014,23 @@ img,
   font-size: 22px;
   font-weight: 1000;
   line-height: 1;
+}
+
+.rhythm-pause-button {
+  min-height: 44px;
+  padding: 0 5px;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 17px;
+  color: white;
+  background: linear-gradient(180deg, #7fc8ff, #287bbb);
+  box-shadow: 0 4px 0 rgba(40, 95, 140, 0.18);
+  font-size: 12px;
+  font-weight: 1000;
+  touch-action: manipulation;
+}
+
+.rhythm-pause-button[hidden] {
+  display: none !important;
 }
 
 .rhythm-level-stat {
@@ -7895,7 +7917,7 @@ img,
   position: absolute;
   z-index: 2;
   top: 50%;
-  left: var(--swipe-progress, 0%);
+  left: clamp(18px, var(--swipe-progress, 0%), calc(100% - 18px));
   display: grid;
   width: 36px;
   height: 36px;
@@ -7936,7 +7958,12 @@ img,
 }
 
 .rhythm-action-button.is-swiping {
-  animation: rhythm-action-swipe 260ms ease-out infinite alternate;
+  transform: translateY(2px) scale(0.995);
+}
+
+.rhythm-action-button.is-swiping .rhythm-swipe-slider i,
+.rhythm-action-button.is-swiping .rhythm-swipe-slider b {
+  transition: none;
 }
 
 .rhythm-mash-pop {
@@ -7954,6 +7981,58 @@ img,
   font-weight: 1000;
   pointer-events: none;
   animation: rhythm-mash-pop 680ms ease-out forwards;
+}
+
+.rhythm-pause-panel {
+  position: absolute;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(94, 55, 29, 0.28);
+  backdrop-filter: blur(4px);
+}
+
+.rhythm-pause-panel[hidden] {
+  display: none !important;
+}
+
+.rhythm-pause-panel > div {
+  display: grid;
+  width: min(86%, 310px);
+  gap: 10px;
+  padding: 18px;
+  border: 3px solid white;
+  border-radius: 28px;
+  background: linear-gradient(180deg, #fff8d9, #ffe3a3);
+  box-shadow: 0 18px 44px rgba(94, 55, 29, 0.28);
+  text-align: center;
+}
+
+.rhythm-pause-panel strong {
+  color: #ef5c2d;
+  font-size: 28px;
+  font-weight: 1000;
+}
+
+.rhythm-pause-panel p {
+  margin: -4px 0 2px;
+  color: #86583c;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.rhythm-pause-panel button {
+  width: 100%;
+  min-height: 52px;
+  font-size: 15px;
+}
+
+.rhythm-overlay.is-paused .rhythm-stage,
+.rhythm-overlay.is-paused .rhythm-track,
+.rhythm-overlay.is-paused .rhythm-action-button {
+  filter: saturate(0.75) brightness(0.95);
 }
 
 .rhythm-overlay.is-fever .rhythm-action-button {
