@@ -17,7 +17,7 @@ export const RHYTHM_WINDOWS = Object.freeze({
 });
 
 export const DEFAULT_ACTIONS_PER_DISH = 3;
-export const DEFAULT_STAR_EGGS = Object.freeze([2, 4, 6]);
+export const DEFAULT_STAR_EGGS = Object.freeze([2, 3, 4]);
 export const RHYTHM_DISH_STEP_TYPES = Object.freeze([
   RHYTHM_COMMAND_TYPES.TAP,
   RHYTHM_COMMAND_TYPES.MASH,
@@ -110,6 +110,27 @@ export function judgeMash(taps, targetTaps) {
   return RHYTHM_HIT_QUALITY.MISS;
 }
 
+export function judgeSwipe({ startX = 0, startY = 0, endX = 0, endY = 0 } = {}, {
+  minDistancePx = 70,
+  direction = "any",
+} = {}) {
+  const dx = Number(endX) - Number(startX);
+  const dy = Number(endY) - Number(startY);
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+  const required = Math.max(1, Math.floor(Number(minDistancePx) || 70));
+  const axisDistance = Math.max(absX, absY);
+  const normalizedDirection = direction || "any";
+  const directionOk =
+    normalizedDirection === "any"
+    || (normalizedDirection === "left" && dx <= -required && absX >= absY)
+    || (normalizedDirection === "right" && dx >= required && absX >= absY)
+    || (normalizedDirection === "up" && dy <= -required && absY >= absX)
+    || (normalizedDirection === "down" && dy >= required && absY >= absX);
+  if (axisDistance >= required && directionOk) return RHYTHM_HIT_QUALITY.PERFECT;
+  return RHYTHM_HIT_QUALITY.MISS;
+}
+
 // Kept for old unit coverage. Rhythm mode now uses completed egg count for stars.
 export function calculateRhythmStars(score, maxScore) {
   const ratio = maxScore > 0 ? score / maxScore : 0;
@@ -182,6 +203,24 @@ function normalizeCommand(command, index) {
     };
   }
 
+  if (type === RHYTHM_COMMAND_TYPES.SWIPE) {
+    return {
+      ...command,
+      id,
+      type,
+      input: type,
+      actionName,
+      prompt,
+      helperText,
+      startAtMs,
+      expireAtMs: Number.POSITIVE_INFINITY,
+      minDistancePx: Math.max(1, Math.floor(Number(command.minDistancePx) || 70)),
+      direction: command.direction || "any",
+      visualKey: command.visualKey || command.scene || "plate",
+      dishStepIndex: Math.max(0, Math.floor(Number(command.dishStepIndex) || 0)),
+    };
+  }
+
   const targetAtMs = Math.max(startAtMs, Math.floor(Number(command.targetAtMs) || startAtMs + 600));
   const targetHoldMs = Math.max(250, Math.floor(Number(command.targetHoldMs) || targetAtMs - startAtMs));
   return {
@@ -235,8 +274,8 @@ function normalizeLevel(level) {
 
 function fallbackStepTemplate(stepIndex) {
   const type = RHYTHM_DISH_STEP_TYPES[stepIndex] || RHYTHM_COMMAND_TYPES.TAP;
-  const names = ["敲蛋", "打蛋", "煎熟出锅", "出锅", "装盘"];
-  const prompts = ["敲蛋！", "快速打蛋！", "按住煎熟！", "出锅！", "装盘！"];
+  const names = ["敲蛋", "打蛋", "煎熟出锅", "装盘"];
+  const prompts = ["敲蛋！", "快速打蛋！", "按住煎熟！", "装盘！"];
   return normalizeCommand({
     id: `fallback-step-${stepIndex}`,
     input: type,
@@ -262,6 +301,8 @@ function fallbackStepTemplate(stepIndex) {
     expireAtMs: 720,
     endAtMs: 2_200,
     targetTaps: 8,
+    minDistancePx: 70,
+    direction: "any",
   }, stepIndex);
 }
 
@@ -348,6 +389,21 @@ export class RhythmCookingGame {
         startAtMs,
         endAtMs: startAtMs + durationMs,
         expireAtMs: Number.POSITIVE_INFINITY,
+      };
+    }
+
+    if (type === RHYTHM_COMMAND_TYPES.SWIPE) {
+      return {
+        ...template,
+        id: `${template.id}-${idSuffix}`,
+        type,
+        input: type,
+        dishStepIndex: stepIndex,
+        eggIndex: this.eggAttemptIndex,
+        startAtMs,
+        expireAtMs: Number.POSITIVE_INFINITY,
+        minDistancePx: Math.max(1, Math.floor(Number(template.minDistancePx) || 70)),
+        direction: template.direction || "any",
       };
     }
 
@@ -491,6 +547,34 @@ export class RhythmCookingGame {
       hitAtMs,
       successStartMs: window.startMs,
       successEndMs: window.endMs,
+    });
+  }
+
+  swipe(points = {}, nowMs = this.elapsedMs) {
+    this.update(nowMs);
+    if (this.state !== "playing") return null;
+    const command = this.activeCommand;
+    if (!command || command.type !== RHYTHM_COMMAND_TYPES.SWIPE) return null;
+    if (this.elapsedMs < command.startAtMs) return null;
+    if (this.elapsedMs < this.stepInputGuardUntilMs) {
+      const event = {
+        type: "inputGuarded",
+        command,
+        untilMs: this.stepInputGuardUntilMs,
+      };
+      this.events.push(event);
+      return event;
+    }
+    const quality = judgeSwipe(points, command);
+    return this.resolveCurrentStep(quality, {
+      swipe: {
+        startX: Number(points.startX) || 0,
+        startY: Number(points.startY) || 0,
+        endX: Number(points.endX) || 0,
+        endY: Number(points.endY) || 0,
+      },
+      minDistancePx: command.minDistancePx,
+      direction: command.direction,
     });
   }
 

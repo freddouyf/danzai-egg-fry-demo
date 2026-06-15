@@ -6,6 +6,7 @@ import {
   getHoldSuccessWindow,
   getTapSuccessWindow,
   judgeMash,
+  judgeSwipe,
   judgeTimingError,
   POST_MASH_INPUT_GUARD_MS,
   RHYTHM_ACTION_RESULT,
@@ -187,11 +188,11 @@ test("rhythm MASH succeeds only when the progress is full", () => {
   assert.equal(judgeMash(5, 6), RHYTHM_HIT_QUALITY.MISS);
 });
 
-test("rhythm level one is a 30 second fried egg completion challenge with TAP MASH HOLD", () => {
+test("rhythm level one is a 24 second fried egg completion challenge with TAP MASH HOLD", () => {
   assert.equal(RHYTHM_TEST_LEVEL.dishName, "元气煎蛋");
-  assert.equal(RHYTHM_TEST_LEVEL.durationMs, 30_000);
+  assert.equal(RHYTHM_TEST_LEVEL.durationMs, 24_000);
   assert.equal(RHYTHM_TEST_LEVEL.actionsPerDish, 3);
-  assert.deepEqual(RHYTHM_TEST_LEVEL.starEggs, [2, 4, 6]);
+  assert.deepEqual(RHYTHM_TEST_LEVEL.starEggs, [2, 3, 4]);
   assert.deepEqual(
     RHYTHM_TEST_LEVEL.commands.slice(0, 3).map((command) => command.actionName),
     ["敲蛋", "快速打蛋", "按住煎熟"],
@@ -219,6 +220,8 @@ test("level one steps expose reusable visual keys", () => {
 
 test("breakfast street level two is a 4 step dish", () => {
   assert.equal(RHYTHM_DISH_LEVELS[1].dishName, "黄金蛋卷");
+  assert.equal(RHYTHM_DISH_LEVELS[1].durationMs, 28_000);
+  assert.deepEqual(RHYTHM_DISH_LEVELS[1].starEggs, [2, 3, 4]);
   assert.equal(RHYTHM_DISH_LEVELS[1].actionsPerDish, 4);
   assert.deepEqual(
     RHYTHM_DISH_LEVELS[1].commands.map((command) => command.input),
@@ -238,16 +241,17 @@ test("level two steps expose reusable visual keys", () => {
   );
 });
 
-test("breakfast street level three is a 5 step dish", () => {
-  assert.equal(RHYTHM_DISH_LEVELS[2].actionsPerDish, 5);
+test("breakfast street level three is a 4 step dish with SWIPE", () => {
+  assert.equal(RHYTHM_DISH_LEVELS[2].durationMs, 32_000);
+  assert.deepEqual(RHYTHM_DISH_LEVELS[2].starEggs, [1, 2, 3]);
+  assert.equal(RHYTHM_DISH_LEVELS[2].actionsPerDish, 4);
   assert.deepEqual(
     RHYTHM_DISH_LEVELS[2].commands.map((command) => command.input),
     [
       RHYTHM_COMMAND_TYPES.TAP,
       RHYTHM_COMMAND_TYPES.HOLD,
-      RHYTHM_COMMAND_TYPES.TAP,
       RHYTHM_COMMAND_TYPES.MASH,
-      RHYTHM_COMMAND_TYPES.TAP,
+      RHYTHM_COMMAND_TYPES.SWIPE,
     ],
   );
 });
@@ -255,7 +259,32 @@ test("breakfast street level three is a 5 step dish", () => {
 test("level three steps expose reusable visual keys", () => {
   assert.deepEqual(
     RHYTHM_DISH_LEVELS[2].commands.map((command) => command.visualKey),
-    ["toast", "bake", "egg-on-plate", "stir", "plate"],
+    ["toast", "bake", "stir", "plate"],
+  );
+});
+
+test("SWIPE succeeds when distance reaches threshold", () => {
+  assert.equal(
+    judgeSwipe({ startX: 0, startY: 0, endX: 70, endY: 0 }, { minDistancePx: 70, direction: "right" }),
+    RHYTHM_HIT_QUALITY.PERFECT,
+  );
+});
+
+test("SWIPE fails when distance is too short", () => {
+  assert.equal(
+    judgeSwipe({ startX: 0, startY: 0, endX: 69, endY: 0 }, { minDistancePx: 70, direction: "any" }),
+    RHYTHM_HIT_QUALITY.MISS,
+  );
+});
+
+test("SWIPE any direction accepts vertical or horizontal swipes", () => {
+  assert.equal(
+    judgeSwipe({ startX: 0, startY: 0, endX: 0, endY: -80 }, { minDistancePx: 70, direction: "any" }),
+    RHYTHM_HIT_QUALITY.PERFECT,
+  );
+  assert.equal(
+    judgeSwipe({ startX: 0, startY: 0, endX: -80, endY: 0 }, { minDistancePx: 70, direction: "any" }),
+    RHYTHM_HIT_QUALITY.PERFECT,
   );
 });
 
@@ -573,6 +602,17 @@ test("early rhythm levels use progressively faster TAP tracks", () => {
   assert.equal(tapDurationTwo > tapDurationThree, true);
 });
 
+test("rhythm level durations and star targets are tuned for shorter runs", () => {
+  assert.deepEqual(
+    RHYTHM_DISH_LEVELS.map((level) => level.durationMs),
+    [24_000, 28_000, 32_000],
+  );
+  assert.deepEqual(
+    RHYTHM_DISH_LEVELS.map((level) => level.starEggs),
+    [[2, 3, 4], [2, 3, 4], [1, 2, 3]],
+  );
+});
+
 test("reaching the 1 star threshold does not end the level early", () => {
   const game = new RhythmCookingGame(LOOP_LEVEL);
   game.start();
@@ -651,30 +691,28 @@ test("rhythm game snapshots expose cooking action fields", () => {
   assert.equal(snapshot.nextCommand.type, RHYTHM_COMMAND_TYPES.MASH);
 });
 
-test("2, 4 and 6 completed eggs map to 1, 2 and 3 stars", () => {
+test("2, 3 and 4 completed eggs map to 1, 2 and 3 stars in level one", () => {
   assert.equal(calculateRhythmStarsFromEggs(0), 0);
   assert.equal(calculateRhythmStarsFromEggs(1), 0);
   assert.equal(calculateRhythmStarsFromEggs(2), 1);
-  assert.equal(calculateRhythmStarsFromEggs(3), 1);
-  assert.equal(calculateRhythmStarsFromEggs(4), 2);
-  assert.equal(calculateRhythmStarsFromEggs(5), 2);
-  assert.equal(calculateRhythmStarsFromEggs(6), 3);
+  assert.equal(calculateRhythmStarsFromEggs(3), 2);
+  assert.equal(calculateRhythmStarsFromEggs(4), 3);
 });
 
-test("level two uses 2, 4 and 6 completed dishes for 1, 2 and 3 stars", () => {
+test("level two uses 2, 3 and 4 completed dishes for 1, 2 and 3 stars", () => {
   const thresholds = RHYTHM_DISH_LEVELS[1].starEggs;
   assert.equal(calculateRhythmStarsFromEggs(1, thresholds), 0);
   assert.equal(calculateRhythmStarsFromEggs(2, thresholds), 1);
-  assert.equal(calculateRhythmStarsFromEggs(4, thresholds), 2);
-  assert.equal(calculateRhythmStarsFromEggs(6, thresholds), 3);
+  assert.equal(calculateRhythmStarsFromEggs(3, thresholds), 2);
+  assert.equal(calculateRhythmStarsFromEggs(4, thresholds), 3);
 });
 
-test("level three uses 1, 3 and 5 completed dishes for 1, 2 and 3 stars", () => {
+test("level three uses 1, 2 and 3 completed dishes for 1, 2 and 3 stars", () => {
   const thresholds = RHYTHM_DISH_LEVELS[2].starEggs;
   assert.equal(calculateRhythmStarsFromEggs(0, thresholds), 0);
   assert.equal(calculateRhythmStarsFromEggs(1, thresholds), 1);
-  assert.equal(calculateRhythmStarsFromEggs(3, thresholds), 2);
-  assert.equal(calculateRhythmStarsFromEggs(5, thresholds), 3);
+  assert.equal(calculateRhythmStarsFromEggs(2, thresholds), 2);
+  assert.equal(calculateRhythmStarsFromEggs(3, thresholds), 3);
 });
 
 test("rhythm coins use base 20 plus stars and completed eggs", () => {
@@ -770,7 +808,7 @@ test("rhythm map cards expose lock state, best stars and star goals", () => {
   const cards = getRhythmMapCards(RHYTHM_DISH_LEVELS, progress);
   assert.equal(cards[0].unlocked, true);
   assert.equal(cards[0].bestStars, 2);
-  assert.equal(cards[0].goalText, "2 个 = ★ · 4 个 = ★★ · 6 个 = ★★★");
+  assert.equal(cards[0].goalText, "2 个 = ★ · 3 个 = ★★ · 4 个 = ★★★");
   assert.equal(cards[1].unlocked, true);
   assert.equal(cards[2].unlocked, false);
 });

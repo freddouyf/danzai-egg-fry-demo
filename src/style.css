@@ -7571,6 +7571,20 @@ img,
   background: #d63d8f;
 }
 
+.rhythm-command[data-type="swipe"] {
+  border-color: #c7f5d3;
+  background: linear-gradient(180deg, rgba(242, 255, 241, 0.95), rgba(211, 250, 224, 0.88));
+}
+
+.rhythm-command[data-type="swipe"] strong,
+.rhythm-command[data-type="swipe"] span {
+  color: #24a765;
+}
+
+.rhythm-command[data-type="swipe"] small {
+  background: #24a765;
+}
+
 .rhythm-action-fx {
   position: absolute;
   z-index: 5;
@@ -7610,6 +7624,25 @@ img,
 .rhythm-cook-scene.is-mashing .scene-egg,
 .rhythm-cook-scene.is-mashing .scene-pan {
   animation: rhythm-mash-scene-pop 190ms ease-out;
+}
+
+.rhythm-stage.is-swiping .rhythm-cook-scene::after {
+  position: absolute;
+  z-index: 3;
+  top: 48%;
+  left: 50%;
+  width: 112px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  opacity: 0.86;
+  background:
+    linear-gradient(90deg, transparent, rgba(36, 167, 101, 0.92)),
+    linear-gradient(90deg, transparent 70%, white 70% 78%, transparent 78%);
+  box-shadow: 0 0 18px rgba(36, 167, 101, 0.4);
+  content: "";
+  pointer-events: none;
+  animation: rhythm-swipe-trail 420ms ease-in-out infinite;
 }
 
 .rhythm-feedback {
@@ -7708,6 +7741,14 @@ img,
   background: linear-gradient(90deg, #ff8aef, #ef3f83);
 }
 
+.rhythm-track[data-type="swipe"] em {
+  background: rgba(36, 167, 101, 0.22);
+}
+
+.rhythm-track[data-type="swipe"] i {
+  background: linear-gradient(90deg, #76e395, #24a765);
+}
+
 .rhythm-track i {
   position: absolute;
   inset: 0 auto 0 0;
@@ -7804,6 +7845,20 @@ img,
 
 .rhythm-action-button[data-type="mash"].is-tapping {
   animation: rhythm-action-mash-pop 150ms ease-out;
+}
+
+.rhythm-action-button[data-type="swipe"] {
+  background:
+    radial-gradient(circle at 20% 16%, rgba(255, 255, 255, 0.55), transparent 22%),
+    linear-gradient(180deg, #67d986, #24a765 62%, #16824c);
+  box-shadow:
+    inset 0 -7px 0 rgba(21, 83, 49, 0.16),
+    0 9px 0 #12683b,
+    0 14px 26px rgba(30, 108, 64, 0.2);
+}
+
+.rhythm-action-button.is-swiping {
+  animation: rhythm-action-swipe 260ms ease-out infinite alternate;
 }
 
 .rhythm-mash-pop {
@@ -7988,6 +8043,12 @@ img,
   }
 }
 
+@keyframes rhythm-action-swipe {
+  to {
+    transform: translateX(5px) scale(1.02);
+  }
+}
+
 @keyframes rhythm-command-enter {
   0% {
     opacity: 0.72;
@@ -8052,6 +8113,18 @@ img,
 
   65% {
     transform: translateX(5px) rotate(1.5deg);
+  }
+}
+
+@keyframes rhythm-swipe-trail {
+  0% {
+    opacity: 0.35;
+    transform: translate(-64%, -50%) scaleX(0.78);
+  }
+
+  100% {
+    opacity: 0.92;
+    transform: translate(-42%, -50%) scaleX(1.08);
   }
 }
 

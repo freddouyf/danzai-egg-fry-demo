@@ -15,12 +15,14 @@ const COMMAND_LABELS = {
   [RHYTHM_COMMAND_TYPES.TAP]: "TAP",
   [RHYTHM_COMMAND_TYPES.HOLD]: "HOLD",
   [RHYTHM_COMMAND_TYPES.MASH]: "MASH",
+  [RHYTHM_COMMAND_TYPES.SWIPE]: "SWIPE",
 };
 
 const COMMAND_HINTS = {
   [RHYTHM_COMMAND_TYPES.TAP]: "看准蓝色成功区点击",
   [RHYTHM_COMMAND_TYPES.HOLD]: "按住，到亮区松开",
   [RHYTHM_COMMAND_TYPES.MASH]: "时间内快速连点",
+  [RHYTHM_COMMAND_TYPES.SWIPE]: "滑动完成",
 };
 
 const COMMAND_UI = {
@@ -41,6 +43,12 @@ const COMMAND_UI = {
     code: "MASH",
     actionLabel: "狂点",
     fallbackPrompt: "狂点！",
+  },
+  [RHYTHM_COMMAND_TYPES.SWIPE]: {
+    icon: "➡️",
+    code: "SWIPE",
+    actionLabel: "滑动",
+    fallbackPrompt: "滑动！",
   },
 };
 
@@ -184,6 +192,7 @@ function formatActionFlow(level = {}) {
 }
 
 function commandIcon(type) {
+  if (type === RHYTHM_COMMAND_TYPES.SWIPE) return "➡️";
   if (type === RHYTHM_COMMAND_TYPES.MASH) return "🥣";
   if (type === RHYTHM_COMMAND_TYPES.HOLD) return "🍳";
   return "🥚";
@@ -236,6 +245,15 @@ function commandProgress(snapshot) {
       copy: `${snapshot.mashTaps} / ${command.targetTaps}`,
       goodLeft: 0,
       goodWidth: 0,
+    };
+  }
+
+  if (command.type === RHYTHM_COMMAND_TYPES.SWIPE) {
+    return {
+      fill: 0,
+      copy: `滑动 ${command.minDistancePx || 70}px`,
+      goodLeft: 0,
+      goodWidth: 100,
     };
   }
 
@@ -393,6 +411,7 @@ export function createRhythmMode({
   let lastCommandId = "";
   let sceneTimer = 0;
   let awaitingGoal = false;
+  let swipeStart = null;
 
   function nowElapsed() {
     return Math.max(0, performance.now() - startTime);
@@ -495,7 +514,9 @@ export function createRhythmMode({
     refs.eggs.textContent = "0";
     refs.fails.textContent = "0";
     refs.actionButton.classList.remove("is-holding", "is-tapping");
+    refs.actionButton.classList.remove("is-swiping");
     refs.stage.classList.remove("is-mashing");
+    refs.stage.classList.remove("is-swiping");
     refs.scene.classList.remove("is-mashing", "is-egg-complete");
     refs.track.classList.remove("is-mash-good", "is-mash-perfect");
     homeOverlay?.classList.remove("is-visible");
@@ -518,7 +539,9 @@ export function createRhythmMode({
     refs.commandBox.hidden = false;
     refs.stepProgress.hidden = false;
     refs.actionButton.classList.remove("is-holding", "is-tapping");
+    refs.actionButton.classList.remove("is-swiping");
     refs.stage.classList.remove("is-mashing");
+    refs.stage.classList.remove("is-swiping");
     refs.scene.classList.remove("is-mashing", "is-egg-complete");
     refs.track.classList.remove("is-mash-good", "is-mash-perfect");
     game.drainEvents();
@@ -589,7 +612,9 @@ export function createRhythmMode({
     refs.stepProgress.hidden = !resultUi.showStepProgress;
     refs.goalCard.hidden = !resultUi.showGoalCard;
     refs.actionButton.classList.remove("is-holding", "is-tapping");
+    refs.actionButton.classList.remove("is-swiping");
     refs.stage.classList.remove("is-mashing");
+    refs.stage.classList.remove("is-swiping");
     refs.scene.classList.remove("is-mashing", "is-egg-complete");
     refs.track.classList.remove("is-mash-good", "is-mash-perfect");
     overlay.classList.add("is-ended");
@@ -615,7 +640,10 @@ export function createRhythmMode({
   function handleEvents() {
     for (const event of game.drainEvents()) {
       if (event.type === "hit") {
-        showActionFeedback(event.actionResult === "success" ? "成功！" : "失败！", event.actionResult);
+        const feedbackText = event.actionResult === "success"
+          ? (event.command?.type === RHYTHM_COMMAND_TYPES.SWIPE ? "装盘完成！" : "成功！")
+          : (event.command?.type === RHYTHM_COMMAND_TYPES.SWIPE ? "再滑远一点！" : "失败！");
+        showActionFeedback(feedbackText, event.actionResult);
         spawnActionFx(event.command?.type, event.actionResult, event.command?.scene);
         if (event.actionResult === "success") {
           playCue?.("good");
@@ -662,6 +690,8 @@ export function createRhythmMode({
         ? ["🔥", "♨️", "🔥"]
         : scene === "serve"
           ? ["✨", "🍳", "⭐"]
+          : type === RHYTHM_COMMAND_TYPES.SWIPE
+            ? ["➡️", "✨", "🍽️"]
           : type === RHYTHM_COMMAND_TYPES.MASH
             ? ["⚡", "🥣", "⚡", "💥"]
             : ["⭐", "🥚", "✨"];
@@ -769,7 +799,7 @@ export function createRhythmMode({
       : "最后一道";
     refs.track.dataset.type = command.type;
     refs.actionButton.dataset.type = command.type;
-    refs.actionIcon.textContent = ui.icon;
+    refs.actionIcon.textContent = visual.icon || ui.icon;
     refs.actionLabel.textContent = ui.actionLabel;
 
     const progress = commandProgress(snapshot);
@@ -789,6 +819,13 @@ export function createRhythmMode({
     if (command?.type === RHYTHM_COMMAND_TYPES.HOLD) {
       refs.actionButton.classList.add("is-holding");
       game.holdStart(nowElapsed());
+    } else if (command?.type === RHYTHM_COMMAND_TYPES.SWIPE) {
+      swipeStart = {
+        x: Number(event?.clientX) || 0,
+        y: Number(event?.clientY) || 0,
+      };
+      refs.actionButton.classList.add("is-swiping");
+      refs.stage.classList.add("is-swiping");
     } else {
       game.tap(nowElapsed());
     }
@@ -801,8 +838,20 @@ export function createRhythmMode({
     if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
     const command = game.getSnapshot().activeCommand;
     refs.actionButton.classList.remove("is-holding");
+    refs.actionButton.classList.remove("is-swiping");
+    refs.stage.classList.remove("is-swiping");
     if (command?.type === RHYTHM_COMMAND_TYPES.HOLD) {
       game.holdEnd(nowElapsed());
+      handleEvents();
+      render();
+    } else if (command?.type === RHYTHM_COMMAND_TYPES.SWIPE && swipeStart) {
+      game.swipe({
+        startX: swipeStart.x,
+        startY: swipeStart.y,
+        endX: Number(event?.clientX) || (event?.code === "Space" ? swipeStart.x + command.minDistancePx : swipeStart.x),
+        endY: Number(event?.clientY) || swipeStart.y,
+      }, nowElapsed());
+      swipeStart = null;
       handleEvents();
       render();
     }
@@ -812,6 +861,9 @@ export function createRhythmMode({
     if (!canRunRhythmClock({ isActive: active, isGoalConfirmed: !awaitingGoal, gameState: game.state })) return;
     if (!game.getSnapshot().holdActive) return;
     refs.actionButton.classList.remove("is-holding");
+    refs.actionButton.classList.remove("is-swiping");
+    refs.stage.classList.remove("is-swiping");
+    swipeStart = null;
     game.cancelHold(nowElapsed());
     handleEvents();
     render();
