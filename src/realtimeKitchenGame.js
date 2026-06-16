@@ -11,9 +11,16 @@ function clampNumber(value, fallback = 0) {
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
+function clonePlacedTargets(placedTargets = {}) {
+  return Object.fromEntries(
+    Object.entries(placedTargets).map(([targetId, ingredientIds]) => [targetId, [...ingredientIds]]),
+  );
+}
+
 function cloneOrder(order) {
   return {
     ...order,
+    placedTargets: clonePlacedTargets(order.placedTargets),
     steps: order.steps.map((step) => ({ ...step })),
   };
 }
@@ -23,6 +30,7 @@ function buildOrder(template, sequence) {
     ...cloneRealtimeTemplate(template),
     instanceId: `${template.id}-${sequence}`,
     remainingPatienceMs: template.patienceMs,
+    placedTargets: {},
   };
 }
 
@@ -46,8 +54,8 @@ export function judgeHoldAction(action, heldMs) {
 export function getHoldFailureReason(action, heldMs) {
   const window = getHoldWindow(action);
   const elapsed = clampNumber(heldMs);
-  if (elapsed < window.startMs) return "太早了";
-  if (elapsed > window.endMs) return "太晚了";
+  if (elapsed < window.startMs) return "\u592a\u65e9\u4e86";
+  if (elapsed > window.endMs) return "\u592a\u665a\u4e86";
   return "";
 }
 
@@ -55,8 +63,21 @@ export function judgeMashAction(action, taps) {
   return clampNumber(taps) >= Math.max(1, Math.floor(clampNumber(action?.targetTaps, 1)));
 }
 
+export function getSwipeProgress(distancePx, requiredDistancePx = 70) {
+  const required = Math.max(1, clampNumber(requiredDistancePx, 70));
+  const distance = Math.max(0, clampNumber(distancePx));
+  const ratio = Math.max(0, Math.min(1, distance / required));
+  return {
+    distancePx: distance,
+    requiredDistancePx: required,
+    percent: ratio * 100,
+    ratio,
+    ready: distance >= required,
+  };
+}
+
 export function judgeSwipeAction(action, distancePx) {
-  return clampNumber(distancePx) >= Math.max(1, Math.floor(clampNumber(action?.minDistancePx, 70)));
+  return getSwipeProgress(distancePx, action?.minDistancePx).ready;
 }
 
 export class RealtimeKitchenGame {
@@ -81,7 +102,7 @@ export class RealtimeKitchenGame {
     this.templateIndex = 0;
     this.currentOrder = null;
     this.currentStepIndex = 0;
-    this.lastFeedback = "顾客来了，先看订单。";
+    this.lastFeedback = "\u987e\u5ba2\u6765\u4e86\uff0c\u5148\u770b\u8ba2\u5355\u3002";
     this.assignNextOrder();
   }
 
@@ -92,7 +113,7 @@ export class RealtimeKitchenGame {
     this.orderSequence += 1;
     this.currentOrder = buildOrder(template, this.orderSequence);
     this.currentStepIndex = 0;
-    if (updateFeedback) this.lastFeedback = `新订单：${this.currentOrder.dishName}`;
+    if (updateFeedback) this.lastFeedback = `\u65b0\u8ba2\u5355\uff1a${this.currentOrder.dishName}`;
     return this.currentOrder;
   }
 
@@ -117,14 +138,16 @@ export class RealtimeKitchenGame {
     const step = this.currentStep;
     if (step?.type !== "ingredient") return null;
     if (step.ingredientId === ingredientId && step.targetId === targetId) {
-      this.lastFeedback = `放对了：${step.label}`;
+      if (!this.currentOrder.placedTargets[targetId]) this.currentOrder.placedTargets[targetId] = [];
+      this.currentOrder.placedTargets[targetId].push(ingredientId);
+      this.lastFeedback = `\u653e\u5bf9\u4e86\uff1a${step.label}`;
       return this.advanceStep();
     }
     this.currentOrder.remainingPatienceMs = Math.max(
       0,
       this.currentOrder.remainingPatienceMs - WRONG_INGREDIENT_PATIENCE_PENALTY_MS,
     );
-    this.lastFeedback = "不是这个食材！";
+    this.lastFeedback = "\u4e0d\u662f\u8fd9\u4e2a\u98df\u6750\uff01";
     if (this.currentOrder.remainingPatienceMs <= 0) this.walkoutCurrentCustomer();
     return this.getSnapshot();
   }
@@ -148,31 +171,31 @@ export class RealtimeKitchenGame {
   completeTap() {
     const step = this.currentStep;
     if (step?.type !== "action" || step.actionType !== "tap") return null;
-    this.lastFeedback = `完成：${step.label}`;
+    this.lastFeedback = `\u5b8c\u6210\uff1a${step.label}`;
     return this.advanceStep();
   }
 
   completeHold(heldMs) {
     const step = this.currentStep;
     if (step?.type !== "action" || step.actionType !== "hold") return null;
-    if (!judgeHoldAction(step, heldMs)) return this.failAction(getHoldFailureReason(step, heldMs) || "控火失败");
-    this.lastFeedback = `完成：${step.label}`;
+    if (!judgeHoldAction(step, heldMs)) return this.failAction(getHoldFailureReason(step, heldMs) || "\u63a7\u706b\u5931\u8d25");
+    this.lastFeedback = `\u5b8c\u6210\uff1a${step.label}`;
     return this.advanceStep();
   }
 
   completeMash(taps) {
     const step = this.currentStep;
     if (step?.type !== "action" || step.actionType !== "mash") return null;
-    if (!judgeMashAction(step, taps)) return this.failAction("没搅够");
-    this.lastFeedback = `完成：${step.label}`;
+    if (!judgeMashAction(step, taps)) return this.failAction("\u6ca1\u6405\u591f");
+    this.lastFeedback = `\u5b8c\u6210\uff1a${step.label}`;
     return this.advanceStep();
   }
 
   completeSwipe(distancePx) {
     const step = this.currentStep;
     if (step?.type !== "action" || step.actionType !== "swipe") return null;
-    if (!judgeSwipeAction(step, distancePx)) return this.failAction("装盘失败");
-    this.lastFeedback = `完成：${step.label}`;
+    if (!judgeSwipeAction(step, distancePx)) return this.failAction("\u88c5\u76d8\u5931\u8d25");
+    this.lastFeedback = `\u5b8c\u6210\uff1a${step.label}`;
     return this.advanceStep();
   }
 
@@ -181,7 +204,7 @@ export class RealtimeKitchenGame {
     const order = this.currentOrder;
     this.coins += order.rewardCoins;
     this.servedCustomers += 1;
-    this.lastFeedback = "出餐成功！";
+    this.lastFeedback = "\u51fa\u9910\u6210\u529f\uff01";
     if (this.servedCustomers >= this.serviceTarget) {
       return this.finish("passed");
     }
@@ -192,7 +215,7 @@ export class RealtimeKitchenGame {
   walkoutCurrentCustomer() {
     if (this.state !== "playing" || !this.currentOrder) return null;
     this.walkedOutCustomers += 1;
-    this.lastFeedback = "顾客生气走了！";
+    this.lastFeedback = "\u987e\u5ba2\u751f\u6c14\u8d70\u4e86\uff01";
     this.currentOrder = null;
     this.currentStepIndex = 0;
     if (this.walkedOutCustomers >= this.walkoutLimit) {
@@ -206,7 +229,7 @@ export class RealtimeKitchenGame {
     this.state = "ended";
     this.currentOrder = null;
     this.currentStepIndex = 0;
-    this.lastFeedback = reason === "passed" ? "通关成功！" : "今日营业失败";
+    this.lastFeedback = reason === "passed" ? "\u901a\u5173\u6210\u529f\uff01" : "\u4eca\u65e5\u8425\u4e1a\u5931\u8d25";
     return this.getResult();
   }
 
@@ -227,7 +250,7 @@ export class RealtimeKitchenGame {
       servedCustomers: this.servedCustomers,
       walkedOutCustomers: this.walkedOutCustomers,
       failedActions: this.failedActions,
-      comment: passed ? "旦仔稳住了后厨节奏！" : "客人跑太多了，后厨需要重整。",
+      comment: passed ? "\u65e6\u4ed4\u7a33\u4f4f\u4e86\u540e\u53a8\u8282\u594f\uff01" : "\u5ba2\u4eba\u8dd1\u592a\u591a\u4e86\uff0c\u540e\u53a8\u9700\u8981\u91cd\u6574\u3002",
     };
   }
 

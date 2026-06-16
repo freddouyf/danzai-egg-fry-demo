@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  getSwipeProgress,
   judgeHoldAction,
   judgeMashAction,
   judgeSwipeAction,
@@ -12,7 +13,7 @@ test("realtime kitchen initializes the first customer order", () => {
   const snapshot = game.getSnapshot();
 
   assert.equal(snapshot.state, "playing");
-  assert.equal(snapshot.currentOrder.dishName, "快手煎蛋");
+  assert.equal(snapshot.currentOrder.dishName, "\u5feb\u624b\u714e\u86cb");
   assert.equal(snapshot.currentStep.type, "ingredient");
   assert.equal(snapshot.currentStep.ingredientId, "egg");
   assert.equal(snapshot.currentStep.targetId, "pan");
@@ -36,13 +37,14 @@ test("two walked out customers fail the level", () => {
   assert.equal(snapshot.result.passed, false);
 });
 
-test("correct ingredient drop advances the step", () => {
+test("correct ingredient drop advances the step and records target contents", () => {
   const game = new RealtimeKitchenGame();
   game.dropIngredient("egg", "pan");
   const snapshot = game.getSnapshot();
 
   assert.equal(snapshot.currentStep.type, "action");
   assert.equal(snapshot.currentStep.actionType, "tap");
+  assert.deepEqual(snapshot.currentOrder.placedTargets.pan, ["egg"]);
 });
 
 test("wrong ingredient drop does not advance and costs patience", () => {
@@ -53,7 +55,7 @@ test("wrong ingredient drop does not advance and costs patience", () => {
 
   assert.equal(after.currentStepIndex, before.currentStepIndex);
   assert.equal(after.currentOrder.remainingPatienceMs, before.currentOrder.remainingPatienceMs - 1000);
-  assert.equal(after.lastFeedback, "不是这个食材！");
+  assert.equal(after.lastFeedback, "\u4e0d\u662f\u8fd9\u4e2a\u98df\u6750\uff01");
 });
 
 test("TAP success advances", () => {
@@ -91,7 +93,14 @@ test("MASH reaching target advances", () => {
   assert.equal(game.getSnapshot().currentStep.actionType, "swipe");
 });
 
-test("SWIPE reaching target advances", () => {
+test("SWIPE below slider distance fails", () => {
+  assert.equal(getSwipeProgress(40, 120).ready, false);
+  assert.equal(judgeSwipeAction({ minDistancePx: 90 }, 40), false);
+});
+
+test("SWIPE reaching slider distance succeeds and advances", () => {
+  assert.equal(getSwipeProgress(120, 120).ready, true);
+
   const game = new RealtimeKitchenGame();
   game.dropIngredient("egg", "pan");
   game.completeTap();

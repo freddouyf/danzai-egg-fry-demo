@@ -5,7 +5,53 @@ import {
   REALTIME_LEVEL_NAME,
   REALTIME_TARGETS,
 } from "./realtimeKitchenData.js";
-import { getHoldWindow, RealtimeKitchenGame } from "./realtimeKitchenGame.js";
+import { getHoldWindow, getSwipeProgress, RealtimeKitchenGame } from "./realtimeKitchenGame.js";
+
+const COPY = Object.freeze({
+  modeLabel: "\u5b9e\u65f6\u53a8\u623f\u6d4b\u8bd5\u7248",
+  modeTitle: "\u987e\u5ba2\u5012\u8ba1\u65f6\u53a8\u623f",
+  home: "\u8fd4\u56de\u9996\u9875",
+  level: "\u5173\u5361",
+  target: "\u76ee\u6807",
+  targetValue: "\u670d\u52a1 3 \u4f4d",
+  served: "\u5df2\u670d\u52a1",
+  walked: "\u8d70\u6389",
+  patience: "\u8010\u5fc3",
+  customer: "\u987e\u5ba2",
+  waitingOrder: "\u7b49\u5f85\u8ba2\u5355",
+  currentDish: "\u5f53\u524d\u83dc\u54c1",
+  ingredients: "\u98df\u6750\u6846",
+  firstHint: "\u5148\u6309\u8ba2\u5355\u653e\u5165\u6b63\u786e\u98df\u6750\u3002",
+  resultTitle: "\u4eca\u65e5\u7ed3\u7b97",
+  finalServed: "\u5df2\u670d\u52a1\u5ba2\u4eba",
+  finalWalked: "\u8d70\u6389\u5ba2\u4eba",
+  finalCoins: "\u603b\u91d1\u5e01",
+  finalState: "\u7ed3\u679c",
+  restart: "\u518d\u6765\u4e00\u5c40",
+  dragIngredient: "\u62d6\u98df\u6750",
+  action: "\u505a\u83dc\u52a8\u4f5c",
+  waitCustomer: "\u7b49\u5f85\u987e\u5ba2",
+  prepareBusiness: "\u51c6\u5907\u8425\u4e1a",
+  customerComing: "\u987e\u5ba2\u6765\u4e86\uff01",
+  finishInstruction: "\u62d6\u98df\u6750\u5230\u53d1\u5149\u533a\u57df\uff0c\u6216\u5b8c\u6210\u4e0b\u65b9\u52a8\u4f5c\u3002",
+  actionFirst: "\u73b0\u5728\u5148\u5b8c\u6210\u52a8\u4f5c\uff01",
+  dragToTarget: "\u62d6\u5230\u9505\u3001\u6848\u677f\u6216\u76d8\u5b50\u91cc\u3002",
+  todayBusiness: "\u4eca\u65e5\u8425\u4e1a",
+  waitResult: "\u7b49\u5f85\u7ed3\u7b97",
+  todayClosed: "\u4eca\u65e5\u6253\u70ca",
+  passed: "\u901a\u5173\u6210\u529f",
+  failed: "\u8425\u4e1a\u5931\u8d25",
+  seeResult: "\u67e5\u770b\u7ed3\u7b97\uff0c\u6216\u518d\u6765\u4e00\u5c40\u3002",
+  customerOnRoad: "\u987e\u5ba2\u6b63\u5728\u8def\u4e0a\u3002",
+  dragCorrect: "\u62d6\u52a8\u6b63\u786e\u98df\u6750\u5230\u53d1\u5149\u533a\u57df\u3002",
+  tapOnce: "\u70b9\u51fb\u4e00\u6b21",
+  holdRelease: "\u6309\u4f4f\uff0c\u5230\u7eff\u8272\u533a\u677e\u624b",
+  mash: "\u72c2\u70b9",
+  swipeTitle: "\u62d6\u52a8\u6ed1\u5757",
+  swipeIdle: "\u5411\u53f3\u62d6\u52a8\u88c5\u76d8",
+  swipeReady: "\u677e\u624b\u88c5\u76d8",
+  coin: "\u91d1\u5e01",
+});
 
 function seconds(ms) {
   return Math.max(0, Math.ceil(ms / 1000));
@@ -27,36 +73,47 @@ function createRealtimeOverlay() {
     <div class="realtime-card">
       <header class="realtime-header">
         <div>
-          <small>实时厨房测试版</small>
-          <h2>顾客倒计时厨房</h2>
+          <small>${COPY.modeLabel}</small>
+          <h2>${COPY.modeTitle}</h2>
         </div>
-        <button class="secondary-button" type="button" data-realtime-home>返回首页</button>
+        <button class="secondary-button" type="button" data-realtime-home>${COPY.home}</button>
       </header>
 
       <section class="realtime-hud">
-        <span>关卡 <strong data-realtime-level>第 1 关</strong></span>
-        <span>目标 <strong>服务 3 位</strong></span>
-        <span>已服务 <strong data-realtime-served>0</strong></span>
-        <span>走掉 <strong data-realtime-walked>0</strong></span>
-        <span>耐心 <strong data-realtime-patience>0s</strong></span>
+        <span>${COPY.level} <strong data-realtime-level>${REALTIME_LEVEL_NAME}</strong></span>
+        <span>${COPY.target} <strong>${COPY.targetValue}</strong></span>
+        <span>${COPY.served} <strong data-realtime-served>0</strong></span>
+        <span>${COPY.walked} <strong data-realtime-walked>0</strong></span>
+        <span>${COPY.patience} <strong data-realtime-patience>0s</strong></span>
       </section>
 
       <section class="realtime-customer">
         <div>
-          <small data-realtime-customer-name>顾客</small>
-          <h3 data-realtime-dish-name>等待订单</h3>
+          <small data-realtime-customer-name>${COPY.customer}</small>
+          <h3 data-realtime-dish-name>${COPY.waitingOrder}</h3>
         </div>
         <div class="realtime-required" data-realtime-required></div>
         <div class="realtime-patience"><i data-realtime-patience-fill></i></div>
       </section>
 
+      <section class="realtime-ingredients">
+        <h3>${COPY.ingredients}</h3>
+        <div class="realtime-ingredient-list" data-realtime-ingredients></div>
+      </section>
+
       <section class="realtime-kitchen">
-        <div class="realtime-mascot">🥚</div>
+        <div class="realtime-danzai">
+          <div class="realtime-mascot">\u{1F95A}</div>
+          <div class="realtime-dish-bubble">
+            <small>${COPY.currentDish}</small>
+            <strong data-realtime-stage-dish>${COPY.waitingOrder}</strong>
+          </div>
+        </div>
         <div class="realtime-targets" data-realtime-targets></div>
         <div class="realtime-step-card">
-          <small data-realtime-step-kicker>当前步骤</small>
-          <h3 data-realtime-step-title>准备接单</h3>
-          <p data-realtime-step-feedback>拖食材到发光区域，或完成下方动作。</p>
+          <small data-realtime-step-kicker>${COPY.dragIngredient}</small>
+          <h3 data-realtime-step-title>${COPY.prepareBusiness}</h3>
+          <p data-realtime-step-feedback>${COPY.finishInstruction}</p>
         </div>
         <div class="realtime-action-progress" data-realtime-progress hidden>
           <span data-realtime-progress-zone hidden></span>
@@ -64,29 +121,24 @@ function createRealtimeOverlay() {
         </div>
       </section>
 
-      <section class="realtime-ingredients">
-        <h3>食材框</h3>
-        <div class="realtime-ingredient-list" data-realtime-ingredients></div>
-      </section>
-
       <section class="realtime-controls" data-realtime-controls>
-        <p>先按订单放入正确食材。</p>
+        <p>${COPY.firstHint}</p>
       </section>
 
       <div class="realtime-toast" data-realtime-toast hidden></div>
 
       <section class="realtime-result" data-realtime-result hidden>
-        <h3 data-realtime-result-title>今日结算</h3>
+        <h3 data-realtime-result-title>${COPY.resultTitle}</h3>
         <dl>
-          <div><dt>已服务客人</dt><dd data-realtime-final-served>0</dd></div>
-          <div><dt>走掉客人</dt><dd data-realtime-final-walked>0</dd></div>
-          <div><dt>总金币</dt><dd data-realtime-final-coins>0</dd></div>
-          <div><dt>结果</dt><dd data-realtime-final-state>--</dd></div>
+          <div><dt>${COPY.finalServed}</dt><dd data-realtime-final-served>0</dd></div>
+          <div><dt>${COPY.finalWalked}</dt><dd data-realtime-final-walked>0</dd></div>
+          <div><dt>${COPY.finalCoins}</dt><dd data-realtime-final-coins>0</dd></div>
+          <div><dt>${COPY.finalState}</dt><dd data-realtime-final-state>--</dd></div>
         </dl>
         <p data-realtime-final-comment></p>
         <div class="realtime-result-actions">
-          <button class="primary-button" type="button" data-realtime-restart><span>再来一局</span></button>
-          <button class="secondary-button" type="button" data-realtime-result-home>返回首页</button>
+          <button class="primary-button" type="button" data-realtime-restart><span>${COPY.restart}</span></button>
+          <button class="secondary-button" type="button" data-realtime-result-home>${COPY.home}</button>
         </div>
       </section>
     </div>
@@ -110,6 +162,7 @@ export function createRealtimeKitchenMode({
     patience: overlay.querySelector("[data-realtime-patience]"),
     customerName: overlay.querySelector("[data-realtime-customer-name]"),
     dishName: overlay.querySelector("[data-realtime-dish-name]"),
+    stageDish: overlay.querySelector("[data-realtime-stage-dish]"),
     required: overlay.querySelector("[data-realtime-required]"),
     patienceFill: overlay.querySelector("[data-realtime-patience-fill]"),
     targets: overlay.querySelector("[data-realtime-targets]"),
@@ -143,7 +196,7 @@ export function createRealtimeKitchenMode({
   let holdRaf = 0;
   let mashTaps = 0;
   let mashTimer = 0;
-  let swipeStart = null;
+  let swipeState = null;
   let dragState = null;
 
   function stopHoldLoop() {
@@ -154,7 +207,7 @@ export function createRealtimeKitchenMode({
   function cleanupRuntimeInput() {
     window.clearTimeout(mashTimer);
     stopHoldLoop();
-    swipeStart = null;
+    swipeState = null;
     if (dragState?.ghost) dragState.ghost.remove();
     dragState = null;
   }
@@ -171,6 +224,15 @@ export function createRealtimeKitchenMode({
       refs.toast.classList.remove("is-visible");
       refs.toast.hidden = true;
     }, 900);
+  }
+
+  function showCoinBurst(amount) {
+    if (!amount) return;
+    const burst = document.createElement("div");
+    burst.className = "realtime-coin-burst";
+    burst.textContent = `+${amount} ${COPY.coin}`;
+    overlay.append(burst);
+    window.setTimeout(() => burst.remove(), 900);
   }
 
   function tick(now) {
@@ -196,7 +258,7 @@ export function createRealtimeKitchenMode({
     overlay.classList.add("is-visible");
     homeOverlay?.classList.remove("is-visible");
     render();
-    showToast("顾客来了！");
+    showToast(COPY.customerComing);
     rafId = window.requestAnimationFrame(tick);
   }
 
@@ -215,7 +277,10 @@ export function createRealtimeKitchenMode({
       const node = document.createElement("div");
       node.className = "realtime-target-zone";
       node.dataset.targetId = target.id;
-      node.innerHTML = `<span>${target.icon}</span><strong>${target.label}</strong>`;
+      node.innerHTML = `
+        <div class="realtime-target-base"><span>${target.icon}</span><strong>${target.label}</strong></div>
+        <div class="realtime-target-contents" data-target-contents></div>
+      `;
       refs.targets.append(node);
     });
   }
@@ -236,7 +301,7 @@ export function createRealtimeKitchenMode({
   function startIngredientDrag(event, ingredient) {
     const snapshot = game.getSnapshot();
     if (snapshot.currentStep?.type !== "ingredient") {
-      showToast("现在先完成动作！");
+      showToast(COPY.actionFirst);
       return;
     }
     event.preventDefault();
@@ -264,12 +329,13 @@ export function createRealtimeKitchenMode({
     dragState = null;
     const targetNode = document.elementFromPoint(event.clientX, event.clientY)?.closest?.("[data-target-id]");
     if (!ingredient || !targetNode) {
-      showToast("拖到锅、案板或盘子里。");
+      showToast(COPY.dragToTarget);
       return;
     }
     const before = game.getSnapshot();
     const snapshot = game.dropIngredient(ingredient.id, targetNode.dataset.targetId);
-    flashTarget(targetNode.dataset.targetId, snapshot?.currentStepIndex !== before.currentStepIndex);
+    const isCorrect = snapshot?.currentStepIndex !== before.currentStepIndex;
+    flashTarget(targetNode.dataset.targetId, isCorrect);
     showToast(snapshot?.lastFeedback);
     stageRenderKey = "";
     render();
@@ -306,14 +372,16 @@ export function createRealtimeKitchenMode({
   function renderCustomer(snapshot) {
     const order = snapshot.currentOrder;
     if (!order) {
-      refs.customerName.textContent = "今日营业";
-      refs.dishName.textContent = "等待结算";
+      refs.customerName.textContent = COPY.todayBusiness;
+      refs.dishName.textContent = COPY.waitResult;
+      refs.stageDish.textContent = COPY.waitResult;
       refs.required.replaceChildren();
       refs.patienceFill.style.width = "0%";
       return;
     }
     refs.customerName.textContent = order.customerName;
     refs.dishName.textContent = order.dishName;
+    refs.stageDish.textContent = order.dishName;
     refs.patienceFill.style.width = percent(order.remainingPatienceMs, order.patienceMs);
     refs.required.replaceChildren();
     snapshot.requiredIngredientIds.forEach((ingredientId) => {
@@ -328,8 +396,21 @@ export function createRealtimeKitchenMode({
 
   function renderTargetHighlights(snapshot) {
     const step = snapshot.currentStep;
+    const placedTargets = snapshot.currentOrder?.placedTargets || {};
     refs.targets.querySelectorAll("[data-target-id]").forEach((node) => {
-      node.classList.toggle("is-needed", step?.type === "ingredient" && node.dataset.targetId === step.targetId);
+      const targetId = node.dataset.targetId;
+      node.classList.toggle("is-needed", step?.type === "ingredient" && targetId === step.targetId);
+      const contents = node.querySelector("[data-target-contents]");
+      if (!contents) return;
+      contents.replaceChildren();
+      (placedTargets[targetId] || []).forEach((ingredientId) => {
+        const ingredient = byId(REALTIME_INGREDIENTS, ingredientId);
+        if (!ingredient) return;
+        const item = document.createElement("span");
+        item.textContent = ingredient.icon;
+        item.title = ingredient.label;
+        contents.append(item);
+      });
     });
   }
 
@@ -337,34 +418,34 @@ export function createRealtimeKitchenMode({
     refs.result.hidden = snapshot.state !== "ended";
     if (snapshot.state === "ended") {
       const result = snapshot.result;
-      refs.stepKicker.textContent = "今日打烊";
-      refs.stepTitle.textContent = result.passed ? "通关成功" : "营业失败";
+      refs.stepKicker.textContent = COPY.todayClosed;
+      refs.stepTitle.textContent = result.passed ? COPY.passed : COPY.failed;
       refs.stepFeedback.textContent = snapshot.lastFeedback;
       refs.progress.hidden = true;
-      refs.controls.innerHTML = "<p>查看结算，或再来一局。</p>";
-      refs.resultTitle.textContent = result.passed ? "通关成功" : "挑战失败";
+      refs.controls.innerHTML = `<p>${COPY.seeResult}</p>`;
+      refs.resultTitle.textContent = result.passed ? COPY.passed : COPY.failed;
       refs.finalServed.textContent = result.servedCustomers;
       refs.finalWalked.textContent = result.walkedOutCustomers;
       refs.finalCoins.textContent = result.coins;
-      refs.finalState.textContent = result.passed ? "通关" : "失败";
+      refs.finalState.textContent = result.passed ? COPY.passed : COPY.failed;
       refs.finalComment.textContent = result.comment;
       return;
     }
 
     const step = snapshot.currentStep;
     if (!step) {
-      refs.stepKicker.textContent = "等待顾客";
-      refs.stepTitle.textContent = "准备营业";
+      refs.stepKicker.textContent = COPY.waitCustomer;
+      refs.stepTitle.textContent = COPY.prepareBusiness;
       refs.stepFeedback.textContent = snapshot.lastFeedback;
       refs.progress.hidden = true;
-      refs.controls.innerHTML = "<p>顾客正在路上。</p>";
+      refs.controls.innerHTML = `<p>${COPY.customerOnRoad}</p>`;
       return;
     }
 
-    refs.stepKicker.textContent = step.type === "ingredient" ? "拖食材" : "做菜动作";
+    refs.stepKicker.textContent = step.type === "ingredient" ? COPY.dragIngredient : COPY.action;
     refs.stepTitle.textContent = step.type === "ingredient"
-      ? `${byId(REALTIME_INGREDIENTS, step.ingredientId)?.label || "食材"} → ${byId(REALTIME_TARGETS, step.targetId)?.label || "目标"}`
-      : `${REALTIME_ACTION_LABELS[step.actionType]} · ${step.label}`;
+      ? `${byId(REALTIME_INGREDIENTS, step.ingredientId)?.label || ""} \u2192 ${byId(REALTIME_TARGETS, step.targetId)?.label || ""}`
+      : `${REALTIME_ACTION_LABELS[step.actionType]} \u00b7 ${step.label}`;
     refs.stepFeedback.textContent = snapshot.lastFeedback;
 
     const nextKey = getStepKey(snapshot);
@@ -382,20 +463,33 @@ export function createRealtimeKitchenMode({
     refs.progressFill.style.width = "0%";
   }
 
+  function finishAction(beforeSnapshot, action) {
+    const after = game.getSnapshot();
+    showToast(after.lastFeedback);
+    if (after.servedCustomers > beforeSnapshot.servedCustomers) {
+      showCoinBurst(after.coins - beforeSnapshot.coins);
+    }
+    if (after.currentStepIndex === beforeSnapshot.currentStepIndex && after.state === "playing") {
+      stageRenderKey = "";
+    } else if (action !== "hold-fail") {
+      stageRenderKey = "";
+    }
+    render();
+  }
+
   function renderControls(step) {
     cleanupRuntimeInput();
     resetProgress();
     if (step.type === "ingredient") {
-      refs.controls.innerHTML = "<p>拖动正确食材到发光区域。</p>";
+      refs.controls.innerHTML = `<p>${COPY.dragCorrect}</p>`;
       return;
     }
     if (step.actionType === REALTIME_ACTION_TYPES.TAP) {
-      refs.controls.innerHTML = `<button class="realtime-action-button" type="button" data-realtime-tap>点击一次</button>`;
+      refs.controls.innerHTML = `<button class="realtime-action-button" type="button" data-realtime-tap>${COPY.tapOnce}</button>`;
       refs.controls.querySelector("[data-realtime-tap]").addEventListener("click", () => {
+        const before = game.getSnapshot();
         game.completeTap();
-        showToast(game.getSnapshot().lastFeedback);
-        stageRenderKey = "";
-        render();
+        finishAction(before);
       });
       return;
     }
@@ -405,7 +499,7 @@ export function createRealtimeKitchenMode({
       refs.progressZone.hidden = false;
       refs.progressZone.style.left = percent(windowData.startMs, windowData.maxMs);
       refs.progressZone.style.width = percent(windowData.endMs - windowData.startMs, windowData.maxMs);
-      refs.controls.innerHTML = `<button class="realtime-action-button" type="button" data-realtime-hold>按住，到绿色区松手</button>`;
+      refs.controls.innerHTML = `<button class="realtime-action-button" type="button" data-realtime-hold>${COPY.holdRelease}</button>`;
       const button = refs.controls.querySelector("[data-realtime-hold]");
       const updateHold = () => {
         const elapsed = performance.now() - holdStartedAt;
@@ -422,12 +516,9 @@ export function createRealtimeKitchenMode({
         event.preventDefault();
         const elapsed = performance.now() - holdStartedAt;
         stopHoldLoop();
-        const before = game.getSnapshot().currentStepIndex;
+        const before = game.getSnapshot();
         game.completeHold(elapsed);
-        const after = game.getSnapshot();
-        showToast(after.lastFeedback);
-        if (after.currentStepIndex === before) stageRenderKey = "";
-        render();
+        finishAction(before, "hold-fail");
       });
       button.addEventListener("pointercancel", stopHoldLoop);
       return;
@@ -435,10 +526,10 @@ export function createRealtimeKitchenMode({
     if (step.actionType === REALTIME_ACTION_TYPES.MASH) {
       refs.progress.hidden = false;
       mashTaps = 0;
-      refs.controls.innerHTML = `<button class="realtime-action-button is-mash" type="button" data-realtime-mash>狂点 0/${step.targetTaps}</button>`;
+      refs.controls.innerHTML = `<button class="realtime-action-button is-mash" type="button" data-realtime-mash>${COPY.mash} 0/${step.targetTaps}</button>`;
       const button = refs.controls.querySelector("[data-realtime-mash]");
       const updateMashLabel = () => {
-        button.textContent = `狂点 ${mashTaps}/${step.targetTaps}`;
+        button.textContent = `${COPY.mash} ${mashTaps}/${step.targetTaps}`;
         refs.progressFill.style.width = percent(mashTaps, step.targetTaps);
       };
       button.addEventListener("click", () => {
@@ -449,50 +540,88 @@ export function createRealtimeKitchenMode({
         updateMashLabel();
         if (mashTaps >= step.targetTaps) {
           window.clearTimeout(mashTimer);
+          const before = game.getSnapshot();
           game.completeMash(mashTaps);
-          showToast(game.getSnapshot().lastFeedback);
-          stageRenderKey = "";
-          render();
+          finishAction(before);
         }
       });
       mashTimer = window.setTimeout(() => {
         if (game.getSnapshot().currentStep?.actionType === REALTIME_ACTION_TYPES.MASH) {
+          const before = game.getSnapshot();
           game.completeMash(mashTaps);
-          showToast(game.getSnapshot().lastFeedback);
-          stageRenderKey = "";
-          render();
+          finishAction(before);
         }
       }, step.durationMs);
       return;
     }
     if (step.actionType === REALTIME_ACTION_TYPES.SWIPE) {
-      refs.progress.hidden = false;
-      refs.controls.innerHTML = `<button class="realtime-action-button is-swipe" type="button" data-realtime-swipe>按住拖动</button>`;
-      const button = refs.controls.querySelector("[data-realtime-swipe]");
-      button.addEventListener("pointerdown", (event) => {
+      refs.controls.innerHTML = `
+        <div class="realtime-swipe-control" data-realtime-swipe-control>
+          <strong>${COPY.swipeTitle}</strong>
+          <div class="realtime-swipe-track" data-realtime-swipe-track>
+            <i data-realtime-swipe-fill></i>
+            <button class="realtime-swipe-thumb" type="button" data-realtime-swipe-thumb>\u{1F37D}\uFE0F</button>
+          </div>
+          <small data-realtime-swipe-copy>${COPY.swipeIdle}</small>
+        </div>
+      `;
+      const control = refs.controls.querySelector("[data-realtime-swipe-control]");
+      const track = refs.controls.querySelector("[data-realtime-swipe-track]");
+      const fill = refs.controls.querySelector("[data-realtime-swipe-fill]");
+      const thumb = refs.controls.querySelector("[data-realtime-swipe-thumb]");
+      const copy = refs.controls.querySelector("[data-realtime-swipe-copy]");
+
+      const setSwipeVisual = (distance) => {
+        const required = Math.max(80, track.clientWidth - thumb.offsetWidth);
+        const state = getSwipeProgress(distance, required);
+        const x = state.ratio * required;
+        fill.style.width = `${state.percent}%`;
+        thumb.style.transform = `translateX(${x}px)`;
+        control.classList.toggle("is-ready", state.ready);
+        copy.textContent = state.ready ? COPY.swipeReady : COPY.swipeIdle;
+        return state;
+      };
+
+      const onMove = (event) => {
+        if (!swipeState) return;
         event.preventDefault();
-        swipeStart = { x: event.clientX, y: event.clientY };
-        refs.progressFill.style.width = "0%";
-      });
-      button.addEventListener("pointermove", (event) => {
-        if (!swipeStart) return;
-        const distance = Math.hypot(event.clientX - swipeStart.x, event.clientY - swipeStart.y);
-        refs.progressFill.style.width = percent(distance, step.minDistancePx);
-      });
-      button.addEventListener("pointerup", (event) => {
-        if (!swipeStart) return;
-        const distance = Math.hypot(event.clientX - swipeStart.x, event.clientY - swipeStart.y);
-        swipeStart = null;
-        const before = game.getSnapshot().currentStepIndex;
-        game.completeSwipe(distance);
-        const after = game.getSnapshot();
-        showToast(after.lastFeedback);
-        if (after.currentStepIndex === before) stageRenderKey = "";
-        render();
-      });
-      button.addEventListener("pointercancel", () => {
-        swipeStart = null;
-      });
+        swipeState.distance = Math.max(0, event.clientX - swipeState.startX);
+        setSwipeVisual(swipeState.distance);
+      };
+
+      const finishSwipe = (event) => {
+        if (!swipeState) return;
+        event.preventDefault();
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", finishSwipe);
+        window.removeEventListener("pointercancel", cancelSwipe);
+        const required = Math.max(80, track.clientWidth - thumb.offsetWidth);
+        const state = getSwipeProgress(swipeState.distance, required);
+        swipeState = null;
+        const before = game.getSnapshot();
+        game.completeSwipe(state.ready ? step.minDistancePx : 0);
+        finishAction(before);
+      };
+
+      const cancelSwipe = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", finishSwipe);
+        window.removeEventListener("pointercancel", cancelSwipe);
+        swipeState = null;
+        setSwipeVisual(0);
+      };
+
+      const startSwipe = (event) => {
+        event.preventDefault();
+        swipeState = { startX: event.clientX, distance: 0 };
+        setSwipeVisual(0);
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", finishSwipe);
+        window.addEventListener("pointercancel", cancelSwipe);
+      };
+
+      thumb.addEventListener("pointerdown", startSwipe);
+      track.addEventListener("pointerdown", startSwipe);
     }
   }
 
