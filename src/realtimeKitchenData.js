@@ -65,6 +65,7 @@ export const REALTIME_ORDER_TEMPLATES = Object.freeze([
     dishName: "\u539a\u86cb\u5410\u53f8",
     rewardCoins: 26,
     patienceMs: 22000,
+    recipeFlowIcons: Object.freeze(["\u{1F95A}", "\u{1F373}", "\u{1F525}", "\u{1F35E}", "\u{1F37D}\uFE0F"]),
     steps: Object.freeze([
       Object.freeze({ type: "ingredient", ingredientId: "egg", targetId: "pan", label: "\u9e21\u86cb\u5165\u9505" }),
       Object.freeze({ type: "action", actionType: "hold", label: "\u714e\u86cb", targetMs: 1000, windowMs: 280, maxMs: 1700 }),
@@ -78,6 +79,7 @@ export const REALTIME_ORDER_TEMPLATES = Object.freeze([
     dishName: "\u8fa3\u5473\u7206\u7092\u86cb",
     rewardCoins: 30,
     patienceMs: 21000,
+    recipeFlowIcons: Object.freeze(["\u{1F95A}", "\u{1F373}", "\u{1F336}\uFE0F", "\u{1F944}", "\u{1F37D}\uFE0F"]),
     steps: Object.freeze([
       Object.freeze({ type: "ingredient", ingredientId: "egg", targetId: "pan", label: "\u9e21\u86cb\u5165\u9505" }),
       Object.freeze({ type: "ingredient", ingredientId: "chili", targetId: "pan", label: "\u8fa3\u6912\u5165\u9505" }),
@@ -95,6 +97,24 @@ export const REALTIME_LEVELS = Object.freeze([
     serviceTarget: REALTIME_SERVICE_TARGET,
     walkoutLimit: REALTIME_WALKOUT_LIMIT,
     newRecipes: Object.freeze(["quick-fried-egg"]),
+    availableOrders: Object.freeze(["quick-fried-egg"]),
+  }),
+  Object.freeze({
+    levelId: "realtime-kitchen-2",
+    levelName: "\u7b2c 2 \u5173",
+    levelTitle: "\u7b2c 2 \u5173\uff1a\u5410\u53f8\u7ec3\u4e60",
+    serviceTarget: 4,
+    walkoutLimit: REALTIME_WALKOUT_LIMIT,
+    newRecipes: Object.freeze(["thick-egg-toast"]),
+    availableOrders: Object.freeze(["quick-fried-egg", "thick-egg-toast"]),
+  }),
+  Object.freeze({
+    levelId: "realtime-kitchen-3",
+    levelName: "\u7b2c 3 \u5173",
+    levelTitle: "\u7b2c 3 \u5173\uff1a\u7206\u7092\u6311\u6218",
+    serviceTarget: 5,
+    walkoutLimit: REALTIME_WALKOUT_LIMIT,
+    newRecipes: Object.freeze(["spicy-stir-egg"]),
     availableOrders: Object.freeze(["quick-fried-egg", "thick-egg-toast", "spicy-stir-egg"]),
   }),
 ]);
@@ -106,6 +126,14 @@ export function cloneRealtimeTemplate(template) {
     ...template,
     steps: template.steps.map((step) => ({ ...step })),
   };
+}
+
+export function getRealtimeOrderTemplateById(orderId) {
+  return REALTIME_ORDER_TEMPLATES.find((template) => template.id === orderId) || null;
+}
+
+export function getRealtimeNewRecipe(level = REALTIME_DEFAULT_LEVEL) {
+  return getRealtimeOrderTemplateById(level?.newRecipes?.[0]) || REALTIME_ORDER_TEMPLATES[0];
 }
 
 export function getRealtimeStepIcon(step = {}) {

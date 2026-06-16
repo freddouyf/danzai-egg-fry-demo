@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  REALTIME_LEVELS,
+  getRealtimeNewRecipe,
+} from "../src/realtimeKitchenData.js";
+import {
   getSwipeProgress,
   judgeHoldAction,
   judgeMashAction,
@@ -9,10 +13,17 @@ import {
 } from "../src/realtimeKitchenGame.js";
 import { shouldShowRealtimePlate } from "../src/realtimeKitchenMode.js";
 
-function startRealtimeGame() {
-  const game = new RealtimeKitchenGame();
+function startRealtimeGame(levelIndex = 0) {
+  const game = new RealtimeKitchenGame({ levelIndex });
   game.startBusiness();
   return game;
+}
+
+function completeQuickFriedEgg(game) {
+  game.dropIngredient("egg", "pan");
+  game.completeTap();
+  game.completeHold(900);
+  game.completeSwipe(90);
 }
 
 test("realtime kitchen starts in teaching state", () => {
@@ -38,6 +49,40 @@ test("start business enters playing with the first customer order", () => {
 test("service target is three customers", () => {
   const game = new RealtimeKitchenGame();
   assert.equal(game.getSnapshot().serviceTarget, 3);
+});
+
+test("level one only serves quick fried egg orders", () => {
+  const game = startRealtimeGame(0);
+  assert.equal(game.getSnapshot().currentOrder.id, "quick-fried-egg");
+
+  game.completeCurrentOrder();
+  assert.equal(game.getSnapshot().currentOrder.id, "quick-fried-egg");
+});
+
+test("level two adds thick egg toast after quick fried egg", () => {
+  const game = startRealtimeGame(1);
+  assert.equal(game.getSnapshot().serviceTarget, 4);
+  assert.equal(game.getSnapshot().currentOrder.id, "quick-fried-egg");
+
+  game.completeCurrentOrder();
+  assert.equal(game.getSnapshot().currentOrder.id, "thick-egg-toast");
+});
+
+test("level three adds spicy stir egg after the first two recipes", () => {
+  const game = startRealtimeGame(2);
+  assert.equal(game.getSnapshot().serviceTarget, 5);
+
+  assert.equal(game.getSnapshot().currentOrder.id, "quick-fried-egg");
+  game.completeCurrentOrder();
+  assert.equal(game.getSnapshot().currentOrder.id, "thick-egg-toast");
+  game.completeCurrentOrder();
+  assert.equal(game.getSnapshot().currentOrder.id, "spicy-stir-egg");
+});
+
+test("each level teaches only its newly introduced recipe", () => {
+  assert.equal(getRealtimeNewRecipe(REALTIME_LEVELS[0]).id, "quick-fried-egg");
+  assert.equal(getRealtimeNewRecipe(REALTIME_LEVELS[1]).id, "thick-egg-toast");
+  assert.equal(getRealtimeNewRecipe(REALTIME_LEVELS[2]).id, "spicy-stir-egg");
 });
 
 test("current order exposes recipe icon flow and active step", () => {
@@ -106,15 +151,9 @@ test("HOLD success window is inclusive", () => {
 });
 
 test("MASH reaching target advances", () => {
-  const game = startRealtimeGame();
-  game.dropIngredient("egg", "pan");
-  game.completeTap();
-  game.completeHold(900);
-  game.completeSwipe(90);
-  game.dropIngredient("egg", "pan");
-  game.completeHold(1000);
-  game.dropIngredient("bread", "plate");
-  game.completeSwipe(100);
+  const game = startRealtimeGame(2);
+  game.completeCurrentOrder();
+  game.completeCurrentOrder();
   game.dropIngredient("egg", "pan");
   game.dropIngredient("chili", "pan");
   assert.equal(game.getSnapshot().currentStep.actionType, "mash");
@@ -153,28 +192,43 @@ test("SWIPE reaching slider distance succeeds and advances", () => {
   assert.equal(snapshot.coins, 18);
 });
 
-test("completing three customers passes the level", () => {
+test("level one passes after three served customers", () => {
   const game = startRealtimeGame();
 
-  game.dropIngredient("egg", "pan");
-  game.completeTap();
-  game.completeHold(900);
-  game.completeSwipe(90);
-
-  game.dropIngredient("egg", "pan");
-  game.completeHold(1000);
-  game.dropIngredient("bread", "plate");
-  game.completeSwipe(90);
-
-  game.dropIngredient("egg", "pan");
-  game.dropIngredient("chili", "pan");
-  game.completeMash(8);
-  game.completeSwipe(90);
+  completeQuickFriedEgg(game);
+  completeQuickFriedEgg(game);
+  completeQuickFriedEgg(game);
 
   const snapshot = game.getSnapshot();
   assert.equal(snapshot.state, "ended");
   assert.equal(snapshot.result.passed, true);
   assert.equal(snapshot.result.servedCustomers, 3);
+});
+
+test("passing level one can advance to level two teaching state", () => {
+  const game = startRealtimeGame();
+  completeQuickFriedEgg(game);
+  completeQuickFriedEgg(game);
+  completeQuickFriedEgg(game);
+
+  assert.equal(game.getSnapshot().result.hasNextLevel, true);
+  const next = game.startNextLevel();
+  assert.equal(next.state, "teaching");
+  assert.equal(next.levelIndex, 1);
+  assert.equal(next.serviceTarget, 4);
+  assert.equal(next.currentOrder, null);
+});
+
+test("last level result does not expose a next level", () => {
+  const game = startRealtimeGame(2);
+  for (let index = 0; index < 5; index += 1) {
+    game.completeCurrentOrder();
+  }
+
+  const snapshot = game.getSnapshot();
+  assert.equal(snapshot.result.passed, true);
+  assert.equal(snapshot.result.hasNextLevel, false);
+  assert.equal(snapshot.hasNextLevel, false);
 });
 
 test("action judges cover hold mash and swipe", () => {

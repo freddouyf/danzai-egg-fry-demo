@@ -3,6 +3,7 @@ import {
   getRealtimeRecipeFlow,
   getRealtimeRecipeSteps,
   REALTIME_DEFAULT_LEVEL,
+  REALTIME_LEVELS,
   REALTIME_ORDER_TEMPLATES,
   REALTIME_SERVICE_TARGET,
   REALTIME_WALKOUT_LIMIT,
@@ -43,6 +44,11 @@ function getLevelTemplates(level) {
     ? REALTIME_ORDER_TEMPLATES.filter((template) => orderIds.includes(template.id))
     : [];
   return filtered.length > 0 ? filtered : REALTIME_ORDER_TEMPLATES;
+}
+
+function clampLevelIndex(levels, levelIndex) {
+  const max = Math.max(0, levels.length - 1);
+  return Math.max(0, Math.min(max, Math.floor(clampNumber(levelIndex))));
 }
 
 export function getHoldWindow(action = {}) {
@@ -93,19 +99,30 @@ export function judgeSwipeAction(action, distancePx) {
 
 export class RealtimeKitchenGame {
   constructor({
-    level = REALTIME_DEFAULT_LEVEL,
-    templates = getLevelTemplates(level),
-    serviceTarget = level.serviceTarget ?? REALTIME_SERVICE_TARGET,
-    walkoutLimit = level.walkoutLimit ?? REALTIME_WALKOUT_LIMIT,
+    levels = REALTIME_LEVELS,
+    levelIndex = 0,
+    templates = null,
+    serviceTarget = null,
+    walkoutLimit = null,
   } = {}) {
-    this.level = level;
-    this.templates = templates;
-    this.serviceTarget = serviceTarget;
-    this.walkoutLimit = walkoutLimit;
-    this.reset();
+    this.levels = Array.isArray(levels) && levels.length > 0 ? levels : REALTIME_LEVELS;
+    this.customTemplates = templates;
+    this.customServiceTarget = serviceTarget;
+    this.customWalkoutLimit = walkoutLimit;
+    this.currentLevelIndex = clampLevelIndex(this.levels, levelIndex);
+    this.reset({ levelIndex: this.currentLevelIndex });
   }
 
-  reset() {
+  configureLevel(levelIndex = this.currentLevelIndex) {
+    this.currentLevelIndex = clampLevelIndex(this.levels, levelIndex);
+    this.level = this.levels[this.currentLevelIndex] || REALTIME_DEFAULT_LEVEL;
+    this.templates = this.customTemplates || getLevelTemplates(this.level);
+    this.serviceTarget = this.customServiceTarget ?? this.level.serviceTarget ?? REALTIME_SERVICE_TARGET;
+    this.walkoutLimit = this.customWalkoutLimit ?? this.level.walkoutLimit ?? REALTIME_WALKOUT_LIMIT;
+  }
+
+  reset({ levelIndex = this.currentLevelIndex } = {}) {
+    this.configureLevel(levelIndex);
     this.state = "teaching";
     this.coins = 0;
     this.servedCustomers = 0;
@@ -116,6 +133,16 @@ export class RealtimeKitchenGame {
     this.currentOrder = null;
     this.currentStepIndex = 0;
     this.lastFeedback = "\u5148\u770b\u83dc\u8c31\uff0c\u518d\u5f00\u59cb\u8425\u4e1a\u3002";
+  }
+
+  hasNextLevel() {
+    return this.currentLevelIndex < this.levels.length - 1;
+  }
+
+  startNextLevel() {
+    if (!this.hasNextLevel()) return this.getSnapshot();
+    this.reset({ levelIndex: this.currentLevelIndex + 1 });
+    return this.getSnapshot();
   }
 
   startBusiness() {
@@ -266,6 +293,9 @@ export class RealtimeKitchenGame {
     const passed = this.servedCustomers >= this.serviceTarget;
     return {
       passed,
+      hasNextLevel: passed && this.hasNextLevel(),
+      levelIndex: this.currentLevelIndex,
+      levelName: this.level?.levelName || "",
       coins: this.coins,
       servedCustomers: this.servedCustomers,
       walkedOutCustomers: this.walkedOutCustomers,
@@ -279,6 +309,8 @@ export class RealtimeKitchenGame {
     return {
       state: this.state,
       level: { ...this.level },
+      levelIndex: this.currentLevelIndex,
+      hasNextLevel: this.hasNextLevel(),
       coins: this.coins,
       servedCustomers: this.servedCustomers,
       walkedOutCustomers: this.walkedOutCustomers,
