@@ -9,8 +9,23 @@ import {
 } from "../src/realtimeKitchenGame.js";
 import { shouldShowRealtimePlate } from "../src/realtimeKitchenMode.js";
 
-test("realtime kitchen initializes the first customer order", () => {
+function startRealtimeGame() {
   const game = new RealtimeKitchenGame();
+  game.startBusiness();
+  return game;
+}
+
+test("realtime kitchen starts in teaching state", () => {
+  const game = new RealtimeKitchenGame();
+  const snapshot = game.getSnapshot();
+
+  assert.equal(snapshot.state, "teaching");
+  assert.equal(snapshot.currentOrder, null);
+  assert.equal(snapshot.serviceTarget, 3);
+});
+
+test("start business enters playing with the first customer order", () => {
+  const game = startRealtimeGame();
   const snapshot = game.getSnapshot();
 
   assert.equal(snapshot.state, "playing");
@@ -25,8 +40,22 @@ test("service target is three customers", () => {
   assert.equal(game.getSnapshot().serviceTarget, 3);
 });
 
+test("current order exposes recipe icon flow and active step", () => {
+  const game = startRealtimeGame();
+  let snapshot = game.getSnapshot();
+
+  assert.deepEqual(snapshot.recipeFlow, ["\u{1F95A}", "\u{1F373}", "\u{1F446}", "\u{1F525}", "\u{1F37D}\uFE0F"]);
+  assert.equal(snapshot.recipeSteps[0].status, "active");
+  assert.equal(snapshot.recipeSteps[1].status, "upcoming");
+
+  game.dropIngredient("egg", "pan");
+  snapshot = game.getSnapshot();
+  assert.equal(snapshot.recipeSteps[0].status, "done");
+  assert.equal(snapshot.recipeSteps[1].status, "active");
+});
+
 test("two walked out customers fail the level", () => {
-  const game = new RealtimeKitchenGame();
+  const game = startRealtimeGame();
   game.update(999999);
   assert.equal(game.getSnapshot().walkedOutCustomers, 1);
   assert.equal(game.getSnapshot().state, "playing");
@@ -39,7 +68,7 @@ test("two walked out customers fail the level", () => {
 });
 
 test("correct ingredient drop advances the step and records target contents", () => {
-  const game = new RealtimeKitchenGame();
+  const game = startRealtimeGame();
   game.dropIngredient("egg", "pan");
   const snapshot = game.getSnapshot();
 
@@ -49,7 +78,7 @@ test("correct ingredient drop advances the step and records target contents", ()
 });
 
 test("wrong ingredient drop does not advance and costs patience", () => {
-  const game = new RealtimeKitchenGame();
+  const game = startRealtimeGame();
   const before = game.getSnapshot();
   game.dropIngredient("scallion", "pan");
   const after = game.getSnapshot();
@@ -60,7 +89,7 @@ test("wrong ingredient drop does not advance and costs patience", () => {
 });
 
 test("TAP success advances", () => {
-  const game = new RealtimeKitchenGame();
+  const game = startRealtimeGame();
   game.dropIngredient("egg", "pan");
   game.completeTap();
 
@@ -77,7 +106,7 @@ test("HOLD success window is inclusive", () => {
 });
 
 test("MASH reaching target advances", () => {
-  const game = new RealtimeKitchenGame();
+  const game = startRealtimeGame();
   game.dropIngredient("egg", "pan");
   game.completeTap();
   game.completeHold(900);
@@ -112,7 +141,7 @@ test("plate appears for plating targets and swipe service", () => {
 test("SWIPE reaching slider distance succeeds and advances", () => {
   assert.equal(getSwipeProgress(120, 120).ready, true);
 
-  const game = new RealtimeKitchenGame();
+  const game = startRealtimeGame();
   game.dropIngredient("egg", "pan");
   game.completeTap();
   game.completeHold(900);
@@ -125,7 +154,7 @@ test("SWIPE reaching slider distance succeeds and advances", () => {
 });
 
 test("completing three customers passes the level", () => {
-  const game = new RealtimeKitchenGame();
+  const game = startRealtimeGame();
 
   game.dropIngredient("egg", "pan");
   game.completeTap();

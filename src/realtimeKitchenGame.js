@@ -1,5 +1,8 @@
 import {
   cloneRealtimeTemplate,
+  getRealtimeRecipeFlow,
+  getRealtimeRecipeSteps,
+  REALTIME_DEFAULT_LEVEL,
   REALTIME_ORDER_TEMPLATES,
   REALTIME_SERVICE_TARGET,
   REALTIME_WALKOUT_LIMIT,
@@ -32,6 +35,14 @@ function buildOrder(template, sequence) {
     remainingPatienceMs: template.patienceMs,
     placedTargets: {},
   };
+}
+
+function getLevelTemplates(level) {
+  const orderIds = Array.isArray(level?.availableOrders) ? level.availableOrders : [];
+  const filtered = orderIds.length > 0
+    ? REALTIME_ORDER_TEMPLATES.filter((template) => orderIds.includes(template.id))
+    : [];
+  return filtered.length > 0 ? filtered : REALTIME_ORDER_TEMPLATES;
 }
 
 export function getHoldWindow(action = {}) {
@@ -82,10 +93,12 @@ export function judgeSwipeAction(action, distancePx) {
 
 export class RealtimeKitchenGame {
   constructor({
-    templates = REALTIME_ORDER_TEMPLATES,
-    serviceTarget = REALTIME_SERVICE_TARGET,
-    walkoutLimit = REALTIME_WALKOUT_LIMIT,
+    level = REALTIME_DEFAULT_LEVEL,
+    templates = getLevelTemplates(level),
+    serviceTarget = level.serviceTarget ?? REALTIME_SERVICE_TARGET,
+    walkoutLimit = level.walkoutLimit ?? REALTIME_WALKOUT_LIMIT,
   } = {}) {
+    this.level = level;
     this.templates = templates;
     this.serviceTarget = serviceTarget;
     this.walkoutLimit = walkoutLimit;
@@ -93,7 +106,7 @@ export class RealtimeKitchenGame {
   }
 
   reset() {
-    this.state = "playing";
+    this.state = "teaching";
     this.coins = 0;
     this.servedCustomers = 0;
     this.walkedOutCustomers = 0;
@@ -102,8 +115,15 @@ export class RealtimeKitchenGame {
     this.templateIndex = 0;
     this.currentOrder = null;
     this.currentStepIndex = 0;
+    this.lastFeedback = "\u5148\u770b\u83dc\u8c31\uff0c\u518d\u5f00\u59cb\u8425\u4e1a\u3002";
+  }
+
+  startBusiness() {
+    if (this.state !== "teaching") return this.getSnapshot();
+    this.state = "playing";
     this.lastFeedback = "\u987e\u5ba2\u6765\u4e86\uff0c\u5148\u770b\u8ba2\u5355\u3002";
     this.assignNextOrder();
+    return this.getSnapshot();
   }
 
   assignNextOrder({ updateFeedback = true } = {}) {
@@ -258,6 +278,7 @@ export class RealtimeKitchenGame {
     const order = this.currentOrder;
     return {
       state: this.state,
+      level: { ...this.level },
       coins: this.coins,
       servedCustomers: this.servedCustomers,
       walkedOutCustomers: this.walkedOutCustomers,
@@ -267,6 +288,8 @@ export class RealtimeKitchenGame {
       currentOrder: order ? cloneOrder(order) : null,
       currentStepIndex: this.currentStepIndex,
       currentStep: this.currentStep ? { ...this.currentStep } : null,
+      recipeFlow: order ? getRealtimeRecipeFlow(order) : [],
+      recipeSteps: order ? getRealtimeRecipeSteps(order, this.currentStepIndex) : [],
       requiredIngredientIds: this.getRequiredIngredientIds(),
       lastFeedback: this.lastFeedback,
       result: this.state === "ended" ? this.getResult() : null,

@@ -1,5 +1,6 @@
 export const REALTIME_LEVEL_ID = "realtime-kitchen-1";
 export const REALTIME_LEVEL_NAME = "\u7b2c 1 \u5173";
+export const REALTIME_LEVEL_TITLE = "\u7b2c 1 \u5173\uff1a\u714e\u86cb\u5165\u95e8";
 export const REALTIME_SERVICE_TARGET = 3;
 export const REALTIME_WALKOUT_LIMIT = 2;
 export const WRONG_INGREDIENT_PATIENCE_PENALTY_MS = 1000;
@@ -36,6 +37,13 @@ export const REALTIME_INGREDIENTS = Object.freeze([
   Object.freeze({ id: "scallion", label: "\u8471\u82b1", icon: "\u{1F7E2}" }),
 ]);
 
+const ACTION_ICONS = Object.freeze({
+  tap: "\u{1F446}",
+  hold: "\u{1F525}",
+  mash: "\u{1F944}",
+  swipe: "\u{1F37D}\uFE0F",
+});
+
 export const REALTIME_ORDER_TEMPLATES = Object.freeze([
   Object.freeze({
     id: "quick-fried-egg",
@@ -43,6 +51,7 @@ export const REALTIME_ORDER_TEMPLATES = Object.freeze([
     dishName: "\u5feb\u624b\u714e\u86cb",
     rewardCoins: 18,
     patienceMs: 18000,
+    recipeFlowIcons: Object.freeze(["\u{1F95A}", "\u{1F373}", "\u{1F446}", "\u{1F525}", "\u{1F37D}\uFE0F"]),
     steps: Object.freeze([
       Object.freeze({ type: "ingredient", ingredientId: "egg", targetId: "pan", label: "\u9e21\u86cb\u5165\u9505" }),
       Object.freeze({ type: "action", actionType: "tap", label: "\u6572\u86cb" }),
@@ -78,9 +87,49 @@ export const REALTIME_ORDER_TEMPLATES = Object.freeze([
   }),
 ]);
 
+export const REALTIME_LEVELS = Object.freeze([
+  Object.freeze({
+    levelId: REALTIME_LEVEL_ID,
+    levelName: REALTIME_LEVEL_NAME,
+    levelTitle: REALTIME_LEVEL_TITLE,
+    serviceTarget: REALTIME_SERVICE_TARGET,
+    walkoutLimit: REALTIME_WALKOUT_LIMIT,
+    newRecipes: Object.freeze(["quick-fried-egg"]),
+    availableOrders: Object.freeze(["quick-fried-egg", "thick-egg-toast", "spicy-stir-egg"]),
+  }),
+]);
+
+export const REALTIME_DEFAULT_LEVEL = REALTIME_LEVELS[0];
+
 export function cloneRealtimeTemplate(template) {
   return {
     ...template,
     steps: template.steps.map((step) => ({ ...step })),
   };
+}
+
+export function getRealtimeStepIcon(step = {}) {
+  if (step.type === "ingredient") {
+    return REALTIME_INGREDIENTS.find((ingredient) => ingredient.id === step.ingredientId)?.icon || "\u{1F95A}";
+  }
+  return ACTION_ICONS[step.actionType] || "\u2728";
+}
+
+export function getRealtimeRecipeFlow(order = {}) {
+  if (Array.isArray(order.recipeFlowIcons) && order.recipeFlowIcons.length > 0) {
+    return [...order.recipeFlowIcons];
+  }
+  return (order.steps || []).map((step) => getRealtimeStepIcon(step));
+}
+
+export function getRealtimeRecipeSteps(order = {}, activeStepIndex = 0) {
+  return (order.steps || []).map((step, index) => ({
+    index,
+    icon: getRealtimeStepIcon(step),
+    label: step.label,
+    type: step.type,
+    actionType: step.actionType || "",
+    targetId: step.targetId || "",
+    status: index < activeStepIndex ? "done" : index === activeStepIndex ? "active" : "upcoming",
+  }));
 }

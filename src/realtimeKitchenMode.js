@@ -1,9 +1,12 @@
 import {
   REALTIME_ACTION_LABELS,
   REALTIME_ACTION_TYPES,
+  REALTIME_DEFAULT_LEVEL,
   REALTIME_INGREDIENTS,
   REALTIME_LEVEL_NAME,
+  REALTIME_ORDER_TEMPLATES,
   REALTIME_TARGETS,
+  getRealtimeRecipeFlow,
 } from "./realtimeKitchenData.js";
 import { getHoldWindow, getSwipeProgress, RealtimeKitchenGame } from "./realtimeKitchenGame.js";
 
@@ -51,6 +54,13 @@ const COPY = Object.freeze({
   swipeIdle: "\u5411\u53f3\u62d6\u52a8\u88c5\u76d8",
   swipeReady: "\u677e\u624b\u88c5\u76d8",
   coin: "\u91d1\u5e01",
+  introGoal: "\u76ee\u6807\uff1a\u670d\u52a1 3 \u4f4d\u5ba2\u4eba",
+  introNewDish: "\u672c\u5173\u65b0\u83dc",
+  introMeaning: "\u9e21\u86cb \u2192 \u9505 \u2192 TAP \u6572\u86cb \u2192 HOLD \u714e\u719f \u2192 SWIPE \u88c5\u76d8",
+  startBusiness: "\u5f00\u59cb\u8425\u4e1a",
+  shortIngredient: "\u653e\u98df\u6750",
+  shortAction: "\u505a\u52a8\u4f5c",
+  shortServe: "\u51fa\u9910",
 });
 
 function seconds(ms) {
@@ -97,6 +107,18 @@ function createRealtimeOverlay() {
         <span>${COPY.patience} <strong data-realtime-patience>0s</strong></span>
       </section>
 
+      <section class="realtime-intro" data-realtime-intro>
+        <small>${COPY.modeLabel}</small>
+        <h3 data-realtime-intro-title>${REALTIME_DEFAULT_LEVEL.levelTitle}</h3>
+        <p>${COPY.introGoal}</p>
+        <div class="realtime-intro-recipe">
+          <strong>${COPY.introNewDish}\uff1a<span data-realtime-intro-dish></span></strong>
+          <div class="realtime-intro-flow" data-realtime-intro-flow></div>
+          <small>${COPY.introMeaning}</small>
+        </div>
+        <button class="primary-button" type="button" data-realtime-start><span>${COPY.startBusiness}</span></button>
+      </section>
+
       <section class="realtime-customer">
         <div>
           <small data-realtime-customer-name>${COPY.customer}</small>
@@ -126,9 +148,9 @@ function createRealtimeOverlay() {
           </div>
           <div class="realtime-targets" data-realtime-targets></div>
         </div>
-        <div class="realtime-step-bar">
+        <div class="realtime-step-bar" data-realtime-step-bar>
           <small data-realtime-step-kicker>${COPY.dragIngredient}</small>
-          <h3 data-realtime-step-title>${COPY.prepareBusiness}</h3>
+          <div class="realtime-recipe-track" data-realtime-recipe-track></div>
           <p data-realtime-step-feedback>${COPY.finishInstruction}</p>
         </div>
         <div class="realtime-action-progress" data-realtime-progress hidden>
@@ -173,6 +195,14 @@ export function createRealtimeKitchenMode({
 
   const refs = {
     level: overlay.querySelector("[data-realtime-level]"),
+    intro: overlay.querySelector("[data-realtime-intro]"),
+    introTitle: overlay.querySelector("[data-realtime-intro-title]"),
+    introDish: overlay.querySelector("[data-realtime-intro-dish]"),
+    introFlow: overlay.querySelector("[data-realtime-intro-flow]"),
+    startBusiness: overlay.querySelector("[data-realtime-start]"),
+    hud: overlay.querySelector(".realtime-hud"),
+    customerSection: overlay.querySelector(".realtime-customer"),
+    ingredientsSection: overlay.querySelector(".realtime-ingredients"),
     served: overlay.querySelector("[data-realtime-served]"),
     walked: overlay.querySelector("[data-realtime-walked]"),
     patience: overlay.querySelector("[data-realtime-patience]"),
@@ -185,8 +215,9 @@ export function createRealtimeKitchenMode({
     mascot: overlay.querySelector("[data-realtime-mascot]"),
     targets: overlay.querySelector("[data-realtime-targets]"),
     ingredients: overlay.querySelector("[data-realtime-ingredients]"),
+    stepBar: overlay.querySelector("[data-realtime-step-bar]"),
+    recipeTrack: overlay.querySelector("[data-realtime-recipe-track]"),
     stepKicker: overlay.querySelector("[data-realtime-step-kicker]"),
-    stepTitle: overlay.querySelector("[data-realtime-step-title]"),
     stepFeedback: overlay.querySelector("[data-realtime-step-feedback]"),
     progress: overlay.querySelector("[data-realtime-progress]"),
     progressZone: overlay.querySelector("[data-realtime-progress-zone]"),
@@ -268,6 +299,18 @@ export function createRealtimeKitchenMode({
     }
   }
 
+  function startBusiness() {
+    ensureAudio?.();
+    game.startBusiness();
+    lastTick = 0;
+    stageRenderKey = "";
+    cleanupRuntimeInput();
+    render();
+    showToast(COPY.customerComing);
+    window.cancelAnimationFrame(rafId);
+    rafId = window.requestAnimationFrame(tick);
+  }
+
   function open() {
     ensureAudio?.();
     game.reset();
@@ -279,8 +322,6 @@ export function createRealtimeKitchenMode({
     overlay.classList.add("is-visible");
     homeOverlay?.classList.remove("is-visible");
     render();
-    showToast(COPY.customerComing);
-    rafId = window.requestAnimationFrame(tick);
   }
 
   function stop({ showHome = true } = {}) {
@@ -319,6 +360,15 @@ export function createRealtimeKitchenMode({
       button.innerHTML = `<span>${ingredient.icon}</span><strong>${ingredient.label}</strong>`;
       button.addEventListener("pointerdown", (event) => startIngredientDrag(event, ingredient));
       refs.ingredients.append(button);
+    });
+  }
+
+  function renderIngredientHighlights(snapshot) {
+    const step = snapshot.currentStep;
+    refs.ingredients.querySelectorAll("[data-ingredient-id]").forEach((button) => {
+      const isNeeded = step?.type === "ingredient" && button.dataset.ingredientId === step.ingredientId;
+      button.classList.toggle("is-needed", isNeeded);
+      button.classList.toggle("is-muted", snapshot.state !== "playing" || step?.type !== "ingredient");
     });
   }
 
@@ -386,11 +436,29 @@ export function createRealtimeKitchenMode({
   }
 
   function renderHud(snapshot) {
-    refs.level.textContent = REALTIME_LEVEL_NAME;
+    refs.level.textContent = snapshot.level?.levelName || REALTIME_LEVEL_NAME;
     refs.served.textContent = `${snapshot.servedCustomers}/${snapshot.serviceTarget}`;
     refs.walked.textContent = `${snapshot.walkedOutCustomers}/${snapshot.walkoutLimit}`;
     const order = snapshot.currentOrder;
     refs.patience.textContent = order ? `${seconds(order.remainingPatienceMs)}s` : "--";
+  }
+
+  function renderIntro(snapshot) {
+    const level = snapshot.level || REALTIME_DEFAULT_LEVEL;
+    const firstRecipe = REALTIME_ORDER_TEMPLATES.find((template) => template.id === level.newRecipes?.[0]) || REALTIME_ORDER_TEMPLATES[0];
+    refs.introTitle.textContent = level.levelTitle || REALTIME_DEFAULT_LEVEL.levelTitle;
+    refs.introDish.textContent = firstRecipe?.dishName || "";
+    refs.introFlow.replaceChildren();
+    getRealtimeRecipeFlow(firstRecipe).forEach((icon, index, icons) => {
+      const chip = document.createElement("span");
+      chip.textContent = icon;
+      refs.introFlow.append(chip);
+      if (index < icons.length - 1) {
+        const arrow = document.createElement("i");
+        arrow.textContent = "\u2192";
+        refs.introFlow.append(arrow);
+      }
+    });
   }
 
   function renderCustomer(snapshot) {
@@ -446,10 +514,22 @@ export function createRealtimeKitchenMode({
   function renderStep(snapshot) {
     refs.kitchen.dataset.stepTone = getStepTone(snapshot.currentStep);
     refs.result.hidden = snapshot.state !== "ended";
+    const isTeaching = snapshot.state === "teaching";
+    refs.intro.hidden = !isTeaching;
+    refs.customerSection.hidden = isTeaching;
+    refs.ingredientsSection.hidden = isTeaching;
+    refs.kitchen.hidden = isTeaching;
+    refs.controls.hidden = isTeaching;
+    if (isTeaching) {
+      renderIntro(snapshot);
+      refs.progress.hidden = true;
+      refs.result.hidden = true;
+      return;
+    }
     if (snapshot.state === "ended") {
       const result = snapshot.result;
       refs.stepKicker.textContent = COPY.todayClosed;
-      refs.stepTitle.textContent = result.passed ? COPY.passed : COPY.failed;
+      refs.recipeTrack.replaceChildren();
       refs.stepFeedback.textContent = snapshot.lastFeedback;
       refs.progress.hidden = true;
       refs.controls.innerHTML = `<p>${COPY.seeResult}</p>`;
@@ -465,7 +545,7 @@ export function createRealtimeKitchenMode({
     const step = snapshot.currentStep;
     if (!step) {
       refs.stepKicker.textContent = COPY.waitCustomer;
-      refs.stepTitle.textContent = COPY.prepareBusiness;
+      refs.recipeTrack.replaceChildren();
       refs.stepFeedback.textContent = snapshot.lastFeedback;
       refs.progress.hidden = true;
       refs.controls.innerHTML = `<p>${COPY.customerOnRoad}</p>`;
@@ -473,18 +553,20 @@ export function createRealtimeKitchenMode({
     }
 
     const target = byId(REALTIME_TARGETS, step.targetId);
-    refs.stepKicker.textContent = step.type === "ingredient" ? COPY.dragIngredient : REALTIME_ACTION_LABELS[step.actionType];
-    refs.stepTitle.textContent = step.type === "ingredient"
-      ? `${byId(REALTIME_INGREDIENTS, step.ingredientId)?.label || ""} \u2192 ${target?.label || ""}`
-      : step.label;
+    refs.stepKicker.textContent = step.type === "ingredient"
+      ? COPY.shortIngredient
+      : step.actionType === REALTIME_ACTION_TYPES.SWIPE ? COPY.shortServe : COPY.shortAction;
+    refs.recipeTrack.replaceChildren();
+    snapshot.recipeSteps.forEach((recipeStep) => {
+      const chip = document.createElement("span");
+      chip.className = `realtime-recipe-chip is-${recipeStep.status}`;
+      chip.textContent = recipeStep.status === "done" ? "\u2713" : recipeStep.icon;
+      chip.title = recipeStep.label;
+      refs.recipeTrack.append(chip);
+    });
     refs.stepFeedback.textContent = step.type === "ingredient"
-      ? `${COPY.dragIngredient} \u2192 ${target?.label || ""}`
-      : {
-        tap: COPY.tapOnce,
-        hold: COPY.holdRelease,
-        mash: COPY.mash,
-        swipe: COPY.swipeIdle,
-      }[step.actionType] || snapshot.lastFeedback;
+      ? target?.label || ""
+      : REALTIME_ACTION_LABELS[step.actionType] || "";
 
     const nextKey = getStepKey(snapshot);
     if (stageRenderKey !== nextKey) {
@@ -523,7 +605,7 @@ export function createRealtimeKitchenMode({
       return;
     }
     if (step.actionType === REALTIME_ACTION_TYPES.TAP) {
-      refs.controls.innerHTML = `<button class="realtime-action-button" type="button" data-realtime-tap>${COPY.tapOnce}</button>`;
+      refs.controls.innerHTML = `<button class="realtime-action-button is-attention" type="button" data-realtime-tap>${COPY.tapOnce}</button>`;
       refs.controls.querySelector("[data-realtime-tap]").addEventListener("click", () => {
         const before = game.getSnapshot();
         game.completeTap();
@@ -537,7 +619,7 @@ export function createRealtimeKitchenMode({
       refs.progressZone.hidden = false;
       refs.progressZone.style.left = percent(windowData.startMs, windowData.maxMs);
       refs.progressZone.style.width = percent(windowData.endMs - windowData.startMs, windowData.maxMs);
-      refs.controls.innerHTML = `<button class="realtime-action-button" type="button" data-realtime-hold>${COPY.holdRelease}</button>`;
+      refs.controls.innerHTML = `<button class="realtime-action-button is-attention" type="button" data-realtime-hold>${COPY.holdRelease}</button>`;
       const button = refs.controls.querySelector("[data-realtime-hold]");
       const updateHold = () => {
         const elapsed = performance.now() - holdStartedAt;
@@ -564,7 +646,7 @@ export function createRealtimeKitchenMode({
     if (step.actionType === REALTIME_ACTION_TYPES.MASH) {
       refs.progress.hidden = false;
       mashTaps = 0;
-      refs.controls.innerHTML = `<button class="realtime-action-button is-mash" type="button" data-realtime-mash>${COPY.mash} 0/${step.targetTaps}</button>`;
+      refs.controls.innerHTML = `<button class="realtime-action-button is-mash is-attention" type="button" data-realtime-mash>${COPY.mash} 0/${step.targetTaps}</button>`;
       const button = refs.controls.querySelector("[data-realtime-mash]");
       const updateMashLabel = () => {
         button.textContent = `${COPY.mash} ${mashTaps}/${step.targetTaps}`;
@@ -594,7 +676,7 @@ export function createRealtimeKitchenMode({
     }
     if (step.actionType === REALTIME_ACTION_TYPES.SWIPE) {
       refs.controls.innerHTML = `
-        <div class="realtime-swipe-control" data-realtime-swipe-control>
+        <div class="realtime-swipe-control is-attention" data-realtime-swipe-control>
           <strong>${COPY.swipeTitle}</strong>
           <div class="realtime-swipe-track" data-realtime-swipe-track>
             <i data-realtime-swipe-fill></i>
@@ -668,11 +750,13 @@ export function createRealtimeKitchenMode({
     renderHud(snapshot);
     renderCustomer(snapshot);
     renderTargetHighlights(snapshot);
+    renderIngredientHighlights(snapshot);
     renderStep(snapshot);
   }
 
   renderStaticTargets();
   renderIngredients();
+  refs.startBusiness.addEventListener("click", startBusiness);
   refs.restart.addEventListener("click", open);
   refs.homeButtons.forEach((button) => button.addEventListener("click", () => stop({ showHome: true })));
   triggerButton?.addEventListener("click", open);
