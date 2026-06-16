@@ -7,6 +7,7 @@ import {
   judgeSwipeAction,
   RealtimeKitchenGame,
 } from "../src/realtimeKitchenGame.js";
+import { shouldShowRealtimePlate } from "../src/realtimeKitchenMode.js";
 
 test("realtime kitchen initializes the first customer order", () => {
   const game = new RealtimeKitchenGame();
@@ -96,6 +97,16 @@ test("MASH reaching target advances", () => {
 test("SWIPE below slider distance fails", () => {
   assert.equal(getSwipeProgress(40, 120).ready, false);
   assert.equal(judgeSwipeAction({ minDistancePx: 90 }, 40), false);
+});
+
+test("plate is muted outside plating steps", () => {
+  assert.equal(shouldShowRealtimePlate({ type: "ingredient", ingredientId: "egg", targetId: "pan" }), false);
+  assert.equal(shouldShowRealtimePlate({ type: "action", actionType: "hold" }), false);
+});
+
+test("plate appears for plating targets and swipe service", () => {
+  assert.equal(shouldShowRealtimePlate({ type: "ingredient", ingredientId: "bread", targetId: "plate" }), true);
+  assert.equal(shouldShowRealtimePlate({ type: "action", actionType: "swipe" }), true);
 });
 
 test("SWIPE reaching slider distance succeeds and advances", () => {

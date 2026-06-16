@@ -65,6 +65,16 @@ function byId(items, id) {
   return items.find((item) => item.id === id) || null;
 }
 
+export function shouldShowRealtimePlate(step = {}) {
+  return step?.targetId === "plate" || step?.actionType === REALTIME_ACTION_TYPES.SWIPE;
+}
+
+function getStepTone(step = {}) {
+  if (!step) return "idle";
+  if (step.type === "ingredient") return `ingredient-${step.targetId || "unknown"}`;
+  return step.actionType || "action";
+}
+
 function createRealtimeOverlay() {
   const overlay = document.createElement("section");
   overlay.className = "overlay realtime-overlay";
@@ -101,16 +111,22 @@ function createRealtimeOverlay() {
         <div class="realtime-ingredient-list" data-realtime-ingredients></div>
       </section>
 
-      <section class="realtime-kitchen">
-        <div class="realtime-danzai">
-          <div class="realtime-mascot">\u{1F95A}</div>
-          <div class="realtime-dish-bubble">
-            <small>${COPY.currentDish}</small>
-            <strong data-realtime-stage-dish>${COPY.waitingOrder}</strong>
-          </div>
+      <section class="realtime-kitchen" data-realtime-kitchen>
+        <div class="realtime-kitchen-skin" aria-hidden="true">
+          <span class="realtime-kitchen-wall"></span>
+          <span class="realtime-kitchen-counter"></span>
         </div>
-        <div class="realtime-targets" data-realtime-targets></div>
-        <div class="realtime-step-card">
+        <div class="realtime-workstation">
+          <div class="realtime-danzai realtime-mascot-shell">
+            <div class="realtime-mascot" data-realtime-mascot>\u{1F95A}</div>
+            <div class="realtime-dish-bubble">
+              <small>${COPY.currentDish}</small>
+              <strong data-realtime-stage-dish>${COPY.waitingOrder}</strong>
+            </div>
+          </div>
+          <div class="realtime-targets" data-realtime-targets></div>
+        </div>
+        <div class="realtime-step-bar">
           <small data-realtime-step-kicker>${COPY.dragIngredient}</small>
           <h3 data-realtime-step-title>${COPY.prepareBusiness}</h3>
           <p data-realtime-step-feedback>${COPY.finishInstruction}</p>
@@ -165,6 +181,8 @@ export function createRealtimeKitchenMode({
     stageDish: overlay.querySelector("[data-realtime-stage-dish]"),
     required: overlay.querySelector("[data-realtime-required]"),
     patienceFill: overlay.querySelector("[data-realtime-patience-fill]"),
+    kitchen: overlay.querySelector("[data-realtime-kitchen]"),
+    mascot: overlay.querySelector("[data-realtime-mascot]"),
     targets: overlay.querySelector("[data-realtime-targets]"),
     ingredients: overlay.querySelector("[data-realtime-ingredients]"),
     stepKicker: overlay.querySelector("[data-realtime-step-kicker]"),
@@ -228,6 +246,9 @@ export function createRealtimeKitchenMode({
 
   function showCoinBurst(amount) {
     if (!amount) return;
+    refs.mascot.classList.remove("is-celebrating");
+    refs.mascot.offsetHeight;
+    refs.mascot.classList.add("is-celebrating");
     const burst = document.createElement("div");
     burst.className = "realtime-coin-burst";
     burst.textContent = `+${amount} ${COPY.coin}`;
@@ -273,13 +294,16 @@ export function createRealtimeKitchenMode({
 
   function renderStaticTargets() {
     refs.targets.replaceChildren();
-    REALTIME_TARGETS.forEach((target) => {
+    ["board", "pan", "plate"].forEach((targetId) => {
+      const target = byId(REALTIME_TARGETS, targetId);
+      if (!target) return;
       const node = document.createElement("div");
-      node.className = "realtime-target-zone";
+      node.className = `realtime-target-zone is-${target.id}`;
       node.dataset.targetId = target.id;
       node.innerHTML = `
         <div class="realtime-target-base"><span>${target.icon}</span><strong>${target.label}</strong></div>
         <div class="realtime-target-contents" data-target-contents></div>
+        <div class="realtime-target-effect" aria-hidden="true"></div>
       `;
       refs.targets.append(node);
     });
@@ -397,9 +421,14 @@ export function createRealtimeKitchenMode({
   function renderTargetHighlights(snapshot) {
     const step = snapshot.currentStep;
     const placedTargets = snapshot.currentOrder?.placedTargets || {};
+    const plateVisible = shouldShowRealtimePlate(step) || Boolean(placedTargets.plate?.length);
     refs.targets.querySelectorAll("[data-target-id]").forEach((node) => {
       const targetId = node.dataset.targetId;
       node.classList.toggle("is-needed", step?.type === "ingredient" && targetId === step.targetId);
+      node.classList.toggle("is-plate-active", targetId === "plate" && plateVisible);
+      node.classList.toggle("is-plate-muted", targetId === "plate" && !plateVisible);
+      node.classList.toggle("is-heating", targetId === "pan" && step?.actionType === REALTIME_ACTION_TYPES.HOLD);
+      node.classList.toggle("is-mashing", targetId === "pan" && step?.actionType === REALTIME_ACTION_TYPES.MASH);
       const contents = node.querySelector("[data-target-contents]");
       if (!contents) return;
       contents.replaceChildren();
@@ -415,6 +444,7 @@ export function createRealtimeKitchenMode({
   }
 
   function renderStep(snapshot) {
+    refs.kitchen.dataset.stepTone = getStepTone(snapshot.currentStep);
     refs.result.hidden = snapshot.state !== "ended";
     if (snapshot.state === "ended") {
       const result = snapshot.result;
@@ -442,11 +472,19 @@ export function createRealtimeKitchenMode({
       return;
     }
 
-    refs.stepKicker.textContent = step.type === "ingredient" ? COPY.dragIngredient : COPY.action;
+    const target = byId(REALTIME_TARGETS, step.targetId);
+    refs.stepKicker.textContent = step.type === "ingredient" ? COPY.dragIngredient : REALTIME_ACTION_LABELS[step.actionType];
     refs.stepTitle.textContent = step.type === "ingredient"
-      ? `${byId(REALTIME_INGREDIENTS, step.ingredientId)?.label || ""} \u2192 ${byId(REALTIME_TARGETS, step.targetId)?.label || ""}`
-      : `${REALTIME_ACTION_LABELS[step.actionType]} \u00b7 ${step.label}`;
-    refs.stepFeedback.textContent = snapshot.lastFeedback;
+      ? `${byId(REALTIME_INGREDIENTS, step.ingredientId)?.label || ""} \u2192 ${target?.label || ""}`
+      : step.label;
+    refs.stepFeedback.textContent = step.type === "ingredient"
+      ? `${COPY.dragIngredient} \u2192 ${target?.label || ""}`
+      : {
+        tap: COPY.tapOnce,
+        hold: COPY.holdRelease,
+        mash: COPY.mash,
+        swipe: COPY.swipeIdle,
+      }[step.actionType] || snapshot.lastFeedback;
 
     const nextKey = getStepKey(snapshot);
     if (stageRenderKey !== nextKey) {
